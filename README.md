@@ -1,5 +1,13 @@
 # Memcached
 
+CHRIS NOTES
+**IMPORANT
+***
+Currently not linked -static ally because it causes weird problems with redefinitions with
+memcached's required libraries. When we get Wentao's allocator it'll be easier to statically
+link that in I think. Either way, we can't protect allocator state right now :(
+
+
 Memcached is a high performance multithreaded event-based key/value cache
 store intended to be used in a distributed system.
 

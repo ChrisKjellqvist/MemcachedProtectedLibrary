@@ -110,7 +110,6 @@ static void *storage;
 
 static void lru_crawler_close_client(crawler_client_t *c) {
     //fprintf(stderr, "CRAWLER: Closing client\n");
-    sidethread_conn_close(c->c);
     c->c = NULL;
     c->cbuf = NULL;
     bipbuf_free(c->buf);
@@ -119,7 +118,6 @@ static void lru_crawler_close_client(crawler_client_t *c) {
 
 static void lru_crawler_release_client(crawler_client_t *c) {
     //fprintf(stderr, "CRAWLER: Closing client\n");
-    redispatch_conn(c->c);
     c->c = NULL;
     c->cbuf = NULL;
     bipbuf_free(c->buf);
@@ -453,9 +451,6 @@ static void *item_crawler_thread(void *arg) {
     if (settings.verbose > 2)
         fprintf(stderr, "LRU crawler thread sleeping\n");
 
-    STATS_LOCK();
-    stats_state.lru_crawler_running = false;
-    STATS_UNLOCK();
     }
     pthread_mutex_unlock(&lru_crawler_lock);
     if (settings.verbose > 2)
@@ -684,9 +679,6 @@ void lru_crawler_resume(void) {
 
 int init_lru_crawler(void *arg) {
     if (lru_crawler_initialized == 0) {
-#ifdef EXTSTORE
-        storage = arg;
-#endif
         if (pthread_cond_init(&lru_crawler_cond, NULL) != 0) {
             fprintf(stderr, "Can't initialize lru crawler condition\n");
             return -1;

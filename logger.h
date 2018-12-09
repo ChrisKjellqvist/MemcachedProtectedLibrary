@@ -139,49 +139,4 @@ enum logger_watcher_type {
     LOGGER_WATCHER_CLIENT = 1
 };
 
-typedef struct  {
-    void *c; /* original connection structure. still with source thread attached */
-    int sfd; /* client fd */
-    int id; /* id number for watcher list */
-    uint64_t skipped; /* lines skipped since last successful print */
-    bool failed_flush; /* recently failed to write out (EAGAIN), wait before retry */
-    enum logger_watcher_type t; /* stderr, client, syslog, etc */
-    uint16_t eflags; /* flags we are interested in */
-    bipbuf_t *buf; /* per-watcher output buffer */
-} logger_watcher;
-
-
-struct logger_stats {
-    uint64_t worker_dropped;
-    uint64_t worker_written;
-    uint64_t watcher_skipped;
-    uint64_t watcher_sent;
-};
-
-extern pthread_key_t logger_key;
-
-/* public functions */
-
-void logger_init(void);
-logger *logger_create(void);
-
-#define LOGGER_LOG(l, flag, type, ...) \
-    do { \
-        logger *myl = l; \
-        if (l == NULL) \
-            myl = GET_LOGGER(); \
-        if (myl->eflags & flag) \
-            logger_log(myl, type, __VA_ARGS__); \
-    } while (0)
-
-enum logger_ret_type logger_log(logger *l, const enum log_entry_type event, const void *entry, ...);
-
-enum logger_add_watcher_ret {
-    LOGGER_ADD_WATCHER_TOO_MANY = 0,
-    LOGGER_ADD_WATCHER_OK,
-    LOGGER_ADD_WATCHER_FAILED
-};
-
-enum logger_add_watcher_ret logger_add_watcher(void *c, const int sfd, uint16_t f);
-
 #endif

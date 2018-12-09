@@ -34,7 +34,7 @@ void slabs_adjust_mem_requested(unsigned int id, size_t old, size_t ntotal);
 bool slabs_adjust_mem_limit(size_t new_mem_limit);
 
 /** Return a datum for stats in binary protocol */
-bool get_stats(const char *stat_type, int nkey, ADD_STAT add_stats, void *c);
+bool get_stats(const char *stat_type, int nkey);
 
 typedef struct {
     unsigned int chunks_per_page;
@@ -46,7 +46,7 @@ void fill_slab_stats_automove(slab_stats_automove *am);
 unsigned int global_page_pool_size(bool *mem_flag);
 
 /** Fill buffer with stats */ /*@null@*/
-void slabs_stats(ADD_STAT add_stats, void *c);
+void slabs_stats();
 
 /* Hints as to freespace in slab class */
 unsigned int slabs_available_chunks(unsigned int id, bool *mem_flag, uint64_t *total_bytes, unsigned int *chunks_perslab);

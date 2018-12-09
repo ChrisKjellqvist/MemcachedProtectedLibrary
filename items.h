@@ -48,15 +48,9 @@ int lru_pull_tail(const int orig_id, const int cur_lru,
 
 /*@null@*/
 char *item_cachedump(const unsigned int slabs_clsid, const unsigned int limit, unsigned int *bytes);
-void item_stats(ADD_STAT add_stats, void *c);
 void do_item_stats_add_crawl(const int i, const uint64_t reclaimed,
         const uint64_t unfetched, const uint64_t checked);
-void item_stats_totals(ADD_STAT add_stats, void *c);
-/*@null@*/
-void item_stats_sizes(ADD_STAT add_stats, void *c);
 void item_stats_sizes_init(void);
-void item_stats_sizes_enable(ADD_STAT add_stats, void *c);
-void item_stats_sizes_disable(ADD_STAT add_stats, void *c);
 void item_stats_sizes_add(item *it);
 void item_stats_sizes_remove(item *it);
 bool item_stats_sizes_status(void);
@@ -69,8 +63,8 @@ typedef struct {
 } item_stats_automove;
 void fill_item_stats_automove(item_stats_automove *am);
 
-item *do_item_get(const char *key, const size_t nkey, const uint32_t hv, conn *c, const bool do_update);
-item *do_item_touch(const char *key, const size_t nkey, uint32_t exptime, const uint32_t hv, conn *c);
+item *do_item_get(const char *key, const size_t nkey, const uint32_t hv, const bool do_update);
+item *do_item_touch(const char *key, const size_t nkey, uint32_t exptime, const uint32_t hv);
 void item_stats_reset(void);
 extern pthread_mutex_t lru_locks[POWER_LARGEST];
 

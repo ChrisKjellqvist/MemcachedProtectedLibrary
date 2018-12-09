@@ -34,6 +34,7 @@ typedef  unsigned       char ub1;   /* unsigned 1-byte quantities */
 /* how many powers of 2's worth of buckets we use */
 unsigned int hashpower = HASHPOWER_DEFAULT;
 
+
 #define hashsize(n) ((ub4)1<<(n))
 #define hashmask(n) (hashsize(n)-1)
 
@@ -255,9 +256,9 @@ static void *assoc_maintenance_thread(void *arg) {
              * allow dynamic hash table expansion without causing significant
              * wait times.
              */
-            pause_threads(PAUSE_ALL_THREADS);
+            pause_accesses();
             assoc_expand();
-            pause_threads(RESUME_ALL_THREADS);
+	    unpause_accesses();
         }
     }
     return NULL;

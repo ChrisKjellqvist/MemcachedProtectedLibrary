@@ -19,13 +19,8 @@ int main(int argc, char **argv) {
 #ifdef EXTSTORE
     display("extstore header", sizeof(item_hdr));
 #endif
-    display("Libevent thread",
-            sizeof(LIBEVENT_THREAD) - sizeof(struct thread_stats));
-    display("Connection", sizeof(conn));
-
     printf("----------------------------------------\n");
 
-    display("libevent thread cumulative", sizeof(LIBEVENT_THREAD));
     display("Thread stats cumulative\t", sizeof(struct thread_stats));
 
     return 0;
