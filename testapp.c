@@ -56,47 +56,62 @@ int not_main(int argc, char **argv)
   char key[STR_LEN+5], val[STR_LEN+5];
   int n;
   fscanf(f, "INSERT %d\n", &n); 
-  for(int i = 0; i < n; ++i){ 
+  for(int i = 0; i < n/2; ++i){ 
+    fscanf(f, "%s %s", key, val);
+    memcached_insert(key, STR_LEN, val, STR_LEN, 0, mytid);
+  }
+  for(int i = n/2; i < n; ++i){ 
     fscanf(f, "%s %s", key, val);
     begin = get_ticks_start();
     memcached_insert(key, STR_LEN, val, STR_LEN, 0, mytid);
     end = get_ticks_end();
     count += (end-begin);
   }
-  printf("INSERT takes %fcy\n", ((count*1.0)/n));
+  printf("INSERT takes %fcy\n", ((count*1.0)/n*2));
 
   char command[STR_LEN];
   fscanf(f, "%s %d", command, &n);
   if (strcmp(command, "TOUCH") == 0){
     count = 0;
     printf("touched!\n");
-    for(int i = 0; i < n; ++i){
+    for(int i = 0; i < n/2; ++i){
+      fscanf(f, "%s", key);
+      memcached_touch(key, STR_LEN, 0, mytid);
+    }
+    for(int i = n/2; i < n; ++i){
       fscanf(f, "%s", key);
       begin = get_ticks_start();
       memcached_touch(key, STR_LEN, 0, mytid);
       end = get_ticks_end();
       count += (end-begin);
     }
-    printf("TOUCH takes %fcy\n", ((count*1.0)/n));
+    printf("TOUCH takes %fcy\n", ((count*1.0)/n*2));
     fscanf(f, "%s %d", command, &n);
   } else printf("command was %s\n", command);
 
   if (strcmp(command, "GET") == 0){
     printf("got!\n");
     count = 0;
-    for(int i = 0; i < n; ++i){
+    for(int i = 0; i < n/2; ++i){
+      fscanf(f, "%s %s", key, val);
+      ret = memcached_get(key, STR_LEN, 0, reciever, STR_LEN+5, mytid);
+      if (ret){
+	printf("error\n");
+	return -1;
+      }
+    }
+    for(int i = n/2; i < n; ++i){
       fscanf(f, "%s %s", key, val);
       begin = get_ticks_start();
       ret = memcached_get(key, STR_LEN, 0, reciever, STR_LEN+5, mytid);
       end = get_ticks_end();
       count += end - begin;
       if (ret){
-	printf("error!\n");
-      } else {
-//	assert(strcmp(val, reciever)==0);
+	printf("error\n");
+	return -1;
       }
     }
-    printf("GET takes %fcy\n", (1.0*count)/n);
+    printf("GET takes %fcy\n", (1.0*count)/n*2);
   } else printf("command was %s\n", command);
   memcached_end(mytid);
   printf("ran!\n");

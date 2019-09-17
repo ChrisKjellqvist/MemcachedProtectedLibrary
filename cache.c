@@ -3,16 +3,7 @@
 #include <string.h>
 #include <inttypes.h>
 
-#ifndef NDEBUG
-#include <signal.h>
-#endif
-
 #include "cache.h"
-
-#ifndef NDEBUG
-const uint64_t redzone_pattern = 0xdeadbeefcafebabe;
-int cache_error = 0;
-#endif
 
 const int initial_pool_size = 64;
 
@@ -36,22 +27,13 @@ cache_t* cache_create(const char *name, size_t bufsize, size_t align,
     ret->constructor = constructor;
     ret->destructor = destructor;
 
-#ifndef NDEBUG
-    ret->bufsize = bufsize + 2 * sizeof(redzone_pattern);
-#else
     ret->bufsize = bufsize;
-#endif
 
     return ret;
 }
 
 static inline void* get_object(void *ptr) {
-#ifndef NDEBUG
-    uint64_t *pre = ptr;
-    return pre + 1;
-#else
     return ptr;
-#endif
 }
 
 void cache_destroy(cache_t *cache) {
@@ -94,18 +76,6 @@ void* do_cache_alloc(cache_t *cache) {
             }
         }
     }
-
-#ifndef NDEBUG
-    if (object != NULL) {
-        /* add a simple form of buffer-check */
-        uint64_t *pre = ret;
-        *pre = redzone_pattern;
-        ret = pre+1;
-        memcpy(((char*)ret) + cache->bufsize - (2 * sizeof(redzone_pattern)),
-               &redzone_pattern, sizeof(redzone_pattern));
-    }
-#endif
-
     return object;
 }
 
@@ -116,23 +86,6 @@ void cache_free(cache_t *cache, void *ptr) {
 }
 
 void do_cache_free(cache_t *cache, void *ptr) {
-#ifndef NDEBUG
-    /* validate redzone... */
-    if (memcmp(((char*)ptr) + cache->bufsize - (2 * sizeof(redzone_pattern)),
-               &redzone_pattern, sizeof(redzone_pattern)) != 0) {
-        raise(SIGABRT);
-        cache_error = 1;
-        return;
-    }
-    uint64_t *pre = ptr;
-    --pre;
-    if (*pre != redzone_pattern) {
-        raise(SIGABRT);
-        cache_error = -1;
-        return;
-    }
-    ptr = pre;
-#endif
     if (cache->freecurr < cache->freetotal) {
         cache->ptr[cache->freecurr++] = ptr;
     } else {

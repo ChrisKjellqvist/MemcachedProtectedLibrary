@@ -15,10 +15,6 @@
 
 #else
 
-#ifndef NDEBUG
-/* may be used for debug purposes */
-extern int cache_error;
-#endif
 
 /**
  * Constructor used to initialize allocated objects
