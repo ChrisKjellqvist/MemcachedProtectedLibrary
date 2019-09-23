@@ -1,7 +1,7 @@
 #include "pku_memcached.h"
 #include <stdlib.h>
 #include "memcached.h"
-#include "plib.h"
+#include <plib.h>
 
 extern int pkey;
 extern pthread_mutex_t end_mutex;
