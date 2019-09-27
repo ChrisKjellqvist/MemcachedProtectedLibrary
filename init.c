@@ -6,6 +6,7 @@ extern char __linker_plib_addr__;
 extern char __linker_plib_len__;
 int pkey;
 extern int not_main();
+
 int main(int argc, char** argv){
 #ifndef NO_PKEY
   printf("using pkeys\n");

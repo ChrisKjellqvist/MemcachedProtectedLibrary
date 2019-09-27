@@ -147,8 +147,10 @@ AM_V_lt = $(am__v_lt_$(V))
 am__v_lt_ = $(am__v_lt_$(AM_DEFAULT_VERBOSITY))
 am__v_lt_0 = --silent
 am__v_lt_1 = 
-COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
+COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
+COMPILE_LENIENT = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
+	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS_LENIENT)
 AM_V_CC = $(am__v_CC_$(V))
 am__v_CC_ = $(am__v_CC_$(AM_DEFAULT_VERBOSITY))
 am__v_CC_0 = @echo "  CC      " $@;
@@ -287,7 +289,9 @@ AWK = gawk
 CC = gcc
 CCDEPMODE = depmode=gcc3
 CFLAGS = -g -O0 -pthread -pthread -Wall -Werror -pedantic -Wmissing-prototypes -Wmissing-declarations -Wredundant-decls
+CFLAGS_LENIENT = -g -O0 -pthread -pthread -pedantic -Wmissing-prototypes -Wmissing-declarations -Wredundant-decls
 #CFLAGS =   -O3 -pthread -pthread -Wall -Werror -pedantic -Wmissing-prototypes -Wmissing-declarations -Wredundant-decls
+#CFLAGS_LENIENT =   -O3 -pthread -pthread -pedantic -Wmissing-prototypes -Wmissing-declarations -Wredundant-decls
 CPP = gcc -E
 CPPFLAGS = 
 CYGPATH_W = echo
@@ -502,7 +506,7 @@ clean-noinstPROGRAMS:
 memcached$(EXEEXT): $(memcached_OBJECTS) $(memcached_DEPENDENCIES) $(EXTRA_memcached_DEPENDENCIES) 
 	@rm -f memcached$(EXEEXT)
 	$(MAKE) plib
-	$(AM_V_CC)$(COMPILE) -c $(CFLAGS) testapp.c pku_memcached.c 
+	$(AM_V_CC)$(COMPILE_LENIENT) -c $(CFLAGS_LENIENT) testapp.c pku_memcached.c 
 	ld -r testapp.o pku_memcached.o plib/plib.o -o user_prg.o
 	$(AM_V_CC)$(COMPILE) -c $(CFLAGS) init.c
 	ld -r -o prot.o $(memcached_OBJECTS) $(memcached_LDADD) 

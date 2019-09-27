@@ -9,6 +9,8 @@ extern pthread_mutex_t begin_ops_mutex;
 static unsigned long* t_psp_ar[256];
 // TODO get imports
 
+asm("trampoline_exit: ret");
+
 static unsigned long *get_new_stack(){
   char *ptr = mmap(0, PSTACK_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
   if (ptr == (char*)-1){
@@ -43,6 +45,7 @@ void memcached_touch(char* key, size_t nkey, uint32_t exptime, int t_id){
 #ifndef NO_PKEY
   pkey_set(pkey, PKEY_DISABLE_ACCESS);
 #endif
+  asm("jmp trampoline_exit");
 }
 
 void memcached_insert(char* key, size_t nkey, char* data, size_t datan, uint32_t exptime, int t_id){ 
@@ -68,9 +71,10 @@ void memcached_insert(char* key, size_t nkey, char* data, size_t datan, uint32_t
 #ifndef NO_PKEY
   pkey_set(pkey, PKEY_DISABLE_ACCESS);
 #endif
+  asm("jmp trampoline_exit");
 }
 
-int memcached_get(char* key, size_t nkey, uint32_t exptime, char* buffer, size_t buffLen, int t_id){
+void memcached_get(char* key, size_t nkey, uint32_t exptime, char* buffer, size_t buffLen, int *exit_code, int t_id){
   unsigned long sp;
   unsigned long *psp = t_psp_ar[t_id];
   if (unlikely(psp == NULL)){
@@ -91,7 +95,8 @@ int memcached_get(char* key, size_t nkey, uint32_t exptime, char* buffer, size_t
 #ifndef NO_PKEY
   pkey_set(pkey, PKEY_DISABLE_ACCESS);
 #endif
-  return ret;
+  *exit_code = ret;
+  asm("jmp trampoline_exit");
 }
 
 int start_server_thread(pthread_t *thread, int argc, char** argv){
@@ -129,5 +134,6 @@ void memcached_end(int t_id){
 #ifndef NO_PKEY
   pkey_set(pkey, PKEY_DISABLE_ACCESS);
 #endif
+  asm("jmp trampoline_exit");
 }
 

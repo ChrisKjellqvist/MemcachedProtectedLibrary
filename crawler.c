@@ -21,6 +21,8 @@
 #include <unistd.h>
 #include <poll.h>
 
+#include "pptr.hpp"
+
 #define LARGEST_ID POWER_LARGEST
 
 typedef struct {
@@ -96,10 +98,6 @@ static volatile int do_run_lru_crawler_thread = 0;
 static int lru_crawler_initialized = 0;
 static pthread_mutex_t lru_crawler_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t  lru_crawler_cond = PTHREAD_COND_INITIALIZER;
-#ifdef EXTSTORE
-/* TODO: pass this around */
-static void *storage;
-#endif
 
 /* Will crawl all slab classes a minimum of once per hour */
 #define MAX_MAINTCRAWL_WAIT 60 * 60

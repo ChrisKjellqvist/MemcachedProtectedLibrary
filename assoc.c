@@ -25,6 +25,8 @@
 #include <assert.h>
 #include <pthread.h>
 
+#include "pptr.h"
+
 static pthread_cond_t maintenance_cond = PTHREAD_COND_INITIALIZER;
 static pthread_mutex_t maintenance_lock = PTHREAD_MUTEX_INITIALIZER;
 
@@ -39,13 +41,13 @@ unsigned int hashpower = HASHPOWER_DEFAULT;
 #define hashmask(n) (hashsize(n)-1)
 
 /* Main hash table. This is where we look except during expansion. */
-static item** primary_hashtable = 0;
+static pptr<pptr<item> > primary_hashtable = 0;
 
 /*
  * Previous hash table. During expansion, we look here for keys that haven't
  * been moved over to the primary yet.
  */
-static item** old_hashtable = 0;
+static pptr<pptr<item> > old_hashtable = 0;
 
 /* Flag: Are we in the middle of expanding now? */
 static bool expanding = false;
@@ -61,7 +63,7 @@ void assoc_init(const int hashtable_init) {
     if (hashtable_init) {
         hashpower = hashtable_init;
     }
-    primary_hashtable = calloc(hashsize(hashpower), sizeof(void *));
+    primary_hashtable = pptr<pptr<item> >(rp_calloc(hashsize(hashpower), sizeof(void *)));
     if (! primary_hashtable) {
         fprintf(stderr, "Failed to init hashtable.\n");
         exit(EXIT_FAILURE);
@@ -123,7 +125,7 @@ static item** _hashitem_before (const char *key, const size_t nkey, const uint32
 static void assoc_expand(void) {
     old_hashtable = primary_hashtable;
 
-    primary_hashtable = calloc(hashsize(hashpower + 1), sizeof(void *));
+    primary_hashtable = pptr<pptr<item> >(rp_calloc(hashsize(hashpower + 1), sizeof(void *)));
     if (primary_hashtable) {
         if (settings.verbose > 1)
             fprintf(stderr, "Hash table expansion starting\n");
