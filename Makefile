@@ -29,16 +29,16 @@ SOURCES = memcached.cc memcached.h hash.cc hash.h \
 	jenkins_hash.cc jenkins_hash.h murmur3_hash.cc murmur3_hash.h \
 	slabs.cc slabs.h items.cc items.h assoc.cc assoc.h thread.cc \
 	daemon.cc stats.cc stats.h util.cc util.h trace.h cache.h \
-	sasl_defs.h bipbuffer.cc bipbuffer.h logger.h \
+	bipbuffer.cc bipbuffer.h logger.h \
 	crawler.cc crawler.h itoa_ljust.cc itoa_ljust.h slab_automove.cc \
-	slab_automove.h sasl_defs.cc crc32c.cc \
+	slab_automove.h crc32c.cc \
 	crc32c.h\
 	slab_automove_extstore.h
 memcached_SOURCES = memcached.cc memcached.h hash.cc hash.h \
 	jenkins_hash.cc jenkins_hash.h murmur3_hash.cc murmur3_hash.h \
 	slabs.cc slabs.h items.cc items.h assoc.cc assoc.h thread.cc \
 	daemon.cc stats.cc stats.h util.cc util.h trace.h cache.h \
-	sasl_defs.h bipbuffer.cc bipbuffer.h logger.h \
+	bipbuffer.cc bipbuffer.h logger.h \
 	crawler.cc crawler.h itoa_ljust.cc itoa_ljust.h slab_automove.cc \
 	slab_automove.h 
 
@@ -109,30 +109,6 @@ memcached-itoa_ljust.o: itoa_ljust.cc
 memcached-slab_automove.o: slab_automove.cc
 	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-slab_automove.o -MD -MP -MF $(DEPDIR)/memcached-slab_automove.Tpo -c -o memcached-slab_automove.o `test -f 'slab_automove.cc' || echo '$(srcdir)/'`slab_automove.cc
 	$(AM_V_at)$(am__mv) $(DEPDIR)/memcached-slab_automove.Tpo $(DEPDIR)/memcached-slab_automove.Po
-
-memcached-cache.o: cache.cc
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-cache.o -MD -MP -MF $(DEPDIR)/memcached-cache.Tpo -c -o memcached-cache.o `test -f 'cache.cc' || echo '$(srcdir)/'`cache.cc
-	$(AM_V_at)$(am__mv) $(DEPDIR)/memcached-cache.Tpo $(DEPDIR)/memcached-cache.Po
-
-memcached-solaris_priv.o: solaris_priv.cc
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-solaris_priv.o -MD -MP -MF $(DEPDIR)/memcached-solaris_priv.Tpo -c -o memcached-solaris_priv.o `test -f 'solaris_priv.cc' || echo '$(srcdir)/'`solaris_priv.cc
-	$(AM_V_at)$(am__mv) $(DEPDIR)/memcached-solaris_priv.Tpo $(DEPDIR)/memcached-solaris_priv.Po
-
-memcached-linux_priv.o: linux_priv.cc
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-linux_priv.o -MD -MP -MF $(DEPDIR)/memcached-linux_priv.Tpo -c -o memcached-linux_priv.o `test -f 'linux_priv.cc' || echo '$(srcdir)/'`linux_priv.cc
-	$(AM_V_at)$(am__mv) $(DEPDIR)/memcached-linux_priv.Tpo $(DEPDIR)/memcached-linux_priv.Po
-
-memcached-openbsd_priv.o: openbsd_priv.cc
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-openbsd_priv.o -MD -MP -MF $(DEPDIR)/memcached-openbsd_priv.Tpo -c -o memcached-openbsd_priv.o `test -f 'openbsd_priv.cc' || echo '$(srcdir)/'`openbsd_priv.cc
-	$(AM_V_at)$(am__mv) $(DEPDIR)/memcached-openbsd_priv.Tpo $(DEPDIR)/memcached-openbsd_priv.Po
-
-memcached-sasl_defs.o: sasl_defs.cc
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-sasl_defs.o -MD -MP -MF $(DEPDIR)/memcached-sasl_defs.Tpo -c -o memcached-sasl_defs.o `test -f 'sasl_defs.cc' || echo '$(srcdir)/'`sasl_defs.cc
-	$(AM_V_at)$(am__mv) $(DEPDIR)/memcached-sasl_defs.Tpo $(DEPDIR)/memcached-sasl_defs.Po
-
-memcached-extstore.o: extstore.cc
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-extstore.o -MD -MP -MF $(DEPDIR)/memcached-extstore.Tpo -c -o memcached-extstore.o `test -f 'extstore.cc' || echo '$(srcdir)/'`extstore.cc
-	$(AM_V_at)$(am__mv) $(DEPDIR)/memcached-extstore.Tpo $(DEPDIR)/memcached-extstore.Po
 
 memcached-crc32c.o: crc32c.cc
 	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-crc32c.o -MD -MP -MF $(DEPDIR)/memcached-crc32c.Tpo -c -o memcached-crc32c.o `test -f 'crc32c.cc' || echo '$(srcdir)/'`crc32c.cc

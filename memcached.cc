@@ -151,7 +151,6 @@ static void settings_init(void) {
   settings.item_size_max = 1024 * 1024; /* The famous 1MB upper limit. */
   settings.slab_page_size = 1024 * 1024; /* chunks are split from 1MB pages. */
   settings.slab_chunk_size_max = settings.slab_page_size / 2;
-  settings.sasl = false;
   settings.maxconns_fast = true;
   settings.lru_crawler = false;
   settings.lru_crawler_sleep = 100;
@@ -925,9 +924,6 @@ static void usage(void) {
   printf("-B, --protocol=<name>     protocol - one of ascii, binary, or auto (default)\n");
   printf("-I, --max-item-size=<num> adjusts max item size\n"
       "                          (default: 1mb, min: 1k, max: 128m)\n");
-#ifdef ENABLE_SASL
-  printf("-S, --enable-sasl         turn on Sasl authentication\n");
-#endif
   printf("-F, --disable-flush-all   disable flush_all command\n");
   printf("-X, --disable-dumping     disable stats cachedump and lru_crawler metadump\n");
   printf("-o, --extended            comma separated list of extended options\n"
@@ -1369,7 +1365,6 @@ void* server_thread (void *pargs) {
     "b:"  /* backlog queue limit */
     "B:"  /* Binding protocol */
     "I:"  /* Max item size */
-    "S"   /* Sasl ON */
     "F"   /* Disable flush_all */
     "X"   /* Disable dump commands */
     "o:"  /* Extended generic options */
@@ -1405,7 +1400,6 @@ void* server_thread (void *pargs) {
     {"listen-backlog", required_argument, 0, 'b'},
     {"protocol", required_argument, 0, 'B'},
     {"max-item-size", required_argument, 0, 'I'},
-    {"enable-sasl", no_argument, 0, 'S'},
     {"disable-flush-all", no_argument, 0, 'F'},
     {"disable-dumping", no_argument, 0, 'X'},
     {"extended", required_argument, 0, 'o'},
@@ -1533,13 +1527,6 @@ void* server_thread (void *pargs) {
 	  settings.item_size_max = atoi(buf);
 	}
 	free(buf);
-	break;
-      case 'S': /* set Sasl authentication to true. Default is false */
-#ifndef ENABLE_SASL
-	fprintf(stderr, "This server is not built with SASL support.\n");
-	exit(EX_USAGE);
-#endif
-	settings.sasl = true;
 	break;
       case 'F' :
 	settings.flush_enabled = false;
@@ -1952,12 +1939,6 @@ void* server_thread (void *pargs) {
     }
   }
 
-  /* Initialize Sasl if -S was specified */
-  if (settings.sasl) {
-    init_sasl();
-  }
-
-  /* daemonize if requested */
   /* if we want to ensure our ability to dump core, don't chdir to / */
   if (do_daemonize) {
     if (sigignore(SIGHUP) == -1) {

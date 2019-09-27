@@ -26,9 +26,6 @@
 #include "cache.h"
 #include "logger.h"
 
-
-#include "sasl_defs.h"
-
 /** Maximum length of a key. */
 #define KEY_MAX_LENGTH 250
 
@@ -308,7 +305,6 @@ struct settings {
     int item_size_max;        /* Maximum item size */
     int slab_chunk_size_max;  /* Upper end for chunks within slab pages. */
     int slab_page_size;     /* Slab's page units. */
-    bool sasl;              /* SASL on/off */
     bool maxconns_fast;     /* Whether or not to early close connections */
     bool lru_crawler;        /* Whether or not to enable the autocrawler thread */
     bool lru_maintainer_thread; /* LRU maintainer background thread */
