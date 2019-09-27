@@ -77,8 +77,8 @@ build_triplet = x86_64-pc-linux-gnu
 host_triplet = x86_64-pc-linux-gnu
 bin_PROGRAMS = memcached$(EXEEXT)
 noinst_PROGRAMS = memcached$(EXEEXT) sizes$(EXEEXT)	
-am__append_1 = cache.c
-am__append_2 = cache.c
+am__append_1 = cache.cc
+am__append_2 = cache.cc
 
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -96,15 +96,15 @@ CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)" "$(DESTDIR)$(pkgincludedir)"
 PROGRAMS = $(bin_PROGRAMS) $(noinst_PROGRAMS)
-am__memcached_SOURCES_DIST = memcached.c memcached.h hash.c hash.h \
-	jenkins_hash.c jenkins_hash.h murmur3_hash.c murmur3_hash.h \
-	slabs.c slabs.h items.c items.h assoc.c assoc.h thread.c \
-	daemon.c stats.c stats.h util.c util.h trace.h cache.h \
-	sasl_defs.h bipbuffer.c bipbuffer.h logger.h \
-	crawler.c crawler.h itoa_ljust.c itoa_ljust.h slab_automove.c \
-	slab_automove.h cache.c solaris_priv.c linux_priv.c \
-	openbsd_priv.c sasl_defs.c extstore.c extstore.h crc32c.c \
-	crc32c.h storage.c storage.h slab_automove_extstore.c \
+am__memcached_SOURCES_DIST = memcached.cc memcached.h hash.cc hash.h \
+	jenkins_hash.cc jenkins_hash.h murmur3_hash.cc murmur3_hash.h \
+	slabs.cc slabs.h items.cc items.h assoc.cc assoc.h thread.cc \
+	daemon.cc stats.cc stats.h util.cc util.h trace.h cache.h \
+	sasl_defs.h bipbuffer.cc bipbuffer.h logger.h \
+	crawler.cc crawler.h itoa_ljust.cc itoa_ljust.h slab_automove.cc \
+	slab_automove.h cache.cc solaris_priv.cc linux_priv.cc \
+	openbsd_priv.cc sasl_defs.cc extstore.cc extstore.h crc32c.cc \
+	crc32c.h storage.cc storage.h slab_automove_extstore.cc \
 	slab_automove_extstore.h
 am__objects_1 = memcached-cache.$(OBJEXT)
 am_memcached_OBJECTS = memcached-memcached.$(OBJEXT) \
@@ -120,7 +120,7 @@ am_memcached_OBJECTS = memcached-memcached.$(OBJEXT) \
 	$(am__objects_5) $(am__objects_6)
 memcached_OBJECTS = $(am_memcached_OBJECTS)
 am__DEPENDENCIES_1 =
-sizes_SOURCES = sizes.c
+sizes_SOURCES = sizes.cc
 sizes_OBJECTS = sizes.$(OBJEXT)
 sizes_LDADD = $(LDADD)
 am__objects_14 = cache.$(OBJEXT)
@@ -161,8 +161,8 @@ AM_V_CCLD = $(am__v_CCLD_$(V))
 am__v_CCLD_ = $(am__v_CCLD_$(AM_DEFAULT_VERBOSITY))
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(memcached_SOURCES) sizes.c
-DIST_SOURCES = $(am__memcached_SOURCES_DIST) sizes.c
+SOURCES = $(memcached_SOURCES) sizes.cc
+DIST_SOURCES = $(am__memcached_SOURCES_DIST) sizes.cc
 RECURSIVE_TARGETS = all-recursive check-recursive cscopelist-recursive \
 	ctags-recursive dvi-recursive html-recursive info-recursive \
 	install-data-recursive install-dvi-recursive \
@@ -387,12 +387,12 @@ top_builddir = .
 top_srcdir = .
 pkginclude_HEADERS = protocol_binary.h
 BUILT_SOURCES = $(am__append_10)
-memcached_SOURCES = memcached.c memcached.h hash.c hash.h \
-	jenkins_hash.c jenkins_hash.h murmur3_hash.c murmur3_hash.h \
-	slabs.c slabs.h items.c items.h assoc.c assoc.h thread.c \
-	daemon.c stats.c stats.h util.c util.h trace.h cache.h \
-	sasl_defs.h bipbuffer.c bipbuffer.h logger.h \
-	crawler.c crawler.h itoa_ljust.c itoa_ljust.h slab_automove.c \
+memcached_SOURCES = memcached.cc memcached.h hash.cc hash.h \
+	jenkins_hash.cc jenkins_hash.h murmur3_hash.cc murmur3_hash.h \
+	slabs.cc slabs.h items.cc items.h assoc.cc assoc.h thread.cc \
+	daemon.cc stats.cc stats.h util.cc util.h trace.h cache.h \
+	sasl_defs.h bipbuffer.cc bipbuffer.h logger.h \
+	crawler.cc crawler.h itoa_ljust.cc itoa_ljust.h slab_automove.cc \
 	slab_automove.h $(am__append_1) $(am__append_3) \
 	$(am__append_4) $(am__append_5) $(am__append_6) \
 	$(am__append_7)
@@ -407,7 +407,7 @@ all: $(BUILT_SOURCES) config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive
 
 .SUFFIXES:
-.SUFFIXES: .c .o .obj
+.SUFFIXES: .cc .o .obj
 am--refresh: Makefile
 	@:
 $(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
@@ -506,9 +506,9 @@ clean-noinstPROGRAMS:
 memcached$(EXEEXT): $(memcached_OBJECTS) $(memcached_DEPENDENCIES) $(EXTRA_memcached_DEPENDENCIES) 
 	@rm -f memcached$(EXEEXT)
 	$(MAKE) plib
-	$(AM_V_CC)$(COMPILE_LENIENT) -c $(CFLAGS_LENIENT) testapp.c pku_memcached.c 
+	$(AM_V_CC)$(COMPILE_LENIENT) -c $(CFLAGS_LENIENT) testapp.cc pku_memcached.cc 
 	ld -r testapp.o pku_memcached.o plib/plib.o -o user_prg.o
-	$(AM_V_CC)$(COMPILE) -c $(CFLAGS) init.c
+	$(AM_V_CC)$(COMPILE) -c $(CFLAGS) init.cc
 	ld -r -o prot.o $(memcached_OBJECTS) $(memcached_LDADD) 
 	clang -WT $(LDS) $(CFLAGS) -o memcached -levent init.o user_prg.o prot.o
 
@@ -520,7 +520,7 @@ mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
 
 distclean-compile:
-	-rm -f *.tab.c
+	-rm -f *.tab.cc
 
 include ./$(DEPDIR)/cache.Po
 include ./$(DEPDIR)/memcached-assoc.Po
@@ -551,108 +551,108 @@ include ./$(DEPDIR)/memcached-util.Po
 include ./$(DEPDIR)/sizes.Po
 include ./$(DEPDIR)/util.Po
 
-.c.o:
+.cc.o:
 	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
 	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
 
-.c.obj:
+.cc.obj:
 	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ `$(CYGPATH_W) '$<'`
 	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
 
-memcached-memcached.o: memcached.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-memcached.o -MD -MP -MF $(DEPDIR)/memcached-memcached.Tpo -c -o memcached-memcached.o `test -f 'memcached.c' || echo '$(srcdir)/'`memcached.c
+memcached-memcached.o: memcached.cc
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-memcached.o -MD -MP -MF $(DEPDIR)/memcached-memcached.Tpo -c -o memcached-memcached.o `test -f 'memcached.cc' || echo '$(srcdir)/'`memcached.cc
 	$(AM_V_at)$(am__mv) $(DEPDIR)/memcached-memcached.Tpo $(DEPDIR)/memcached-memcached.Po
 
-memcached-hash.o: hash.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-hash.o -MD -MP -MF $(DEPDIR)/memcached-hash.Tpo -c -o memcached-hash.o `test -f 'hash.c' || echo '$(srcdir)/'`hash.c
+memcached-hash.o: hash.cc
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-hash.o -MD -MP -MF $(DEPDIR)/memcached-hash.Tpo -c -o memcached-hash.o `test -f 'hash.cc' || echo '$(srcdir)/'`hash.cc
 	$(AM_V_at)$(am__mv) $(DEPDIR)/memcached-hash.Tpo $(DEPDIR)/memcached-hash.Po
 
-memcached-jenkins_hash.o: jenkins_hash.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-jenkins_hash.o -MD -MP -MF $(DEPDIR)/memcached-jenkins_hash.Tpo -c -o memcached-jenkins_hash.o `test -f 'jenkins_hash.c' || echo '$(srcdir)/'`jenkins_hash.c
+memcached-jenkins_hash.o: jenkins_hash.cc
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-jenkins_hash.o -MD -MP -MF $(DEPDIR)/memcached-jenkins_hash.Tpo -c -o memcached-jenkins_hash.o `test -f 'jenkins_hash.cc' || echo '$(srcdir)/'`jenkins_hash.cc
 	$(AM_V_at)$(am__mv) $(DEPDIR)/memcached-jenkins_hash.Tpo $(DEPDIR)/memcached-jenkins_hash.Po
 
-memcached-murmur3_hash.o: murmur3_hash.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-murmur3_hash.o -MD -MP -MF $(DEPDIR)/memcached-murmur3_hash.Tpo -c -o memcached-murmur3_hash.o `test -f 'murmur3_hash.c' || echo '$(srcdir)/'`murmur3_hash.c
+memcached-murmur3_hash.o: murmur3_hash.cc
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-murmur3_hash.o -MD -MP -MF $(DEPDIR)/memcached-murmur3_hash.Tpo -c -o memcached-murmur3_hash.o `test -f 'murmur3_hash.cc' || echo '$(srcdir)/'`murmur3_hash.cc
 	$(AM_V_at)$(am__mv) $(DEPDIR)/memcached-murmur3_hash.Tpo $(DEPDIR)/memcached-murmur3_hash.Po
 
-memcached-slabs.o: slabs.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-slabs.o -MD -MP -MF $(DEPDIR)/memcached-slabs.Tpo -c -o memcached-slabs.o `test -f 'slabs.c' || echo '$(srcdir)/'`slabs.c
+memcached-slabs.o: slabs.cc
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-slabs.o -MD -MP -MF $(DEPDIR)/memcached-slabs.Tpo -c -o memcached-slabs.o `test -f 'slabs.cc' || echo '$(srcdir)/'`slabs.cc
 	$(AM_V_at)$(am__mv) $(DEPDIR)/memcached-slabs.Tpo $(DEPDIR)/memcached-slabs.Po
 
-memcached-items.o: items.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-items.o -MD -MP -MF $(DEPDIR)/memcached-items.Tpo -c -o memcached-items.o `test -f 'items.c' || echo '$(srcdir)/'`items.c
+memcached-items.o: items.cc
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-items.o -MD -MP -MF $(DEPDIR)/memcached-items.Tpo -c -o memcached-items.o `test -f 'items.cc' || echo '$(srcdir)/'`items.cc
 	$(AM_V_at)$(am__mv) $(DEPDIR)/memcached-items.Tpo $(DEPDIR)/memcached-items.Po
 
-memcached-assoc.o: assoc.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-assoc.o -MD -MP -MF $(DEPDIR)/memcached-assoc.Tpo -c -o memcached-assoc.o `test -f 'assoc.c' || echo '$(srcdir)/'`assoc.c
+memcached-assoc.o: assoc.cc
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-assoc.o -MD -MP -MF $(DEPDIR)/memcached-assoc.Tpo -c -o memcached-assoc.o `test -f 'assoc.cc' || echo '$(srcdir)/'`assoc.cc
 	$(AM_V_at)$(am__mv) $(DEPDIR)/memcached-assoc.Tpo $(DEPDIR)/memcached-assoc.Po
 
-memcached-thread.o: thread.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-thread.o -MD -MP -MF $(DEPDIR)/memcached-thread.Tpo -c -o memcached-thread.o `test -f 'thread.c' || echo '$(srcdir)/'`thread.c
+memcached-thread.o: thread.cc
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-thread.o -MD -MP -MF $(DEPDIR)/memcached-thread.Tpo -c -o memcached-thread.o `test -f 'thread.cc' || echo '$(srcdir)/'`thread.cc
 	$(AM_V_at)$(am__mv) $(DEPDIR)/memcached-thread.Tpo $(DEPDIR)/memcached-thread.Po
 
-memcached-daemon.o: daemon.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-daemon.o -MD -MP -MF $(DEPDIR)/memcached-daemon.Tpo -c -o memcached-daemon.o `test -f 'daemon.c' || echo '$(srcdir)/'`daemon.c
+memcached-daemon.o: daemon.cc
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-daemon.o -MD -MP -MF $(DEPDIR)/memcached-daemon.Tpo -c -o memcached-daemon.o `test -f 'daemon.cc' || echo '$(srcdir)/'`daemon.cc
 	$(AM_V_at)$(am__mv) $(DEPDIR)/memcached-daemon.Tpo $(DEPDIR)/memcached-daemon.Po
 
-memcached-stats.o: stats.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-stats.o -MD -MP -MF $(DEPDIR)/memcached-stats.Tpo -c -o memcached-stats.o `test -f 'stats.c' || echo '$(srcdir)/'`stats.c
+memcached-stats.o: stats.cc
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-stats.o -MD -MP -MF $(DEPDIR)/memcached-stats.Tpo -c -o memcached-stats.o `test -f 'stats.cc' || echo '$(srcdir)/'`stats.cc
 	$(AM_V_at)$(am__mv) $(DEPDIR)/memcached-stats.Tpo $(DEPDIR)/memcached-stats.Po
 
-memcached-util.o: util.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-util.o -MD -MP -MF $(DEPDIR)/memcached-util.Tpo -c -o memcached-util.o `test -f 'util.c' || echo '$(srcdir)/'`util.c
+memcached-util.o: util.cc
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-util.o -MD -MP -MF $(DEPDIR)/memcached-util.Tpo -c -o memcached-util.o `test -f 'util.cc' || echo '$(srcdir)/'`util.cc
 	$(AM_V_at)$(am__mv) $(DEPDIR)/memcached-util.Tpo $(DEPDIR)/memcached-util.Po
 
-memcached-bipbuffer.o: bipbuffer.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-bipbuffer.o -MD -MP -MF $(DEPDIR)/memcached-bipbuffer.Tpo -c -o memcached-bipbuffer.o `test -f 'bipbuffer.c' || echo '$(srcdir)/'`bipbuffer.c
+memcached-bipbuffer.o: bipbuffer.cc
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-bipbuffer.o -MD -MP -MF $(DEPDIR)/memcached-bipbuffer.Tpo -c -o memcached-bipbuffer.o `test -f 'bipbuffer.cc' || echo '$(srcdir)/'`bipbuffer.cc
 	$(AM_V_at)$(am__mv) $(DEPDIR)/memcached-bipbuffer.Tpo $(DEPDIR)/memcached-bipbuffer.Po
 
-memcached-crawler.o: crawler.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-crawler.o -MD -MP -MF $(DEPDIR)/memcached-crawler.Tpo -c -o memcached-crawler.o `test -f 'crawler.c' || echo '$(srcdir)/'`crawler.c
+memcached-crawler.o: crawler.cc
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-crawler.o -MD -MP -MF $(DEPDIR)/memcached-crawler.Tpo -c -o memcached-crawler.o `test -f 'crawler.cc' || echo '$(srcdir)/'`crawler.cc
 	$(AM_V_at)$(am__mv) $(DEPDIR)/memcached-crawler.Tpo $(DEPDIR)/memcached-crawler.Po
 
-memcached-itoa_ljust.o: itoa_ljust.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-itoa_ljust.o -MD -MP -MF $(DEPDIR)/memcached-itoa_ljust.Tpo -c -o memcached-itoa_ljust.o `test -f 'itoa_ljust.c' || echo '$(srcdir)/'`itoa_ljust.c
+memcached-itoa_ljust.o: itoa_ljust.cc
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-itoa_ljust.o -MD -MP -MF $(DEPDIR)/memcached-itoa_ljust.Tpo -c -o memcached-itoa_ljust.o `test -f 'itoa_ljust.cc' || echo '$(srcdir)/'`itoa_ljust.cc
 	$(AM_V_at)$(am__mv) $(DEPDIR)/memcached-itoa_ljust.Tpo $(DEPDIR)/memcached-itoa_ljust.Po
 
-memcached-slab_automove.o: slab_automove.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-slab_automove.o -MD -MP -MF $(DEPDIR)/memcached-slab_automove.Tpo -c -o memcached-slab_automove.o `test -f 'slab_automove.c' || echo '$(srcdir)/'`slab_automove.c
+memcached-slab_automove.o: slab_automove.cc
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-slab_automove.o -MD -MP -MF $(DEPDIR)/memcached-slab_automove.Tpo -c -o memcached-slab_automove.o `test -f 'slab_automove.cc' || echo '$(srcdir)/'`slab_automove.cc
 	$(AM_V_at)$(am__mv) $(DEPDIR)/memcached-slab_automove.Tpo $(DEPDIR)/memcached-slab_automove.Po
 
-memcached-cache.o: cache.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-cache.o -MD -MP -MF $(DEPDIR)/memcached-cache.Tpo -c -o memcached-cache.o `test -f 'cache.c' || echo '$(srcdir)/'`cache.c
+memcached-cache.o: cache.cc
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-cache.o -MD -MP -MF $(DEPDIR)/memcached-cache.Tpo -c -o memcached-cache.o `test -f 'cache.cc' || echo '$(srcdir)/'`cache.cc
 	$(AM_V_at)$(am__mv) $(DEPDIR)/memcached-cache.Tpo $(DEPDIR)/memcached-cache.Po
 
-memcached-solaris_priv.o: solaris_priv.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-solaris_priv.o -MD -MP -MF $(DEPDIR)/memcached-solaris_priv.Tpo -c -o memcached-solaris_priv.o `test -f 'solaris_priv.c' || echo '$(srcdir)/'`solaris_priv.c
+memcached-solaris_priv.o: solaris_priv.cc
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-solaris_priv.o -MD -MP -MF $(DEPDIR)/memcached-solaris_priv.Tpo -c -o memcached-solaris_priv.o `test -f 'solaris_priv.cc' || echo '$(srcdir)/'`solaris_priv.cc
 	$(AM_V_at)$(am__mv) $(DEPDIR)/memcached-solaris_priv.Tpo $(DEPDIR)/memcached-solaris_priv.Po
 
-memcached-linux_priv.o: linux_priv.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-linux_priv.o -MD -MP -MF $(DEPDIR)/memcached-linux_priv.Tpo -c -o memcached-linux_priv.o `test -f 'linux_priv.c' || echo '$(srcdir)/'`linux_priv.c
+memcached-linux_priv.o: linux_priv.cc
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-linux_priv.o -MD -MP -MF $(DEPDIR)/memcached-linux_priv.Tpo -c -o memcached-linux_priv.o `test -f 'linux_priv.cc' || echo '$(srcdir)/'`linux_priv.cc
 	$(AM_V_at)$(am__mv) $(DEPDIR)/memcached-linux_priv.Tpo $(DEPDIR)/memcached-linux_priv.Po
 
-memcached-openbsd_priv.o: openbsd_priv.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-openbsd_priv.o -MD -MP -MF $(DEPDIR)/memcached-openbsd_priv.Tpo -c -o memcached-openbsd_priv.o `test -f 'openbsd_priv.c' || echo '$(srcdir)/'`openbsd_priv.c
+memcached-openbsd_priv.o: openbsd_priv.cc
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-openbsd_priv.o -MD -MP -MF $(DEPDIR)/memcached-openbsd_priv.Tpo -c -o memcached-openbsd_priv.o `test -f 'openbsd_priv.cc' || echo '$(srcdir)/'`openbsd_priv.cc
 	$(AM_V_at)$(am__mv) $(DEPDIR)/memcached-openbsd_priv.Tpo $(DEPDIR)/memcached-openbsd_priv.Po
 
-memcached-sasl_defs.o: sasl_defs.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-sasl_defs.o -MD -MP -MF $(DEPDIR)/memcached-sasl_defs.Tpo -c -o memcached-sasl_defs.o `test -f 'sasl_defs.c' || echo '$(srcdir)/'`sasl_defs.c
+memcached-sasl_defs.o: sasl_defs.cc
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-sasl_defs.o -MD -MP -MF $(DEPDIR)/memcached-sasl_defs.Tpo -c -o memcached-sasl_defs.o `test -f 'sasl_defs.cc' || echo '$(srcdir)/'`sasl_defs.cc
 	$(AM_V_at)$(am__mv) $(DEPDIR)/memcached-sasl_defs.Tpo $(DEPDIR)/memcached-sasl_defs.Po
 
-memcached-extstore.o: extstore.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-extstore.o -MD -MP -MF $(DEPDIR)/memcached-extstore.Tpo -c -o memcached-extstore.o `test -f 'extstore.c' || echo '$(srcdir)/'`extstore.c
+memcached-extstore.o: extstore.cc
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-extstore.o -MD -MP -MF $(DEPDIR)/memcached-extstore.Tpo -c -o memcached-extstore.o `test -f 'extstore.cc' || echo '$(srcdir)/'`extstore.cc
 	$(AM_V_at)$(am__mv) $(DEPDIR)/memcached-extstore.Tpo $(DEPDIR)/memcached-extstore.Po
 
-memcached-crc32c.o: crc32c.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-crc32c.o -MD -MP -MF $(DEPDIR)/memcached-crc32c.Tpo -c -o memcached-crc32c.o `test -f 'crc32c.c' || echo '$(srcdir)/'`crc32c.c
+memcached-crc32c.o: crc32c.cc
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-crc32c.o -MD -MP -MF $(DEPDIR)/memcached-crc32c.Tpo -c -o memcached-crc32c.o `test -f 'crc32c.cc' || echo '$(srcdir)/'`crc32c.cc
 	$(AM_V_at)$(am__mv) $(DEPDIR)/memcached-crc32c.Tpo $(DEPDIR)/memcached-crc32c.Po
 
-memcached-storage.o: storage.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-storage.o -MD -MP -MF $(DEPDIR)/memcached-storage.Tpo -c -o memcached-storage.o `test -f 'storage.c' || echo '$(srcdir)/'`storage.c
+memcached-storage.o: storage.cc
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-storage.o -MD -MP -MF $(DEPDIR)/memcached-storage.Tpo -c -o memcached-storage.o `test -f 'storage.cc' || echo '$(srcdir)/'`storage.cc
 	$(AM_V_at)$(am__mv) $(DEPDIR)/memcached-storage.Tpo $(DEPDIR)/memcached-storage.Po
 
-memcached-slab_automove_extstore.o: slab_automove_extstore.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-slab_automove_extstore.o -MD -MP -MF $(DEPDIR)/memcached-slab_automove_extstore.Tpo -c -o memcached-slab_automove_extstore.o `test -f 'slab_automove_extstore.c' || echo '$(srcdir)/'`slab_automove_extstore.c
+memcached-slab_automove_extstore.o: slab_automove_extstore.cc
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-slab_automove_extstore.o -MD -MP -MF $(DEPDIR)/memcached-slab_automove_extstore.Tpo -c -o memcached-slab_automove_extstore.o `test -f 'slab_automove_extstore.cc' || echo '$(srcdir)/'`slab_automove_extstore.cc
 	$(AM_V_at)$(am__mv) $(DEPDIR)/memcached-slab_automove_extstore.Tpo $(DEPDIR)/memcached-slab_automove_extstore.Po
 
 $(am__recursive_targets):
@@ -913,7 +913,7 @@ test:	memcached sizes
 	    mv -f $$file `echo $$file | sed 's/memcached-//'`; \
 	  done && \
 	  for file in *.gcda; do \
-	    srcfile=`echo $$file | sed 's/.gcda/.c/'`; \
+	    srcfile=`echo $$file | sed 's/.gcda/.cc/'`; \
 	    if test -n "`echo $(memcached_SOURCES) | grep $$srcfile`"; then \
 	      echo `$(PROFILER) $$srcfile` | sed 's/'$$srcfile':.*//'; \
 	    fi \
