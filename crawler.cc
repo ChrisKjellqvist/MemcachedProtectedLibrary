@@ -179,20 +179,7 @@ static void crawler_expired_eval(crawler_module_t *cm, item *search, uint32_t hv
     pthread_mutex_lock(&d->lock);
     crawlerstats_t *s = &d->crawlerstats[i];
     int is_flushed = item_is_flushed(search);
-#ifdef EXTSTORE
-    bool is_valid = true;
-    if (search->it_flags & ITEM_HDR) {
-        item_hdr *hdr = (item_hdr *)ITEM_data(search);
-        if (extstore_check(storage, hdr->page_id, hdr->page_version) != 0)
-            is_valid = false;
-    }
-#endif
-    if ((search->exptime != 0 && search->exptime < current_time)
-        || is_flushed
-#ifdef EXTSTORE
-        || !is_valid
-#endif
-        ) {
+    if ((search->exptime != 0 && search->exptime < current_time) || is_flushed) {
         crawlers[i].reclaimed++;
         s->reclaimed++;
 
@@ -209,9 +196,6 @@ static void crawler_expired_eval(crawler_module_t *cm, item *search, uint32_t hv
         if ((search->it_flags & ITEM_FETCHED) == 0 && !is_flushed) {
             crawlers[i].unfetched++;
         }
-#ifdef EXTSTORE
-        STORAGE_delete(storage, search);
-#endif
         do_item_unlink_nolock(search, hv);
         do_item_remove(search);
     } else {

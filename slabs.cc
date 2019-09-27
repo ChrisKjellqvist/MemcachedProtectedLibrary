@@ -51,9 +51,6 @@ static int power_largest;
 static void *mem_base = NULL;
 static void *mem_current = NULL;
 static size_t mem_avail = 0;
-#ifdef EXTSTORE
-static void *storage  = NULL;
-#endif
 /**
  * Access to the slab allocator is protected by this lock
  */
@@ -75,11 +72,6 @@ static void do_slabs_free(void *ptr, const size_t size, unsigned int id);
    slab types can be made.  if max memory is less than 18 MB, only the
    smaller ones will be made.  */
 static void slabs_preallocate (const unsigned int maxslabs);
-#ifdef EXTSTORE
-void slabs_set_storage(void *arg) {
-    storage = arg;
-}
-#endif
 /*
  * Figures out which slab class (chunk size) is required to store an item of
  * a given size.
@@ -458,9 +450,6 @@ static void do_slabs_free(void *ptr, const size_t size, unsigned int id) {
 
     it = (item *)ptr;
     if ((it->it_flags & ITEM_CHUNKED) == 0) {
-#ifdef EXTSTORE
-        bool is_hdr = it->it_flags & ITEM_HDR;
-#endif
         it->it_flags = ITEM_SLABBED;
         it->slabs_clsid = 0;
         it->prev = 0;
@@ -469,15 +458,7 @@ static void do_slabs_free(void *ptr, const size_t size, unsigned int id) {
         p->slots = it;
 
         p->sl_curr++;
-#ifdef EXTSTORE
-        if (!is_hdr) {
-            p->requested -= size;
-        } else {
-            p->requested -= (size - it->nbytes) + sizeof(item_hdr);
-        }
-#else
         p->requested -= size;
-#endif
     } else {
         do_slabs_free_chunked(it, size);
     }
@@ -879,11 +860,6 @@ static int slab_rebalance_move(void) {
                  */
                 /* Check if expired or flushed */
                 ntotal = ITEM_ntotal(it);
-#ifdef EXTSTORE
-                if (it->it_flags & ITEM_HDR) {
-                    ntotal = (ntotal - it->nbytes) + sizeof(item_hdr);
-                }
-#endif
                 /* REQUIRES slabs_lock: CHECK FOR cls->sl_curr > 0 */
                 if (ch == NULL && (it->it_flags & ITEM_CHUNKED)) {
                     /* Chunked should be identical to non-chunked, except we need

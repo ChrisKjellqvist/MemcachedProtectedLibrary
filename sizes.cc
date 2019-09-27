@@ -16,9 +16,6 @@ int main(int argc, char **argv) {
     display("Settings", sizeof(struct settings));
     display("Item (no cas)", sizeof(item));
     display("Item (cas)", sizeof(item) + sizeof(uint64_t));
-#ifdef EXTSTORE
-    display("extstore header", sizeof(item_hdr));
-#endif
     printf("----------------------------------------\n");
 
     display("Thread stats cumulative\t", sizeof(struct thread_stats));

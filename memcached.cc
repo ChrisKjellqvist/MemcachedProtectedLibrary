@@ -178,7 +178,6 @@ static void settings_init(void) {
   settings.crawls_persleep = 1000;
   settings.logger_watcher_buf_size = LOGGER_WATCHER_BUF_SIZE;
   settings.logger_buf_size = LOGGER_BUF_SIZE;
-  settings.drop_privileges = false;
 }
 
 /* Destination must always be chunked */
@@ -969,11 +968,6 @@ static void usage(void) {
       "   - modern:              enables options which will be default in future.\n"
       "             currently: nothing\n"
       "   - no_modern:           uses defaults of previous major version (1.4.x)\n"
-#ifdef HAVE_DROP_PRIVILEGES
-      "   - drop_privileges:     enable dropping extra syscall privileges\n"
-      "   - no_drop_privileges:  disable drop_privileges in case it causes issues with\n"
-      "                          some customisation.\n"
-#endif
       );
   return;
 }
@@ -1291,9 +1285,7 @@ void* server_thread (void *pargs) {
     NO_MAXCONNS_FAST,
     INLINE_ASCII_RESP,
     NO_LRU_CRAWLER,
-    NO_LRU_MAINTAINER,
-    NO_DROP_PRIVILEGES,
-    DROP_PRIVILEGES,
+    NO_LRU_MAINTAINER
   };
   char *const subopts_tokens[] = {
     [MAXCONNS_FAST] = "maxconns_fast",
@@ -1330,8 +1322,6 @@ void* server_thread (void *pargs) {
     [INLINE_ASCII_RESP] = "inline_ascii_resp",
     [NO_LRU_CRAWLER] = "no_lru_crawler",
     [NO_LRU_MAINTAINER] = "no_lru_maintainer",
-    [NO_DROP_PRIVILEGES] = "no_drop_privileges",
-    [DROP_PRIVILEGES] = "drop_privileges",
     NULL
   };
 
@@ -1810,12 +1800,6 @@ void* server_thread (void *pargs) {
 	      start_lru_crawler = false;
 	      start_lru_maintainer = false;
 	      break;
-	    case NO_DROP_PRIVILEGES:
-	      settings.drop_privileges = false;
-	      break;
-	    case DROP_PRIVILEGES:
-	      settings.drop_privileges = true;
-	      break;
 	    default:
 	      printf("Illegal suboption \"%s\"\n", subopts_value);
 	      return NULL;
@@ -2049,11 +2033,6 @@ void* server_thread (void *pargs) {
 
   if (pid_file != NULL) {
     save_pid(pid_file);
-  }
-
-  /* Drop privileges no longer needed */
-  if (settings.drop_privileges) {
-    drop_privileges();
   }
 
   /* Initialize the uriencode lookup table. */

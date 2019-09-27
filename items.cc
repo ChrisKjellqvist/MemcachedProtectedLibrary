@@ -2,10 +2,6 @@
 #include "memcached.h"
 #include "bipbuffer.h"
 #include "slab_automove.h"
-#ifdef EXTSTORE
-#include "storage.h"
-#include "slab_automove_extstore.h"
-#endif
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/resource.h>
@@ -396,15 +392,7 @@ static void do_item_link_q(item *it) { /* item is the new head */
     *head = it;
     if (*tail == 0) *tail = it;
     sizes[it->slabs_clsid]++;
-#ifdef EXTSTORE
-    if (it->it_flags & ITEM_HDR) {
-        sizes_bytes[it->slabs_clsid] += (ITEM_ntotal(it) - it->nbytes) + sizeof(item_hdr);
-    } else {
-        sizes_bytes[it->slabs_clsid] += ITEM_ntotal(it);
-    }
-#else
     sizes_bytes[it->slabs_clsid] += ITEM_ntotal(it);
-#endif
 
     return;
 }
@@ -441,16 +429,7 @@ static void do_item_unlink_q(item *it) {
     if (it->next) it->next->prev = it->prev;
     if (it->prev) it->prev->next = it->next;
     sizes[it->slabs_clsid]--;
-#ifdef EXTSTORE
-    if (it->it_flags & ITEM_HDR) {
-        sizes_bytes[it->slabs_clsid] -= (ITEM_ntotal(it) - it->nbytes) + sizeof(item_hdr);
-    } else {
-        sizes_bytes[it->slabs_clsid] -= ITEM_ntotal(it);
-    }
-#else
     sizes_bytes[it->slabs_clsid] -= ITEM_ntotal(it);
-#endif
-
     return;
 }
 
@@ -1174,13 +1153,6 @@ slab_automove_reg_t slab_automove_default = {
   .free = slab_automove_free,
   .run = slab_automove_run
 };
-#ifdef EXTSTORE
-slab_automove_reg_t slab_automove_extstore = {
-  .init = slab_automove_extstore_init,
-  .free = slab_automove_extstore_free,
-  .run = slab_automove_extstore_run
-};
-#endif
 static pthread_t lru_maintainer_tid;
 
 #define MAX_LRU_MAINTAINER_SLEEP 1000000
@@ -1188,11 +1160,6 @@ static pthread_t lru_maintainer_tid;
 
 static void *lru_maintainer_thread(void *arg) {
   slab_automove_reg_t *sam = &slab_automove_default;
-#ifdef EXTSTORE
-  void *storage = arg;
-  if (storage != NULL)
-    sam = &slab_automove_extstore;
-#endif
   int i;
   useconds_t to_sleep = MIN_LRU_MAINTAINER_SLEEP;
   useconds_t last_sleep = MIN_LRU_MAINTAINER_SLEEP;

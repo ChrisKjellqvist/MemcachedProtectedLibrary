@@ -55,27 +55,6 @@ static const entry_details default_entries[] = {
     [LOGGER_SLAB_MOVE] = {LOGGER_TEXT_ENTRY, 512, LOG_SYSEVENTS,
         "type=slab_move src=%d dst=%d"
     },
-#ifdef EXTSTORE
-    [LOGGER_EXTSTORE_WRITE] = {LOGGER_EXT_WRITE_ENTRY, 512, LOG_EVICTIONS, NULL},
-    [LOGGER_COMPACT_START] = {LOGGER_TEXT_ENTRY, 512, LOG_SYSEVENTS,
-        "type=compact_start id=%lu version=%llu"
-    },
-    [LOGGER_COMPACT_ABORT] = {LOGGER_TEXT_ENTRY, 512, LOG_SYSEVENTS,
-        "type=compact_abort id=%lu"
-    },
-    [LOGGER_COMPACT_READ_START] = {LOGGER_TEXT_ENTRY, 512, LOG_SYSEVENTS,
-        "type=compact_read_start id=%lu offset=%llu"
-    },
-    [LOGGER_COMPACT_READ_END] = {LOGGER_TEXT_ENTRY, 512, LOG_SYSEVENTS,
-        "type=compact_read_end id=%lu offset=%llu rescues=%lu lost=%lu skipped=%lu"
-    },
-    [LOGGER_COMPACT_END] = {LOGGER_TEXT_ENTRY, 512, LOG_SYSEVENTS,
-        "type=compact_end id=%lu"
-    },
-    [LOGGER_COMPACT_FRAGINFO] = {LOGGER_TEXT_ENTRY, 512, LOG_SYSEVENTS,
-        "type=compact_fraginfo ratio=%.2f bytes=%lu"
-    },
-#endif
 };
 
 #define WATCHER_ALL -1
@@ -219,21 +198,6 @@ static int _logger_thread_parse_ee(logentry *e, char *scratch) {
 
     return total;
 }
-#ifdef EXTSTORE
-static int _logger_thread_parse_extw(logentry *e, char *scratch) {
-    int total;
-    char keybuf[KEY_MAX_LENGTH * 3 + 1];
-    struct logentry_ext_write *le = (struct logentry_ext_write *) e->data;
-    uriencode(le->key, keybuf, le->nkey, LOGGER_PARSE_SCRATCH);
-    total = snprintf(scratch, LOGGER_PARSE_SCRATCH,
-            "ts=%d.%d gid=%llu type=extwrite key=%s fetch=%s ttl=%lld la=%d clsid=%u bucket=%u\n",
-            (int)e->tv.tv_sec, (int)e->tv.tv_usec, (unsigned long long) e->gid,
-            keybuf, (le->it_flags & ITEM_FETCHED) ? "yes" : "no",
-            (long long int)le->exptime, le->latime, le->clsid, le->bucket);
-
-    return total;
-}
-#endif
 /* Completes rendering of log line. */
 static enum logger_parse_entry_ret logger_thread_parse_entry(logentry *e, struct logger_stats *ls,
         char *scratch, int *scratch_len) {
@@ -248,11 +212,6 @@ static enum logger_parse_entry_ret logger_thread_parse_entry(logentry *e, struct
         case LOGGER_EVICTION_ENTRY:
             total = _logger_thread_parse_ee(e, scratch);
             break;
-#ifdef EXTSTORE
-        case LOGGER_EXT_WRITE_ENTRY:
-            total = _logger_thread_parse_extw(e, scratch);
-            break;
-#endif
         case LOGGER_ITEM_GET_ENTRY:
             total = _logger_thread_parse_ige(e, scratch);
             break;
@@ -628,23 +587,6 @@ static void _logger_log_evictions(logentry *e, item *it) {
     memcpy(le->key, ITEM_key(it), it->nkey);
     e->size = sizeof(struct logentry_eviction) + le->nkey;
 }
-#ifdef EXTSTORE
-/* TODO: When more logging endpoints are done and the extstore API has matured
- * more, this could be merged with above and print different types of
- * expulsion events.
- */
-static void _logger_log_ext_write(logentry *e, item *it, uint8_t bucket) {
-    struct logentry_ext_write *le = (struct logentry_ext_write *) e->data;
-    le->exptime = (it->exptime > 0) ? (long long int)(it->exptime - current_time) : (long long int) -1;
-    le->latime = current_time - it->time;
-    le->it_flags = it->it_flags;
-    le->nkey = it->nkey;
-    le->clsid = ITEM_clsid(it);
-    le->bucket = bucket;
-    memcpy(le->key, ITEM_key(it), it->nkey);
-    e->size = sizeof(struct logentry_ext_write) + le->nkey;
-}
-#endif
 /* 0 == nf, 1 == found. 2 == flushed. 3 == expired.
  * might be useful to store/print the flags an item has?
  * could also collapse this and above code into an "item status" struct. wait
@@ -726,14 +668,6 @@ enum logger_ret_type logger_log(logger *l, const enum log_entry_type event, cons
         case LOGGER_EVICTION_ENTRY:
             _logger_log_evictions(e, (item *)entry);
             break;
-#ifdef EXTSTORE
-        case LOGGER_EXT_WRITE_ENTRY:
-            va_start(ap, entry);
-            int ew_bucket = va_arg(ap, int);
-            va_end(ap);
-            _logger_log_ext_write(e, (item *)entry, ew_bucket);
-            break;
-#endif
         case LOGGER_ITEM_GET_ENTRY:
             va_start(ap, entry);
             int was_found = va_arg(ap, int);

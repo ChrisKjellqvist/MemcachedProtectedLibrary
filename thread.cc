@@ -3,9 +3,6 @@
  * Thread management for memcached.
  */
 #include "memcached.h"
-#ifdef EXTSTORE
-#include "storage.h"
-#endif
 #include <assert.h>
 #include <stdio.h>
 #include <errno.h>
