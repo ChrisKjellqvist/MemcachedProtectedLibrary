@@ -1,8 +1,7 @@
 #ifndef BIPBUFFER_H
 #define BIPBUFFER_H
 
-typedef struct
-{
+struct bipbuf_t {
     unsigned long int size;
 
     /* region A */
@@ -15,7 +14,7 @@ typedef struct
     int b_inuse;
 
     unsigned char data[];
-} bipbuf_t;
+};
 
 /**
  * Create a new bip buffer.

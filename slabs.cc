@@ -271,7 +271,7 @@ static int grow_slab_list (const unsigned int id) {
         void *new_list = realloc(p->slab_list, new_size * sizeof(void *));
         if (new_list == 0) return 0;
         p->list_size = new_size;
-        p->slab_list = new_list;
+        p->slab_list = (void**)new_list;
     }
     return 1;
 }
@@ -291,7 +291,7 @@ static void *get_page_from_global_pool(void) {
     if (p->slabs < 1) {
         return NULL;
     }
-    char *ret = p->slab_list[p->slabs - 1];
+    char *ret = (char*)p->slab_list[p->slabs - 1];
     p->slabs--;
     return ret;
 }
@@ -312,8 +312,8 @@ static int do_slabs_newslab(const unsigned int id) {
     }
 
     if ((grow_slab_list(id) == 0) ||
-        (((ptr = get_page_from_global_pool()) == NULL) &&
-        ((ptr = memory_allocate((size_t)len)) == 0))) {
+        (((ptr = (char*)get_page_from_global_pool()) == NULL) &&
+        ((ptr = (char*)memory_allocate((size_t)len)) == 0))) {
 
         MEMCACHED_SLABS_SLABCLASS_ALLOCATE_FAILED(id);
         return 0;
@@ -333,13 +333,13 @@ static void *do_slabs_alloc(const size_t size, unsigned int id, uint64_t *total_
         unsigned int flags) {
     slabclass_t *p;
     void *ret = NULL;
-    item *it = NULL;
+    pptr<item> it = NULL;
     if (id < POWER_SMALLEST || id > power_largest) {
         MEMCACHED_SLABS_ALLOCATE_FAILED(size, 0);
         return NULL;
     }
     p = &slabclass[id];
-    assert(p->sl_curr == 0 || ((item *)p->slots)->slabs_clsid == 0);
+    assert(p->sl_curr == 0 || (pptr<item>((item*)(p->slots)))->slabs_clsid == 0);
     if (total_bytes != NULL) {
         *total_bytes = p->requested;
     }
@@ -354,9 +354,9 @@ static void *do_slabs_alloc(const size_t size, unsigned int id, uint64_t *total_
 
     if (p->sl_curr != 0) {
         /* return off our freelist */
-        it = (item *)p->slots;
+        it = pptr<item>((item*)(p->slots));
         p->slots = it->next;
-        if (it->next) it->next->prev = 0;
+        if (it->next != nullptr) it->next->prev = 0;
         /* Kill flag and initialize refcount here for lock safety in slab
          * mover's freeness detection. */
         it->it_flags &= ~ITEM_SLABBED;
@@ -377,7 +377,7 @@ static void *do_slabs_alloc(const size_t size, unsigned int id, uint64_t *total_
     return ret;
 }
 
-static void do_slabs_free_chunked(item *it, const size_t size) {
+static void do_slabs_free_chunked(pptr<item> it, const size_t size) {
     item_chunk *chunk = (item_chunk *) ITEM_schunk(it);
     slabclass_t *p;
 
@@ -397,8 +397,8 @@ static void do_slabs_free_chunked(item *it, const size_t size) {
     // return the header object.
     // TODO: This is in three places, here and in do_slabs_free().
     it->prev = 0;
-    it->next = p->slots;
-    if (it->next) it->next->prev = it;
+    it->next = pptr<item>((item*)p->slots);
+    if (it->next != nullptr) it->next->prev = it;
     p->slots = it;
     p->sl_curr++;
     // TODO: macro
@@ -424,7 +424,7 @@ static void do_slabs_free_chunked(item *it, const size_t size) {
         next_chunk = chunk->next;
 
         chunk->prev = 0;
-        chunk->next = p->slots;
+        chunk->next = (item_chunk*)p->slots;
         if (chunk->next) chunk->next->prev = chunk;
         p->slots = chunk;
         p->sl_curr++;
@@ -439,7 +439,7 @@ static void do_slabs_free_chunked(item *it, const size_t size) {
 
 static void do_slabs_free(void *ptr, const size_t size, unsigned int id) {
     slabclass_t *p;
-    item *it;
+    pptr<item> it;
 
     assert(id >= POWER_SMALLEST && id <= power_largest);
     if (id < POWER_SMALLEST || id > power_largest)
@@ -448,13 +448,13 @@ static void do_slabs_free(void *ptr, const size_t size, unsigned int id) {
     MEMCACHED_SLABS_FREE(size, id, ptr);
     p = &slabclass[id];
 
-    it = (item *)ptr;
+    it = pptr<item>((item*)ptr);
     if ((it->it_flags & ITEM_CHUNKED) == 0) {
         it->it_flags = ITEM_SLABBED;
         it->slabs_clsid = 0;
         it->prev = 0;
-        it->next = p->slots;
-        if (it->next) it->next->prev = it;
+        it->next = pptr<item>((item*)(p->slots));
+        if (it->next != nullptr) it->next->prev = it;
         p->slots = it;
 
         p->sl_curr++;
@@ -689,10 +689,10 @@ static void *slab_rebalance_alloc(const size_t size, unsigned int id) {
     slabclass_t *s_cls;
     s_cls = &slabclass[slab_rebal.s_clsid];
     int x;
-    item *new_it = NULL;
+    pptr<item> new_it = NULL;
 
     for (x = 0; x < s_cls->perslab; x++) {
-        new_it = do_slabs_alloc(size, id, NULL, SLABS_ALLOC_NO_NEWPAGE);
+        new_it = (item*)do_slabs_alloc(size, id, NULL, SLABS_ALLOC_NO_NEWPAGE);
         /* check that memory isn't within the range to clear */
         if (new_it == NULL) {
             break;
@@ -719,14 +719,14 @@ static void *slab_rebalance_alloc(const size_t size, unsigned int id) {
 
 /* CALLED WITH slabs_lock HELD */
 /* detaches item/chunk from freelist. */
-static void slab_rebalance_cut_free(slabclass_t *s_cls, item *it) {
+static void slab_rebalance_cut_free(slabclass_t *s_cls, pptr<item> it) {
     /* Ensure this was on the freelist and nothing else. */
     assert(it->it_flags == ITEM_SLABBED);
     if (s_cls->slots == it) {
         s_cls->slots = it->next;
     }
-    if (it->next) it->next->prev = it->prev;
-    if (it->prev) it->prev->next = it->next;
+    if (it->next != nullptr) it->next->prev = it->prev;
+    if (it->prev != nullptr) it->prev->next = it->next;
     s_cls->sl_curr--;
 }
 
@@ -769,12 +769,12 @@ static int slab_rebalance_move(void) {
     for (x = 0; x < slab_bulk_check; x++) {
         hv = 0;
         hold_lock = NULL;
-        item *it = slab_rebal.slab_pos;
+        pptr<item> it = (item*)slab_rebal.slab_pos;
         item_chunk *ch = NULL;
         status = MOVE_PASS;
         if (it->it_flags & ITEM_CHUNK) {
             /* This chunk is a chained part of a larger item. */
-            ch = (item_chunk *) it;
+            ch = (item_chunk *)(&*it);
             /* Instead, we use the head chunk to find the item and effectively
              * lock the entire structure. If a chunk has ITEM_CHUNK flag, its
              * head cannot be slabbed, so the normal routine is safe. */
@@ -797,7 +797,7 @@ static int slab_rebalance_move(void) {
                  * ITEM_SLABBED, but it's had ITEM_LINKED, it must be active
                  * and have the key written to it already.
                  */
-                hv = hash(ITEM_key(it), it->nkey);
+                hv = tcd_hash(ITEM_key(it), it->nkey);
                 if ((hold_lock = item_trylock(hv)) == NULL) {
                     status = MOVE_LOCKED;
                 } else {
@@ -848,8 +848,9 @@ static int slab_rebalance_move(void) {
         }
 
         int save_item = 0;
-        item *new_it = NULL;
+        pptr<item> new_it = NULL;
         size_t ntotal = 0;
+        unsigned int requested_adjust;
         switch (status) {
             case MOVE_FROM_LRU:
                 /* Lock order is LRU locks -> slabs_lock. unlink uses LRU lock.
@@ -871,12 +872,12 @@ static int slab_rebalance_move(void) {
                     /* Expired, don't save. */
                     save_item = 0;
                 } else if (ch == NULL &&
-                        (new_it = slab_rebalance_alloc(ntotal, slab_rebal.s_clsid)) == NULL) {
+                        (new_it = (item*)slab_rebalance_alloc(ntotal, slab_rebal.s_clsid)) == NULL) {
                     /* Not a chunk of an item, and nomem. */
                     save_item = 0;
                     slab_rebal.evictions_nomem++;
                 } else if (ch != NULL &&
-                        (new_it = slab_rebalance_alloc(s_cls->size, slab_rebal.s_clsid)) == NULL) {
+                        (new_it = (item*)slab_rebalance_alloc(s_cls->size, slab_rebal.s_clsid)) == NULL) {
                     /* Is a chunk of an item, and nomem. */
                     save_item = 0;
                     slab_rebal.evictions_nomem++;
@@ -885,7 +886,7 @@ static int slab_rebalance_move(void) {
                     save_item = 1;
                 }
                 pthread_mutex_unlock(&slabs_lock);
-                unsigned int requested_adjust = 0;
+                requested_adjust = 0;
                 if (save_item) {
                     if (ch == NULL) {
                         assert((new_it->it_flags & ITEM_CHUNKED) == 0);
@@ -915,7 +916,7 @@ static int slab_rebalance_move(void) {
                         slab_rebal.rescues++;
                         requested_adjust = ntotal;
                     } else {
-                        item_chunk *nch = (item_chunk *) new_it;
+                        item_chunk *nch = (item_chunk *) (&*new_it);
                         /* Chunks always have head chunk (the main it) */
                         ch->prev->next = nch;
                         if (ch->next)
@@ -925,7 +926,7 @@ static int slab_rebalance_move(void) {
                         ch->it_flags = ITEM_SLABBED|ITEM_FETCHED;
                         slab_rebal.chunk_rescues++;
 #ifdef DEBUG_SLAB_MOVER
-                        memcpy(ITEM_key((item *)ch), "deadbeef", 8);
+                        memcpy(ITEM_key(pptr<item>(ch)), "deadbeef", 8);
 #endif
                         refcount_decr(it);
                         requested_adjust = s_cls->size;
@@ -1006,7 +1007,7 @@ static void slab_rebalance_finish(void) {
     /* If the algorithm is broken, live items can sneak in. */
     slab_rebal.slab_pos = slab_rebal.slab_start;
     while (1) {
-        item *it = slab_rebal.slab_pos;
+        pptr<item> it = slab_rebal.slab_pos;
         assert(it->it_flags == (ITEM_SLABBED|ITEM_FETCHED));
         assert(memcmp(ITEM_key(it), "deadbeef", 8) == 0);
         it->it_flags = ITEM_SLABBED|ITEM_FETCHED;
@@ -1029,7 +1030,7 @@ static void slab_rebalance_finish(void) {
     /* Don't need to split the page into chunks if we're just storing it */
     if (slab_rebal.d_clsid > SLAB_GLOBAL_PAGE_POOL) {
         memset(slab_rebal.slab_start, 0, (size_t)settings.slab_page_size);
-        split_slab_page_into_freelist(slab_rebal.slab_start,
+        split_slab_page_into_freelist((char*)slab_rebal.slab_start,
             slab_rebal.d_clsid);
     } else if (slab_rebal.d_clsid == SLAB_GLOBAL_PAGE_POOL) {
         /* mem_malloc'ed might be higher than mem_limit. */

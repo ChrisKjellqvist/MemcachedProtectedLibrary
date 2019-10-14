@@ -25,14 +25,14 @@
 
 #define LARGEST_ID POWER_LARGEST
 
-typedef struct {
+struct crawler_module_reg_t;
+struct crawler_module_t;
+struct crawler_client_t {
     void *c; /* original connection structure. still with source thread attached. */
     int sfd; /* client fd. */
     bipbuf_t *buf; /* output buffer */
     char *cbuf; /* current buffer */
-} crawler_client_t;
-
-typedef struct _crawler_module_t crawler_module_t;
+};
 
 typedef void (*crawler_eval_func)(crawler_module_t *cm, item *it, uint32_t hv, int slab_cls);
 typedef int (*crawler_init_func)(crawler_module_t *cm, void *data); // TODO: init args?
@@ -40,16 +40,16 @@ typedef void (*crawler_deinit_func)(crawler_module_t *cm); // TODO: extra args?
 typedef void (*crawler_doneclass_func)(crawler_module_t *cm, int slab_cls);
 typedef void (*crawler_finalize_func)(crawler_module_t *cm);
 
-typedef struct {
+struct crawler_module_reg_t {
     crawler_init_func init; /* run before crawl starts */
     crawler_eval_func eval; /* runs on an item. */
     crawler_doneclass_func doneclass; /* runs once per sub-crawler completion. */
     crawler_finalize_func finalize; /* runs once when all sub-crawlers are done. */
     bool needs_lock; /* whether or not we need the LRU lock held when eval is called */
     bool needs_client; /* whether or not to grab onto the remote client */
-} crawler_module_reg_t;
+};
 
-struct _crawler_module_t {
+struct crawler_module_t {
     void *data; /* opaque data pointer */
     crawler_client_t c;
     crawler_module_reg_t *mod;
@@ -123,14 +123,14 @@ static void lru_crawler_release_client(crawler_client_t *c) {
 }
 
 static int crawler_expired_init(crawler_module_t *cm, void *data) {
-    struct crawler_expired_data *d;
+    crawler_expired_data *d;
     if (data != NULL) {
-        d = data;
+        d = (crawler_expired_data*)data;
         d->is_external = true;
         cm->data = data;
     } else {
         // allocate data.
-        d = calloc(1, sizeof(struct crawler_expired_data));
+        d = (crawler_expired_data*)calloc(1, sizeof(crawler_expired_data));
         if (d == NULL) {
             return -1;
         }
@@ -315,7 +315,7 @@ static int lru_crawler_client_getbuf(crawler_client_t *c) {
         if (ret < 0) return ret;
     }
 
-    c->cbuf = buf;
+    c->cbuf = (char*)buf;
     return 0;
 }
 
@@ -371,7 +371,7 @@ static void *item_crawler_thread(void *arg) {
                 lru_crawler_class_done(i);
                 continue;
             }
-            uint32_t hv = hash(ITEM_key(search), search->nkey);
+            uint32_t hv = tcd_hash(ITEM_key(search), search->nkey);
             /* Attempt to hash item lock the "search" item. If locked, no
              * other callers can incr the refcount
              */

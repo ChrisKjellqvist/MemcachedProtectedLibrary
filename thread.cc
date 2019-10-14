@@ -101,7 +101,7 @@ void memcached_thread_init(int nthreads, void *arg) {
     item_lock_count = hashsize(power);
     item_lock_hashpower = power;
 
-    item_locks = calloc(item_lock_count, sizeof(pthread_mutex_t));
+    item_locks = (pthread_mutex_t*)calloc(item_lock_count, sizeof(pthread_mutex_t));
     if (! item_locks) {
         perror("Can't allocate item locks");
         exit(1);
@@ -130,7 +130,7 @@ item *item_alloc(char *key, size_t nkey, int flags, rel_time_t exptime, int nbyt
 item *item_get(const char *key, const size_t nkey, uint32_t exptime, const bool do_update) {
     item *it;
     uint32_t hv;
-    hv = hash(key, nkey);
+    hv = tcd_hash(key, nkey);
     item_lock(hv);
     it = do_item_get(key, nkey, hv, do_update);
     item_unlock(hv);
@@ -140,7 +140,7 @@ item *item_get(const char *key, const size_t nkey, uint32_t exptime, const bool 
 item *item_touch(const char *key, size_t nkey, uint32_t exptime) {
     item *it;
     uint32_t hv;
-    hv = hash(key, nkey);
+    hv = tcd_hash(key, nkey);
     item_lock(hv);
     it = do_item_touch(key, nkey, exptime, hv);
     item_unlock(hv);
@@ -154,7 +154,7 @@ int item_link(item *item) {
     int ret;
     uint32_t hv;
 
-    hv = hash(ITEM_key(item), item->nkey);
+    hv = tcd_hash(ITEM_key(item), item->nkey);
     item_lock(hv);
     ret = do_item_link(item, hv);
     item_unlock(hv);
@@ -167,7 +167,7 @@ int item_link(item *item) {
  */
 void item_remove(item *item) {
     uint32_t hv;
-    hv = hash(ITEM_key(item), item->nkey);
+    hv = tcd_hash(ITEM_key(item), item->nkey);
 
     item_lock(hv);
     do_item_remove(item);
@@ -188,7 +188,7 @@ int item_replace(item *old_it, item *new_it, const uint32_t hv) {
  */
 void item_unlink(item *item) {
     uint32_t hv;
-    hv = hash(ITEM_key(item), item->nkey);
+    hv = tcd_hash(ITEM_key(item), item->nkey);
     item_lock(hv);
     do_item_unlink(item, hv);
     item_unlock(hv);
@@ -204,7 +204,7 @@ enum delta_result_type add_delta(const char *key,
     enum delta_result_type ret;
     uint32_t hv;
 
-    hv = hash(key, nkey);
+    hv = tcd_hash(key, nkey);
     item_lock(hv);
     ret = do_add_delta(key, nkey, incr, delta, buf, cas, hv);
     item_unlock(hv);
@@ -218,7 +218,7 @@ enum store_item_type store_item(item *item, int comm) {
     struct st_st *ret;
     uint32_t hv;
 
-    hv = hash(ITEM_key(item), item->nkey);
+    hv = tcd_hash(ITEM_key(item), item->nkey);
     item_lock(hv);
     ret = do_store_item(item, comm, hv);
     item_unlock(hv);

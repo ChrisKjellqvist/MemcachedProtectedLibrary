@@ -3,7 +3,7 @@
 
 #define LRU_CRAWLER_CAP_REMAINING -1
 
-typedef struct {
+struct crawlerstats_t {
     uint64_t histo[61];
     uint64_t ttl_hourplus;
     uint64_t noexp;
@@ -12,7 +12,7 @@ typedef struct {
     rel_time_t start_time;
     rel_time_t end_time;
     bool run_complete;
-} crawlerstats_t;
+};
 
 struct crawler_expired_data {
     pthread_mutex_t lock;

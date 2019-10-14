@@ -21,10 +21,12 @@
 #include <unistd.h>
 #include <assert.h>
 #include <grp.h>
+#include <string>
 
 #include "itoa_ljust.h"
-#include "cache.h"
 #include "logger.h"
+
+#include <pptr.hpp>
 
 /** Maximum length of a key. */
 #define KEY_MAX_LENGTH 250
@@ -100,22 +102,22 @@
     } \
 }
 
-#define ITEM_key(item) (((char*)&((item)->data)) \
-         + (((item)->it_flags & ITEM_CAS) ? sizeof(uint64_t) : 0))
+#define ITEM_key(it) (((char*)&((it)->data)) \
+         + (((it)->it_flags & ITEM_CAS) ? sizeof(uint64_t) : 0))
 
-#define ITEM_suffix(item) ((char*) &((item)->data) + (item)->nkey + 1 \
-         + (((item)->it_flags & ITEM_CAS) ? sizeof(uint64_t) : 0))
+#define ITEM_suffix(it) ((char*) &((it)->data) + (it)->nkey + 1 \
+         + (((it)->it_flags & ITEM_CAS) ? sizeof(uint64_t) : 0))
 
-#define ITEM_data(item) ((char*) &((item)->data) + (item)->nkey + 1 \
-         + (item)->nsuffix \
-         + (((item)->it_flags & ITEM_CAS) ? sizeof(uint64_t) : 0))
+#define ITEM_data(it) ((char*) &((it)->data) + (it)->nkey + 1 \
+         + (it)->nsuffix \
+         + (((it)->it_flags & ITEM_CAS) ? sizeof(uint64_t) : 0))
 
-#define ITEM_ntotal(item) (sizeof(struct _stritem) + (item)->nkey + 1 \
-         + (item)->nsuffix + (item)->nbytes \
-         + (((item)->it_flags & ITEM_CAS) ? sizeof(uint64_t) : 0))
+#define ITEM_ntotal(it) (sizeof(item) + (it)->nkey + 1 \
+         + (it)->nsuffix + (it)->nbytes \
+         + (((it)->it_flags & ITEM_CAS) ? sizeof(uint64_t) : 0))
 
-#define ITEM_clsid(item) ((item)->slabs_clsid & ~(3<<6))
-#define ITEM_lruid(item) ((item)->slabs_clsid & (3<<6))
+#define ITEM_clsid(it) ((it)->slabs_clsid & ~(3<<6))
+#define ITEM_lruid(it) ((it)->slabs_clsid & (3<<6))
 
 #define STAT_KEY_LEN 128
 #define STAT_VAL_LEN 128
@@ -318,7 +320,7 @@ struct settings {
     int tail_repair_time;   /* LRU tail refcount leak repair time */
     bool flush_enabled;     /* flush_all enabled */
     bool dump_enabled;      /* whether cachedump/metadump commands work */
-    char *hash_algorithm;     /* Hash algorithm in use */
+    std::string hash_algorithm;     /* Hash algorithm in use */
     int lru_crawler_sleep;  /* Microsecond sleep between items */
     uint32_t lru_crawler_tocrawl; /* Number of items to crawl per run */
     int hot_lru_pct; /* percentage of slab space for HOT_LRU */
@@ -357,12 +359,12 @@ extern struct settings settings;
 /**
  * Structure for storing items within memcached.
  */
-typedef struct _stritem {
+struct item{
     /* Protected by LRU locks */
-    struct _stritem *next;
-    struct _stritem *prev;
+    pptr<item>      next;
+    pptr<item>      prev;
     /* Rest are protected by an item lock */
-    struct _stritem *h_next;    /* hash chain next */
+    pptr<item>      h_next;    /* hash chain next */
     rel_time_t      time;       /* least recent access */
     rel_time_t      exptime;    /* expire time */
     int             nbytes;     /* size of data */
@@ -381,17 +383,17 @@ typedef struct _stritem {
     /* then null-terminated key */
     /* then " flags length\r\n" (no terminating null) */
     /* then data with terminating \r\n (no terminating null; it's binary!) */
-} item;
+};
 
 // TODO: If we eventually want user loaded modules, we can't use an enum :(
 enum crawler_run_type {
     CRAWLER_AUTOEXPIRE=0, CRAWLER_EXPIRED, CRAWLER_METADUMP
 };
 
-typedef struct {
-    struct _stritem *next;
-    struct _stritem *prev;
-    struct _stritem *h_next;    /* hash chain next */
+struct crawler{
+    item *next;
+    item *prev;
+    item *h_next;    /* hash chain next */
     rel_time_t      time;       /* least recent access */
     rel_time_t      exptime;    /* expire time */
     int             nbytes;     /* size of data */
@@ -404,13 +406,13 @@ typedef struct {
     uint64_t        reclaimed;  /* items reclaimed during this crawl. */
     uint64_t        unfetched;  /* items reclaimed unfetched during this crawl. */
     uint64_t        checked;    /* items examined during this crawl. */
-} crawler;
+};
 
 /* Header when an item is actually a chunk of another item. */
-typedef struct _strchunk {
-    struct _strchunk *next;     /* points within its own chain. */
-    struct _strchunk *prev;     /* can potentially point to the head. */
-    struct _stritem  *head;     /* always points to the owner chunk */
+struct item_chunk {
+    item_chunk *next;     /* points within its own chain. */
+    item_chunk *prev;     /* can potentially point to the head. */
+    item  *head;     /* always points to the owner chunk */
     int              size;      /* available chunk space in bytes */
     int              used;      /* chunk space used */
     int              nbytes;    /* used. */
@@ -419,7 +421,7 @@ typedef struct _strchunk {
     uint8_t          it_flags;  /* ITEM_* above. */
     uint8_t          slabs_clsid; /* Same as above. */
     char data[];
-} item_chunk;
+};
 
 #ifdef NEED_ALIGN
 static inline char *ITEM_schunk(item *it) {

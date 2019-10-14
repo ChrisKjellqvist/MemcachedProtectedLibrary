@@ -25,7 +25,8 @@
 #include <assert.h>
 #include <pthread.h>
 
-#include "pptr.h"
+#include <pptr.hpp>
+#include <rpmalloc.hpp>
 
 static pthread_cond_t maintenance_cond = PTHREAD_COND_INITIALIZER;
 static pthread_mutex_t maintenance_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -63,8 +64,9 @@ void assoc_init(const int hashtable_init) {
     if (hashtable_init) {
         hashpower = hashtable_init;
     }
-    primary_hashtable = pptr<pptr<item> >(rp_calloc(hashsize(hashpower), sizeof(void *)));
-    if (! primary_hashtable) {
+    primary_hashtable = pptr<pptr<item> >(
+        (pptr<item>*)RP_calloc(hashsize(hashpower), sizeof(pptr<item>)));
+    if (primary_hashtable == nullptr) {
         fprintf(stderr, "Failed to init hashtable.\n");
         exit(EXIT_FAILURE);
     }
@@ -103,8 +105,8 @@ item *assoc_find(const char *key, const size_t nkey, const uint32_t hv) {
 /* returns the address of the item pointer before the key.  if *item == 0,
    the item wasn't found */
 
-static item** _hashitem_before (const char *key, const size_t nkey, const uint32_t hv) {
-    item **pos;
+static pptr<item>* _hashitem_before (const char *key, const size_t nkey, const uint32_t hv) {
+    pptr<item> *pos;
     unsigned int oldbucket;
 
     if (expanding &&
@@ -115,7 +117,8 @@ static item** _hashitem_before (const char *key, const size_t nkey, const uint32
         pos = &primary_hashtable[hv & hashmask(hashpower)];
     }
 
-    while (*pos && ((nkey != (*pos)->nkey) || memcmp(key, ITEM_key(*pos), nkey))) {
+    // CHRIS TODO 
+    while ((*pos != nullptr) && ((nkey != (*pos)->nkey) || memcmp(key, ITEM_key(*pos), nkey))) {
         pos = &(*pos)->h_next;
     }
     return pos;
@@ -125,8 +128,9 @@ static item** _hashitem_before (const char *key, const size_t nkey, const uint32
 static void assoc_expand(void) {
     old_hashtable = primary_hashtable;
 
-    primary_hashtable = pptr<pptr<item> >(rp_calloc(hashsize(hashpower + 1), sizeof(void *)));
-    if (primary_hashtable) {
+    primary_hashtable = pptr<pptr<item> >(
+        (pptr<item>*)RP_calloc(hashsize(hashpower + 1), sizeof(pptr<item>)));
+    if (primary_hashtable != nullptr) {
         if (settings.verbose > 1)
             fprintf(stderr, "Hash table expansion starting\n");
         hashpower++;
@@ -175,10 +179,10 @@ int assoc_insert(item *it, const uint32_t hv) {
 }
 
 void assoc_delete(const char *key, const size_t nkey, const uint32_t hv) {
-    item **before = _hashitem_before(key, nkey, hv);
+    pptr<item> *before = _hashitem_before(key, nkey, hv);
 
-    if (*before) {
-        item *nxt;
+    if (*before != nullptr) {
+        pptr<item> nxt;
         /* The DTrace probe cannot be triggered as the last instruction
          * due to possible tail-optimization by the compiler
          */
@@ -218,7 +222,7 @@ static void *assoc_maintenance_thread(void *arg) {
             if ((item_lock = item_trylock(expand_bucket))) {
                     for (it = old_hashtable[expand_bucket]; NULL != it; it = next) {
                         next = it->h_next;
-                        bucket = hash(ITEM_key(it), it->nkey) & hashmask(hashpower);
+                        bucket = tcd_hash(ITEM_key(it), it->nkey) & hashmask(hashpower);
                         it->h_next = primary_hashtable[bucket];
                         primary_hashtable[bucket] = it;
                     }

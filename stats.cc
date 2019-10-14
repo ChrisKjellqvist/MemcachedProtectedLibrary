@@ -18,8 +18,7 @@
  * fixed-size hash of prefixes; we run the prefixes through the same
  * CRC function used by the cache hashtable.
  */
-typedef struct _prefix_stats PREFIX_STATS;
-struct _prefix_stats {
+struct PREFIX_STATS {
     char         *prefix;
     size_t        prefix_len;
     uint64_t      num_gets;
@@ -83,20 +82,20 @@ static PREFIX_STATS *stats_prefix_find(const char *key, const size_t nkey) {
         return NULL;
     }
 
-    hashval = hash(key, length) % PREFIX_HASH_SIZE;
+    hashval = tcd_hash(key, length) % PREFIX_HASH_SIZE;
 
     for (pfs = prefix_stats[hashval]; NULL != pfs; pfs = pfs->next) {
         if (strncmp(pfs->prefix, key, length) == 0)
             return pfs;
     }
 
-    pfs = calloc(sizeof(PREFIX_STATS), 1);
+    pfs = (PREFIX_STATS*)calloc(sizeof(PREFIX_STATS), 1);
     if (NULL == pfs) {
         perror("Can't allocate space for stats structure: calloc");
         return NULL;
     }
 
-    pfs->prefix = malloc(length + 1);
+    pfs->prefix = (char*)malloc(length + 1);
     if (NULL == pfs->prefix) {
         perror("Can't allocate space for copy of prefix: malloc");
         free(pfs);
@@ -183,7 +182,7 @@ char *stats_prefix_dump(int *length) {
            num_prefixes * (strlen(format) - 2 /* %s */
                            + 4 * (20 - 4)) /* %llu replaced by 20-digit num */
                            + sizeof("END\r\n");
-    buf = malloc(size);
+    buf = (char*)malloc(size);
     if (NULL == buf) {
         perror("Can't allocate stats response: malloc");
         STATS_UNLOCK();
@@ -214,7 +213,7 @@ char *stats_prefix_dump(int *length) {
 
 /****************************************************************************
       To run unit tests, compile with $(CC) -DUNIT_TEST stats.c assoc.o
-      (need assoc.o to get the hash() function).
+      (need assoc.o to get the tcd_hash() function).
 ****************************************************************************/
 
 struct settings settings;
@@ -295,7 +294,7 @@ static void test_prefix_record_set() {
 }
 
 static void test_prefix_dump() {
-    int hashval = hash("abc", 3) % PREFIX_HASH_SIZE;
+    int hashval = tcd_hash("abc", 3) % PREFIX_HASH_SIZE;
     char tmp[500];
     char *expected;
     int keynum;
@@ -331,7 +330,7 @@ static void test_prefix_dump() {
     /* Find a key that hashes to the same bucket as "abc" */
     for (keynum = 0; keynum < PREFIX_HASH_SIZE * 100; keynum++) {
         snprintf(tmp, sizeof(tmp), "%d", keynum);
-        if (hashval == hash(tmp, strlen(tmp)) % PREFIX_HASH_SIZE) {
+        if (hashval == tcd_hash(tmp, strlen(tmp)) % PREFIX_HASH_SIZE) {
             break;
         }
     }

@@ -56,11 +56,11 @@ void item_stats_sizes_remove(item *it);
 bool item_stats_sizes_status(void);
 
 /* stats getter for slab automover */
-typedef struct {
+struct item_stats_automove{
     int64_t evicted;
     int64_t outofmemory;
     uint32_t age;
-} item_stats_automove;
+};
 void fill_item_stats_automove(item_stats_automove *am);
 
 item *do_item_get(const char *key, const size_t nkey, const uint32_t hv, const bool do_update);

@@ -1,14 +1,10 @@
-#ifndef HASH_H
-#define    HASH_H
+#pragma once
 
 typedef uint32_t (*hash_func)(const void *key, size_t length);
-hash_func hash;
+extern hash_func tcd_hash;
 
 enum hashfunc_type {
     JENKINS_HASH=0, MURMUR3_HASH
 };
 
 int hash_init(enum hashfunc_type type);
-
-#endif    /* HASH_H */
-

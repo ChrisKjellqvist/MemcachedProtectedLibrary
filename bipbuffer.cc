@@ -48,7 +48,7 @@ void bipbuf_init(bipbuf_t* me, const unsigned int size)
 
 bipbuf_t *bipbuf_new(const unsigned int size)
 {
-    bipbuf_t *me = malloc(bipbuf_sizeof(size));
+    bipbuf_t *me = (bipbuf_t*)malloc(bipbuf_sizeof(size));
     if (!me)
         return NULL;
     bipbuf_init(me, size);
@@ -176,5 +176,5 @@ unsigned char *bipbuf_poll(bipbuf_t* me, const unsigned int size)
     }
 
     __check_for_switch_to_b(me);
-    return end;
+    return (unsigned char*)end;
 }

@@ -33,10 +33,10 @@ typedef struct {
 void *slab_automove_init(struct settings *settings) {
     uint32_t window_size = settings->slab_automove_window;
     double max_age_ratio = settings->slab_automove_ratio;
-    slab_automove *a = calloc(1, sizeof(slab_automove));
+    slab_automove *a = (slab_automove*)calloc(1, sizeof(slab_automove));
     if (a == NULL)
         return NULL;
-    a->window_data = calloc(window_size * MAX_NUMBER_OF_SLAB_CLASSES, sizeof(struct window_data));
+    a->window_data = (struct window_data*)calloc(window_size * MAX_NUMBER_OF_SLAB_CLASSES, sizeof(struct window_data));
     a->window_size = window_size;
     a->max_age_ratio = max_age_ratio;
     if (a->window_data == NULL) {

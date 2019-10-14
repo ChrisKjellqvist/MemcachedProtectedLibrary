@@ -16,7 +16,7 @@ int main(int argc, char** argv){
 #endif
   pthread_t my_server;
   start_server_thread(&my_server, argc, argv);
-  not_main(argc, argv);
+  not_main();
   exit(0); 
 }
 

@@ -380,10 +380,10 @@ struct st_st *do_store_item(item *it, int comm, const uint32_t hv) {
   return mk_st(stored, cas);
 }
 
-typedef struct token_s {
+struct token_t {
   char *value;
   size_t length;
-} token_t;
+};
 
 #define COMMAND_TOKEN 0
 #define SUBCOMMAND_TOKEN 1
@@ -1283,6 +1283,7 @@ void* server_thread (void *pargs) {
     NO_LRU_CRAWLER,
     NO_LRU_MAINTAINER
   };
+  /*
   char *const subopts_tokens[] = {
     [MAXCONNS_FAST] = "maxconns_fast",
     [HASHPOWER_INIT] = "hashpower",
@@ -1320,6 +1321,7 @@ void* server_thread (void *pargs) {
     [NO_LRU_MAINTAINER] = "no_lru_maintainer",
     NULL
   };
+  */
 
   if (!sanitycheck()) {
     return (void*)0xDEAFBEEF;
@@ -1338,39 +1340,71 @@ void* server_thread (void *pargs) {
   /* set stderr non-buffering (for running under, say, daemontools) */
   setbuf(stderr, NULL);
 
+  /*
   char *shortopts =
-    "a:"  /* access mask for unix socket */
-    "A"  /* enable admin shutdown command */
-    "p:"  /* TCP port number to listen on */
-    "s:"  /* unix socket path to listen on */
-    "U:"  /* UDP port number to listen on */
-    "m:"  /* max memory to use for items in megabytes */
-    "M"   /* return error on memory exhausted */
-    "c:"  /* max simultaneous connections */
-    "k"   /* lock down all paged memory */
-    "hiV" /* help, licence info, version */
-    "r"   /* maximize core file limit */
-    "v"   /* verbose */
-    "d"   /* daemon mode */
-    "l:"  /* interface to listen on */
-    "u:"  /* user identity to run as */
-    "P:"  /* save PID in file */
-    "f:"  /* factor? */
-    "n:"  /* minimum space allocated for key+value+flags */
-    "t:"  /* threads */
-    "D:"  /* prefix delimiter? */
-    "L"   /* Large memory pages */
-    "R:"  /* max requests per event */
-    "C"   /* Disable use of CAS */
-    "b:"  /* backlog queue limit */
-    "B:"  /* Binding protocol */
-    "I:"  /* Max item size */
-    "F"   /* Disable flush_all */
-    "X"   /* Disable dump commands */
-    "o:"  /* Extended generic options */
+    "a:"  
+// access mask for unix socket 
+    "A"  
+// enable admin shutdown command 
+    "p:"  
+// TCP port number to listen on 
+    "s:"  
+// unix socket path to listen on 
+    "U:"  
+// UDP port number to listen on 
+    "m:"  
+// max memory to use for items in megabytes 
+    "M"   
+// return error on memory exhausted 
+    "c:"  
+// max simultaneous connections 
+    "k"   
+// lock down all paged memory 
+    "hiV" 
+// help, licence info, version 
+    "r"   
+// maximize core file limit 
+    "v"   
+// verbose 
+    "d"   
+// daemon mode 
+    "l:"  
+// interface to listen on 
+    "u:"  
+// user identity to run as 
+    "P:"  
+// save PID in file 
+    "f:"  
+// factor? 
+    "n:"  
+// minimum space allocated for key+value+flags 
+    "t:"  
+// threads 
+    "D:"  
+// prefix delimiter? 
+    "L"   
+// Large memory pages 
+    "R:"  
+// max requests per event 
+    "C"   
+// Disable use of CAS 
+    "b:"  
+// backlog queue limit 
+    "B:"  
+// Binding protocol 
+    "I:"  
+// Max item size 
+    "F"   
+// Disable flush_all 
+    "X"   
+// Disable dump commands 
+    "o:"  
+// Extended generic options 
     ;
+    */
 
   /* process arguments */
+  /*
 #ifdef HAVE_GETOPT_LONG
   const struct option longopts[] = {
     {"unix-mask", required_argument, 0, 'a'},
@@ -1405,6 +1439,7 @@ void* server_thread (void *pargs) {
     {"extended", required_argument, 0, 'o'},
     {0, 0, 0, 0}
   };
+  
   int optindex;
   while (-1 != (c = getopt_long(argc, argv, shortopts,
 	  longopts, &optindex))) {
@@ -1413,7 +1448,6 @@ void* server_thread (void *pargs) {
 #endif
     switch (c) {
       case 'A':
-	/* enables "shutdown" command */
 	settings.shutdown_command = true;
 	break;
       case 'm':
@@ -1534,11 +1568,14 @@ void* server_thread (void *pargs) {
       case 'X' :
 	settings.dump_enabled = false;
 	break;
-      case 'o': /* It's sub-opts time! */
-	subopts_orig = subopts = strdup(optarg); /* getsubopt() changes the original args */
+      case 'o': 
+// It's sub-opts time! 
+	subopts_orig = subopts = strdup(optarg); 
+// getsubopt() changes the original args 
 
 	while (*subopts != '\0') {
-
+          fprintf(stderr, "Warning! Reading subopts, when deprecated!\n");
+          break;
 	  switch (getsubopt(&subopts, subopts_tokens, &subopts_value)) {
 	    case MAXCONNS_FAST:
 	      settings.maxconns_fast = true;
@@ -1721,8 +1758,9 @@ void* server_thread (void *pargs) {
 		fprintf(stderr, "could not parse argument to watcher_logbuf_size\n");
 		return NULL;
 	      }
-	      settings.logger_watcher_buf_size *= 1024; /* kilobytes */
-	      break;
+              //kb
+	      settings.logger_watcher_buf_size *= 1024; 
+              break;
 	    case WORKER_LOGBUF_SIZE:
 	      if (subopts_value == NULL) {
 		fprintf(stderr, "Missing worker_logbuf_size argument\n");
@@ -1732,7 +1770,8 @@ void* server_thread (void *pargs) {
 		fprintf(stderr, "could not parse argument to worker_logbuf_size\n");
 		return NULL;
 	      }
-	      settings.logger_buf_size *= 1024; /* kilobytes */
+              // kb
+	      settings.logger_buf_size *= 1024;
 	    case SLAB_SIZES:
 	      slab_sizes_unparsed = subopts_value;
 	      break;
@@ -1772,7 +1811,6 @@ void* server_thread (void *pargs) {
 	      settings.lru_segmented = false;
 	      break;
 	    case MODERN:
-	      /* currently no new defaults */
 	      break;
 	    case NO_MODERN:
 	      if (!slab_chunk_size_changed) {
@@ -1800,6 +1838,7 @@ void* server_thread (void *pargs) {
 	return NULL;
     }
   }
+  */
 
   if (settings.item_size_max < 1024) {
     fprintf(stderr, "Item max size cannot be less than 1024 bytes.\n");
@@ -2093,7 +2132,7 @@ void pku_memcached_insert(struct insert_struct *is){
   if (it != NULL) {
     memcpy(ITEM_data(it), is->d, is->dn);
     memcpy(ITEM_data(it) + is->dn, "\r\n", 2);
-    uint32_t hv = hash(is->k, is->nk);
+    uint32_t hv = tcd_hash(is->k, is->nk);
     if (!(tup =do_store_item(it, NREAD_ADD, hv))->sit) {
       perror("Couldn't store item!!!\n");
     }

@@ -75,7 +75,7 @@ struct logentry_item_store {
 
 /* end intermediary structures */
 
-typedef struct _logentry {
+struct logentry {
     enum log_entry_subtype event;
     uint8_t pad;
     uint16_t eflags;
@@ -86,7 +86,7 @@ typedef struct _logentry {
         void *entry; /* probably an item */
         char end;
     } data[];
-} logentry;
+};
 
 #define LOG_SYSEVENTS  (1<<1) /* threads start/stop/working */
 #define LOG_FETCHERS   (1<<2) /* get/gets/etc */
@@ -97,9 +97,9 @@ typedef struct _logentry {
 #define LOG_STRICT     (1<<7) /* block worker instead of drop */
 #define LOG_RAWCMDS    (1<<9) /* raw ascii commands */
 
-typedef struct _logger {
-    struct _logger *prev;
-    struct _logger *next;
+struct logger {
+    logger *prev;
+    logger *next;
     pthread_mutex_t mutex; /* guard for this + *buf */
     uint64_t written; /* entries written to the buffer */
     uint64_t dropped; /* entries dropped */
@@ -109,7 +109,7 @@ typedef struct _logger {
     uint16_t eflags; /* flags this logger should log */
     bipbuf_t *buf;
     const entry_details *entry_map;
-} logger;
+};
 
 enum logger_watcher_type {
     LOGGER_WATCHER_STDERR = 0,
