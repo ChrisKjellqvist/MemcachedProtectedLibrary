@@ -12,7 +12,7 @@ static unsigned long* t_psp_ar[256];
 asm("trampoline_exit: ret");
 
 static unsigned long *get_new_stack(){
-  char *ptr = mmap(0, PSTACK_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+  char *ptr = (char*)mmap(0, PSTACK_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
   if (ptr == (char*)-1){
     printf("error!\n");
     exit(1);

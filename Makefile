@@ -2,8 +2,10 @@
 
 LDS = scripts/ldscript.lds
 
-OBJECTS = memcached.o hash.o jenkins_hash.o murmur3_hash.o slabs.o items.o assoc.o thread.o \
-	  daemon.o stats.o util.o bipbuffer.o crawler.o itoa_ljust.o slab_automove.o init.o
+OBJECTS = plib.o memcached.o hash.o jenkins_hash.o murmur3_hash.o slabs.o \
+	  items.o assoc.o thread.o daemon.o stats.o util.o bipbuffer.o \
+	  crawler.o itoa_ljust.o slab_automove.o init.o testapp.o \
+	  pku_memcached.o 
 
 OPTS_LENIENT = -I. -Iplib/ -I../rpmalloc/src -DHAVE_CONFIG_H -O2 -MD -MP -MF -Wall -std=c++17
 OPTS = $(OPTS_LENIENT) -Werror
@@ -15,6 +17,10 @@ all: $(OBJECTS)
 
 %.o: %.cc
 	$(CC) -c $^ $(OPTS) -MT $@ -o $@
+
+%.o: plib/%.cc
+	$(CC) -c $^ $(OPTS) -MT $@ -o $@
+
 
 .PHONY : clean
 clean: 
