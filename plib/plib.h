@@ -41,12 +41,14 @@
 		"jne RESET \n\t"					\
 		: : "a" (0xfffffffc), "c" (0), "d" (0));
 
-int pkey_set(int pkey, unsigned int rights);
+namespace Hodor {
+  int pkey_set(int pkey, unsigned int rights);
 
-int pkey_mprotect(void *addr, size_t len, int prot, int pkey);
+  int pkey_mprotect(void *addr, size_t len, int prot, int pkey);
 
-int pkey_alloc(unsigned long flags, unsigned long access_rights);
+  int pkey_alloc(unsigned long flags, unsigned long access_rights);
 
-int pkey_free(int pkey);
+  int pkey_free(int pkey);
+}
 
 #endif

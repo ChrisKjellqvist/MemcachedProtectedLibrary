@@ -1,7 +1,12 @@
 CC=clang
 CCOPTS = -Ofast
-all:
-	clang $(CCOPTS) -c -static plib.c -o plib.o
+OBJECTS = plib.o
+
+all: plib.o
+
+%.o: %.cc
+	$(CC) -c $(CCOPTS) $^ -o $@
+
 clean:
 	rm -rf plib.o
 
