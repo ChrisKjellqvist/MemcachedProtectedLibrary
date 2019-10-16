@@ -18,9 +18,9 @@ struct start_struct {
   char ** argv;
 };
 
-void memcached_touch(char* key, size_t nkey, uint32_t exptime, int t_id);
-void memcached_insert(char* key, size_t nkey, char *data, size_t datan, uint32_t exptime, int t_id);
-void  memcached_get(char *key, size_t nkey, uint32_t exptime, char *buffer, size_t buffLen, int *exit_code, int t_id);
+void memcached_touch(char* key, size_t nkey, uint32_t exptime, int t_id = 0);
+void memcached_insert(char* key, size_t nkey, char *data, size_t datan, uint32_t exptime, int t_id = 0);
+void  memcached_get(char *key, size_t nkey, uint32_t exptime, char *buffer, size_t buffLen, int *exit_code, int t_id = 0);
+void memcached_end(int t_id = 0);
 int start_server_thread(pthread_t *thread, int argc, char** argv);
-void memcached_end(int t_id);
 #endif

@@ -3,7 +3,10 @@ OBJECTS = plib.o memcached.o hash.o jenkins_hash.o murmur3_hash.o items.o \
 	  assoc.o thread.o daemon.o stats.o util.o bipbuffer.o crawler.o \
 	  itoa_ljust.o slab_automove.o slabs.o init.o testapp.o pku_memcached.o
 
-OPTS_LENIENT = -Iprotected/ -Iunprotected/ -Iplib/ -I../rpmalloc/src -DHAVE_CONFIG_H -O2 -MD -MP -Wall -std=c++17
+OPT_LEVEL = -O0 -g -DNO_PKEY
+#OPT_LEVEL = -O2
+OPTS_LENIENT = -Iprotected/ -Iunprotected/ -Iplib/ -I../rpmalloc/src \
+	       -DHAVE_CONFIG_H -MD -MP -Wall -std=c++17 $(OPT_LEVEL)
 OPTS = $(OPTS_LENIENT) -Werror
 # Default arguments that clang++ passes to the linker. This turns out to be
 # important for C++ programs
