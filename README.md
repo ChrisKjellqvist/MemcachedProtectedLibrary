@@ -10,7 +10,7 @@ src/pptr.hpp -- header containing persistent pointer class
 RegionManager.hpp:lookup -- find base pointers for regions
 	size is stored 
 
-Make sure to export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)
+Make sure to export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/lib
 
 
 
