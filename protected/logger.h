@@ -11,7 +11,7 @@
 #define GET_LOGGER() ((logger *) pthread_getspecific(logger_key));
 
 /* Inlined from memcached.h - should go into sub header */
-typedef unsigned int rel_time_t;
+using rel_time_t = unsigned int;
 
 enum log_entry_type {
     LOGGER_ASCII_CMD = 0,
@@ -41,12 +41,12 @@ enum logger_parse_entry_ret {
     LOGGER_PARSE_ENTRY_FAILED
 };
 
-typedef const struct {
+struct entry_details {
     enum log_entry_subtype subtype;
     int reqlen;
     uint16_t eflags;
     char *format;
-} entry_details;
+};
 
 /* log entry intermediary structures */
 struct logentry_eviction {

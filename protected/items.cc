@@ -220,8 +220,8 @@ item *do_item_alloc_pull(const size_t ntotal, const unsigned int id) {
 item_chunk *do_item_alloc_chunk(item_chunk *ch, const size_t bytes_remain) {
   // TODO: Should be a cleaner way of finding real size with slabber calls
   size_t size = bytes_remain + sizeof(item_chunk);
-  if (size > settings.slab_chunk_size_max)
-    size = settings.slab_chunk_size_max;
+  if (size > (size_t)settings.slab_chunk_size_max)
+    size = (size_t)settings.slab_chunk_size_max;
   unsigned int id = slabs_clsid(size);
 
   item_chunk *nch = (item_chunk *) do_item_alloc_pull(size, id);
@@ -264,7 +264,7 @@ item *do_item_alloc(char *key, const size_t nkey, const unsigned int flags,
   /* This is a large item. Allocate a header object now, lazily allocate
    *  chunks while reading the upload.
    */
-  if (ntotal > settings.slab_chunk_size_max) {
+  if (ntotal > (size_t)settings.slab_chunk_size_max) {
     /* We still link this item into the LRU for the larger slab class, but
      * we're pulling a header from an entirely different slab class. The
      * free routines handle large items specifically.
@@ -689,7 +689,7 @@ item *do_item_get(const char *key, const size_t nkey, const uint32_t hv, const b
   }
 
   if (settings.verbose > 2) {
-    int ii;
+    size_t ii;
     if (it == NULL) {
       fprintf(stderr, "> NOT FOUND ");
     } else {
@@ -1095,7 +1095,7 @@ static void lru_maintainer_crawler_check(crawler_expired_data *cdata) {
     /* We've not successfully kicked off a crawl yet. */
     if (s->run_complete) {
       pthread_mutex_lock(&cdata->lock);
-      int x;
+      uint32_t x;
       /* Should we crawl again? */
       uint64_t possible_reclaims = s->seen - s->noexp;
       uint64_t available_reclaims = 0;

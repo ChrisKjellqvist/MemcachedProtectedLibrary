@@ -506,7 +506,7 @@ static int do_lru_crawler_start(uint32_t id, uint32_t remaining) {
         crawlers[sid].next = 0;
         crawlers[sid].prev = 0;
         crawlers[sid].time = 0;
-        if (remaining == LRU_CRAWLER_CAP_REMAINING) {
+        if ((int)remaining == LRU_CRAWLER_CAP_REMAINING) {
             remaining = do_get_lru_size(sid);
         }
         /* Values for remaining:

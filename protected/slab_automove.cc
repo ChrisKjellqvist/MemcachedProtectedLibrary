@@ -58,7 +58,7 @@ void slab_automove_free(void *arg) {
 }
 
 static void window_sum(struct window_data *wd, struct window_data *w, uint32_t size) {
-    int x;
+    size_t x;
     for (x = 0; x < size; x++) {
         struct window_data *d = &wd[x];
         w->age += d->age;

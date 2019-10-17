@@ -87,7 +87,7 @@ unsigned int slabs_clsid(const size_t size) {
       printf("size is 0: %ld\n", size);
         return 0;
     }
-    if (size > settings.item_size_max){
+    if (size > (size_t)settings.item_size_max){
       printf("size is too big: %ld > %d\n", size, settings.item_size_max);
       return 0;
     }
@@ -278,7 +278,7 @@ static int grow_slab_list (const unsigned int id) {
 
 static void split_slab_page_into_freelist(char *ptr, const unsigned int id) {
     slabclass_t *p = &slabclass[id];
-    int x;
+    unsigned int x;
     for (x = 0; x < p->perslab; x++) {
         do_slabs_free(ptr, 0, id);
         ptr += p->size;
@@ -334,7 +334,7 @@ static void *do_slabs_alloc(const size_t size, unsigned int id, uint64_t *total_
     slabclass_t *p;
     void *ret = NULL;
     pptr<item> it = NULL;
-    if (id < POWER_SMALLEST || id > power_largest) {
+    if (id < POWER_SMALLEST || id > (unsigned int)power_largest) {
         MEMCACHED_SLABS_ALLOCATE_FAILED(size, 0);
         return NULL;
     }
@@ -441,8 +441,8 @@ static void do_slabs_free(void *ptr, const size_t size, unsigned int id) {
     slabclass_t *p;
     pptr<item> it;
 
-    assert(id >= POWER_SMALLEST && id <= power_largest);
-    if (id < POWER_SMALLEST || id > power_largest)
+    assert(id >= POWER_SMALLEST && id <= (unsigned int)power_largest);
+    if (id < POWER_SMALLEST || id > (unsigned int)power_largest)
         return;
 
     MEMCACHED_SLABS_FREE(size, id, ptr);
@@ -580,7 +580,7 @@ void slabs_adjust_mem_requested(unsigned int id, size_t old, size_t ntotal)
 {
     pthread_mutex_lock(&slabs_lock);
     slabclass_t *p;
-    if (id < POWER_SMALLEST || id > power_largest) {
+    if (id < POWER_SMALLEST || id > (unsigned int)power_largest) {
         fprintf(stderr, "Internal error! Invalid slab class\n");
         abort();
     }
@@ -688,7 +688,7 @@ static int slab_rebalance_start(void) {
 static void *slab_rebalance_alloc(const size_t size, unsigned int id) {
     slabclass_t *s_cls;
     s_cls = &slabclass[slab_rebal.s_clsid];
-    int x;
+    unsigned int x;
     pptr<item> new_it = NULL;
 
     for (x = 0; x < s_cls->perslab; x++) {
@@ -991,7 +991,7 @@ static int slab_rebalance_move(void) {
 static void slab_rebalance_finish(void) {
     slabclass_t *s_cls;
     slabclass_t *d_cls;
-    int x;
+    unsigned int x;
     uint32_t rescues;
     uint32_t evictions_nomem;
     uint32_t inline_reclaim;

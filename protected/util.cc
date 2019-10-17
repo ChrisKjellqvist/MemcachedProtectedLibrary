@@ -26,8 +26,7 @@ void uriencode_init(void) {
 }
 
 bool uriencode(const char *src, char *dst, const size_t srclen, const size_t dstlen) {
-    int x;
-    size_t d = 0;
+    size_t x, d = 0;
     for (x = 0; x < srclen; x++) {
         if (d + 4 >= dstlen)
             return false;

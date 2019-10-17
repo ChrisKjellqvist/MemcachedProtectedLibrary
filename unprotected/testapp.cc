@@ -1,11 +1,13 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-#include "pku_memcached.h"
+#include <pku_memcached.h>
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
 #include <stdlib.h>
 #include <string>
 #include <string.h>
+#include <hodor-plib.h>
+#include <hodor.h>
 
 /*
 static inline void cpuid(void) {
@@ -39,24 +41,26 @@ static inline unsigned long get_ticks_end(void) {
 
 const int buff_len = 32;
 
-int not_main(){
+int main(){
+  memcached_init();
+// Necessary until we start testing Hodor. Mohammad's code should make everything easy :) 
+//  hodor_init();
   char buff[buff_len];
   char age[buff_len];
   char check_age[buff_len+2];
   strcpy(buff, std::string("chris").c_str());
   strcpy(age, std::string("21").c_str());
-  memcached_insert(buff, strlen(buff), age, strlen(age), 0, 0);  
+  memcached_insert(buff, strlen(buff), 0, age, strlen(age), 0);  
   printf("insert worked\n");
 
-  int exit_code = 141;
   memset(check_age, 0, buff_len);
-  memcached_get(buff, strlen(buff), 0, check_age, buff_len, &exit_code, 0); 
-  assert(exit_code == 0);
+  memcached_get(buff, strlen(buff), 0, check_age, buff_len, 0); 
   printf("%s's age is %s\n", buff, check_age);
 
+  /*
   exit_code = 141;
   memcached_touch(buff, strlen(buff), 0, 0);
-
+*/
   memcached_end(0);
   return 0;
 }

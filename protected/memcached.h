@@ -142,9 +142,11 @@ struct pthread_args {
 
 void pause_accesses(void);
 void unpause_accesses(void);
-int  pku_memcached_get(struct get_struct *gs);
-void pku_memcached_touch(struct touch_struct *ts);
-void pku_memcached_insert(struct insert_struct *ts);
+int  pku_memcached_get(char* key, size_t nkey, uint32_t exptime, char* buffer,
+    size_t buffLen);
+void pku_memcached_touch(char* key, size_t nkey, uint32_t exptime);
+void pku_memcached_insert(char* key, size_t nkey, char* data, size_t datan,
+    uint32_t exptime);
 
 
 /*

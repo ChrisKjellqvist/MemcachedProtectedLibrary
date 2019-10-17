@@ -439,7 +439,7 @@ enum delta_result_type do_add_delta(const char *key, const size_t nkey,
     value += delta;
     MEMCACHED_COMMAND_INCR(c->sfd, ITEM_key(it), it->nkey, value);
   } else {
-    if(delta > value) {
+    if(delta > (int64_t)value) {
       value = 0;
     } else {
       value -= delta;
@@ -957,8 +957,8 @@ static bool _parse_slab_sizes(char *s, uint32_t *slab_sizes) {
     for (char *p = strtok_r(s, "-", &b);
          p != NULL;
          p = strtok_r(NULL, "-", &b)) {
-        if (!safe_strtoul(p, &size) || size < settings.chunk_size
-             || size > settings.slab_chunk_size_max) {
+        if (!safe_strtoul(p, &size) || (int)size < settings.chunk_size
+             || (int)size > settings.slab_chunk_size_max) {
             fprintf(stderr, "slab size %u is out of valid range\n", size);
             return false;
         }
@@ -1599,7 +1599,7 @@ void* server_thread (void *pargs) {
     fprintf(stderr, "Item max size cannot be less than 1024 bytes.\n");
     exit(EX_USAGE);
   }
-  if (settings.item_size_max > (settings.maxbytes / 2)) {
+  if ((uint64_t)settings.item_size_max > (settings.maxbytes / 2)) {
     fprintf(stderr, "Cannot set item size limit higher than 1/2 of memory max.\n");
     exit(EX_USAGE);
   }
@@ -1860,34 +1860,36 @@ void unpause_accesses(void){
 }
 
 
-int pku_memcached_get(struct get_struct *gs){
+int pku_memcached_get(char* key, size_t nkey, uint32_t exptime, char* buffer,
+    size_t buffLen){
   inc_lookers();
-  item* it = item_get(gs->k, gs->nk, gs->exptime, 1);
+  item* it = item_get(key, nkey, exptime, 1);
   if (it == NULL)
     return 2;
-  if (gs->buffLen < it->nbytes)
+  if (buffLen < (size_t)it->nbytes)
     return 1;
-  memcpy(gs->buffer, ITEM_data(it), it->nbytes);
+  memcpy(buffer, ITEM_data(it), it->nbytes);
   dec_lookers();
   return 0;
 }
 
-void pku_memcached_touch(struct touch_struct *ts){
+void pku_memcached_touch(char* key, size_t nkey, uint32_t exptime){
   inc_lookers();
-  item_get(ts->k, ts->nk, ts->exptime, 0);
+  item_get(key, nkey, exptime, 0);
   dec_lookers();
 }
 
-void pku_memcached_insert(struct insert_struct *is){
+void pku_memcached_insert(char* key, size_t nkey, char* data, size_t datan,
+    uint32_t exptime){
   // do what we're here for
   struct st_st *tup;
   inc_lookers();
-  item *it = item_alloc(is->k, is->nk, 0, realtime(is->exptime), is->dn + 2);
+  item *it = item_alloc(key, nkey, 0, realtime(exptime), datan + 2);
 
   if (it != NULL) {
-    memcpy(ITEM_data(it), is->d, is->dn);
-    memcpy(ITEM_data(it) + is->dn, "\r\n", 2);
-    uint32_t hv = tcd_hash(is->k, is->nk);
+    memcpy(ITEM_data(it), data, datan);
+    memcpy(ITEM_data(it) + datan, "\r\n", 2);
+    uint32_t hv = tcd_hash(key, nkey);
     if (!(tup =do_store_item(it, NREAD_ADD, hv))->sit) {
       perror("Couldn't store item!!!\n");
     }

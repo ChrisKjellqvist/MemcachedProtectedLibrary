@@ -68,8 +68,8 @@ void item_unlock(uint32_t hv) {
  * nthreads  Number of worker event handler threads to spawn
  */
 void memcached_thread_init(int nthreads, void *arg) {
-    int         i;
-    int         power;
+    unsigned int  i;
+    unsigned int  power;
 
     for (i = 0; i < POWER_LARGEST; i++) {
         pthread_mutex_init(&lru_locks[i], NULL);

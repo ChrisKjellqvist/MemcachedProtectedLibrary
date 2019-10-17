@@ -1,17 +1,16 @@
 # Memcached
 
 CHRIS NOTES
-**IMPORANT
-***
-Currently not linked -static ally because it causes weird problems with redefinitions with
-memcached's required libraries. When we get Wentao's allocator it'll be easier to statically
-link that in I think. Either way, we can't protect allocator state right now :(
+**IMPORANT***
+
 
 src/pfence_util.h -- macros for fences
 src/rpmalloc.hpp -- main header file
 src/pptr.hpp -- header containing persistent pointer class
 RegionManager.hpp:lookup -- find base pointers for regions
 	size is stored 
+
+Make sure to export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)
 
 
 
