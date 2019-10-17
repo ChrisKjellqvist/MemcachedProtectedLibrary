@@ -9,7 +9,6 @@
 #include <hodor-plib.h>
 #include <hodor.h>
 
-/*
 static inline void cpuid(void) {
   asm volatile(
       "cpuid\n\t"
@@ -37,30 +36,61 @@ static inline unsigned long get_ticks_end(void) {
       : "=r"(cycles_high), "=r"(cycles_low)::"%rax", "%rbx", "%rcx", "%rdx");
   return ((unsigned long)cycles_low) | (((unsigned long)cycles_high) << 32);
 }
-*/
 
-const int buff_len = 32;
+
+#define HMAP_SIZ 600000
+#define N_INSERT 100000
+#define N_GET    100000
+#define BUFF_LEN 64
+#define GET_NS(cy, N) ((cy*1.0)/2.2/N)
+#define GET_RAND_R(MAX) (rand() % MAX)
+
+char *write_random_string(char* wr){
+  for(unsigned i = 0 ;i < BUFF_LEN - 5; ++i)
+    wr[i] = rand() | 0x81;
+  wr[BUFF_LEN-5] = 0;
+  return wr;
+}
+char *keys[N_INSERT];
+char *dats[N_INSERT];
 
 int main(){
+  for(unsigned i = 0; i < N_INSERT; ++i)
+    keys[i] = dats[i] = nullptr;
+
   memcached_init();
+  srand(42);
 // Necessary until we start testing Hodor. Mohammad's code should make everything easy :) 
 //  hodor_init();
-  char buff[buff_len];
-  char age[buff_len];
-  char check_age[buff_len+2];
-  strcpy(buff, std::string("chris").c_str());
-  strcpy(age, std::string("21").c_str());
-  memcached_insert(buff, strlen(buff), 0, age, strlen(age), 0);  
-  printf("insert worked\n");
 
-  memset(check_age, 0, buff_len);
-  memcached_get(buff, strlen(buff), 0, check_age, buff_len, 0); 
-  printf("%s's age is %s\n", buff, check_age);
 
-  /*
-  exit_code = 141;
-  memcached_touch(buff, strlen(buff), 0, 0);
-*/
+  unsigned long long count = 0, start, end;
+
+  for(unsigned i = 0; i < N_INSERT; ++i){
+    keys[i] = write_random_string((char*)malloc(BUFF_LEN));
+    dats[i] = write_random_string((char*)malloc(BUFF_LEN));
+    start = get_ticks_start();
+    memcached_insert(keys[i], BUFF_LEN - 5, 0, dats[i], BUFF_LEN - 5, 0);
+    end = get_ticks_end();
+    count += end - start;
+  }
+  printf("insert in %fns\n", GET_NS(count, N_INSERT)); 
+
+  count = 0;
+  for(unsigned i = 0; i < N_GET; ++i){
+    char buff[BUFF_LEN];
+    unsigned idx = GET_RAND_R(N_INSERT);
+    start = get_ticks_start();
+    int res = memcached_get(keys[idx], BUFF_LEN - 5, 0, buff, BUFF_LEN, 0);  
+    end = get_ticks_end();
+    count += end - start;
+    assert(res == 0 && "Get right value");
+    buff[BUFF_LEN-5] = 0;
+    assert(strcmp(buff, dats[idx]) == 0);
+  }
+  printf("get in %fns\n", GET_NS(count, N_GET));
+  
+
   memcached_end(0);
   return 0;
 }

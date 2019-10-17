@@ -2,8 +2,9 @@
 #include <memcached.h>
 
 #include <stdlib.h>
-#include <plib.h>
 #include <hodor-plib.h>
+#include <hodor.h>
+#include <sys/mman.h>
 #include <rpmalloc.hpp>
 
 extern pthread_mutex_t end_mutex;
@@ -36,8 +37,10 @@ HODOR_FUNC_ATTR void memcached_end(int t_id){
 } HODOR_FUNC_EXPORT(memcached_end, 1);
 
 void memcached_init(){
-  // TODO: check if record already exists. If so, we're restarting
-  RP_init("memcached.rpma");
+  int restart = RP_init("memcached.rpma");
+  if (restart){
+    // reset roots
+  }
   // TODO: make sure private stack exists... We used to do this.
   void *start, *end;
   int i = 0;
@@ -57,4 +60,3 @@ void memcached_init(){
 } HODOR_INIT_FUNC(memcached_init);
 
 }
-

@@ -1,12 +1,13 @@
-PROT_OBJ = obj/plib.o obj/memcached.o obj/hash.o obj/jenkins_hash.o \
+CC = g++
+PROT_OBJ = obj/memcached.o obj/hash.o obj/jenkins_hash.o \
 	   obj/murmur3_hash.o obj/items.o obj/assoc.o obj/thread.o obj/daemon.o\
 	   obj/stats.o obj/util.o obj/bipbuffer.o obj/crawler.o \
 	   obj/itoa_ljust.o obj/slab_automove.o obj/slabs.o obj/pku_memcached.o 
 UPRO_OBJ = obj/testapp.o 
 
-OPT_LEVEL = -O0 -g
-#OPT_LEVEL = -g -O2 -DNO_PKEY
-OPTS_LENIENT = -Iprotected/ -Iunprotected/ -Iplib/ -I../rpmalloc/src \
+#OPT_LEVEL = -O0 -g
+OPT_LEVEL =-O2
+OPTS_LENIENT = -Iprotected/ -Iunprotected/ -I../rpmalloc/src \
 	       -I../hodor/include -DHAVE_CONFIG_H -MD -MP -Wall -std=c++17 \
 	       -fPIC -I../hodor/libhodor $(OPT_LEVEL)
 OPTS = $(OPTS_LENIENT) -Werror
@@ -30,15 +31,15 @@ LINKOPTS = $(DEFLINK) -lpthread -levent -ldl -T scripts/ldscript.lds
 
 .PHONY : all
 all: $(LIBS) $(UPRO_OBJ)
-	ld $(LINKOPTS) -o exec $(UPRO_OBJ) libhodor.a libthreadcached.so librpmalloc.a
+	ld $(LINKOPTS) -o exec $(UPRO_OBJ) $(LIBS)
 
 lib/libhodor.a:
-	cp ~/hodor/libhodor/libhodor.a .
+	cp ~/hodor/libhodor/libhodor.a lib/
 lib/libthreadcached.so: $(PROT_OBJ)
-	$(CC) -shared $(PROT_OBJ) $(OPTS) -o libthreadcached.so
+	$(CC) -shared $(PROT_OBJ) $(OPTS) -o lib/libthreadcached.so
 
 lib/librpmalloc.a:
-	cp ~/rpmalloc/librpmalloc.a .
+	cp ~/rpmalloc/librpmalloc.a lib/
 
 obj/%.o: protected/%.cc
 	$(CC) -c $^ $(OPTS) -MT $@ -o $@
