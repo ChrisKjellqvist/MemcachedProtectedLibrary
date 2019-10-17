@@ -81,8 +81,6 @@ time_t process_started;     /* when the process was started */
 
 struct slab_rebalance slab_rebal;
 volatile int slab_rebalance_signal;
-/** file scope variables **/
-static struct event_base *main_base;
 
 struct st_st *mk_st (enum store_item_type my_sit, size_t my_cas){
   struct st_st *temp = (struct st_st*)malloc(sizeof(struct st_st));
@@ -811,7 +809,6 @@ static struct event clockevent;
  * Note that users who are setting explicit dates for expiration times *must*
  * ensure their clocks are correct before starting memcached. */
 static void clock_handler(const int fd, const short which, void *arg) {
-  struct timeval t = {.tv_sec = 1, .tv_usec = 0};
   static bool initialized = false;
 #if defined(HAVE_CLOCK_GETTIME) && defined(CLOCK_MONOTONIC)
   static bool monotonic = false;
@@ -837,10 +834,6 @@ static void clock_handler(const int fd, const short which, void *arg) {
   // While we're here, check for hash table expansion.
   // This function should be quick to avoid delaying the timer.
   assoc_start_expand(stats_state.curr_items);
-
-  evtimer_set(&clockevent, clock_handler, 0);
-  event_base_set(main_base, &clockevent);
-  evtimer_add(&clockevent, &t);
 
 #if defined(HAVE_CLOCK_GETTIME) && defined(CLOCK_MONOTONIC)
   if (monotonic) {
@@ -1757,19 +1750,6 @@ void* server_thread (void *pargs) {
 #endif
   }
 
-  /* initialize main thread libevent instance */
-#if defined(LIBEVENT_VERSION_NUMBER) && LIBEVENT_VERSION_NUMBER >= 0x02000101
-  /* If libevent version is larger/equal to 2.0.2-alpha, use newer version */
-  struct event_config *ev_config;
-  ev_config = event_config_new();
-  event_config_set_flag(ev_config, EVENT_BASE_FLAG_NOLOCK);
-  main_base = event_base_new_with_config(ev_config);
-  event_config_free(ev_config);
-#else
-  /* Otherwise, use older API */
-  main_base = event_init();
-#endif
-
   /* initialize other stuff */
   assoc_init(settings.hashpower_init);
   slabs_init(settings.maxbytes, settings.factor, preallocate,
@@ -1826,9 +1806,6 @@ void* server_thread (void *pargs) {
   /* Clean up strdup() call for bind() address */
   if (settings.inter)
     free(settings.inter);
-
-  /* cleanup base */
-  event_base_free(main_base);
 
   return NULL;
 }
