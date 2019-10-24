@@ -28,6 +28,7 @@
 #include <pptr.hpp>
 #include <rpmalloc.hpp>
 
+
 static pthread_cond_t maintenance_cond = PTHREAD_COND_INITIALIZER;
 static pthread_mutex_t maintenance_lock = PTHREAD_MUTEX_INITIALIZER;
 
@@ -36,6 +37,8 @@ typedef  unsigned       char ub1;   /* unsigned 1-byte quantities */
 
 /* how many powers of 2's worth of buckets we use */
 unsigned int hashpower = HASHPOWER_DEFAULT;
+extern int is_restart;
+extern int am_server;
 
 
 #define hashsize(n) ((ub4)1<<(n))
@@ -64,11 +67,21 @@ void assoc_init(const int hashtable_init) {
     if (hashtable_init) {
         hashpower = hashtable_init;
     }
-    primary_hashtable = pptr<pptr<item> >(
-        (pptr<item>*)RP_calloc(hashsize(hashpower), sizeof(pptr<item>)));
-    if (primary_hashtable == nullptr) {
-        fprintf(stderr, "Failed to init hashtable.\n");
-        exit(EXIT_FAILURE);
+    if (is_restart || !am_server){
+      // reuse old roots
+      // definitions in memcached.h::RPMRoot
+      primary_hashtable = 
+        pptr<pptr<item> >((pptr<item>*)RP_get_root(RPMRoot::PrimaryHT));
+      old_hashtable =
+        pptr<pptr<item> >((pptr<item>*)RP_get_root(RPMRoot::OldHT));
+    } else {
+      primary_hashtable = pptr<pptr<item> >(
+          (pptr<item>*)RP_calloc(hashsize(hashpower), sizeof(pptr<item>)));
+      if (primary_hashtable == nullptr) {
+          fprintf(stderr, "Failed to init hashtable.\n");
+          exit(EXIT_FAILURE);
+      }
+      RP_set_root((void*)(&*primary_hashtable), RPMRoot::PrimaryHT);
     }
     STATS_LOCK();
     stats_state.hash_power_level = hashpower;
@@ -104,7 +117,6 @@ item *assoc_find(const char *key, const size_t nkey, const uint32_t hv) {
 
 /* returns the address of the item pointer before the key.  if *item == 0,
    the item wasn't found */
-
 static pptr<item>* _hashitem_before (const char *key, const size_t nkey, const uint32_t hv) {
     pptr<item> *pos;
     unsigned int oldbucket;
@@ -133,6 +145,9 @@ static void assoc_expand(void) {
     if (primary_hashtable != nullptr) {
         if (settings.verbose > 1)
             fprintf(stderr, "Hash table expansion starting\n");
+        RP_set_root((void*)(&*old_hashtable), RPMRoot::OldHT);
+        RP_set_root((void*)(&*primary_hashtable), RPMRoot::PrimaryHT);
+        // CHRIS - do I have to persist changes to the roots
         hashpower++;
         expanding = true;
         expand_bucket = 0;
@@ -161,8 +176,6 @@ void assoc_start_expand(uint64_t curr_items) {
 /* Note: this isn't an assoc_update.  The key must not already exist to call this */
 int assoc_insert(item *it, const uint32_t hv) {
     unsigned int oldbucket;
-
-//    assert(assoc_find(ITEM_key(it), it->nkey) == 0);  /* shouldn't have duplicately named things defined */
 
     if (expanding &&
         (oldbucket = (hv & hashmask(hashpower - 1))) >= expand_bucket)

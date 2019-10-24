@@ -10,26 +10,24 @@
 #include <string.h>
 #include <pthread.h>
 
-#ifdef __sun
-#include <atomic.h>
-#endif
+// Threadcached
+#include <rpmalloc.hpp>
+
 
 #define ITEMS_PER_ALLOC 64
 
-
 /* Locks for cache LRU operations */
-pthread_mutex_t lru_locks[POWER_LARGEST];
+pthread_mutex_t *lru_locks;
 
-#if !defined(HAVE_GCC_ATOMICS) && !defined(__sun)
-pthread_mutex_t atomics_mutex = PTHREAD_MUTEX_INITIALIZER;
-#endif
 /* Lock for global stats */
-static pthread_mutex_t stats_lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t *stats_lock;
 
-static pthread_mutex_t *item_locks;
+pthread_mutex_t *item_locks;
 /* size of the item lock hash table */
 static uint32_t item_lock_count;
 unsigned int item_lock_hashpower;
+extern int is_restart;
+extern int am_server;
 #define hashsize(n) ((unsigned long int)1<<(n))
 #define hashmask(n) (hashsize(n)-1)
 
@@ -71,8 +69,14 @@ void memcached_thread_init(int nthreads, void *arg) {
     unsigned int  i;
     unsigned int  power;
 
-    for (i = 0; i < POWER_LARGEST; i++) {
-        pthread_mutex_init(&lru_locks[i], NULL);
+    if (am_server){
+      lru_locks = (pthread_mutex_t*)RP_malloc(sizeof(pthread_mutex_t)*POWER_LARGEST);
+      for (i = 0; i < POWER_LARGEST; i++) {
+          pthread_mutex_init(&lru_locks[i], NULL);
+      }
+      RP_set_root(lru_locks, RPMRoot::LRULocks);
+    } else {
+      lru_locks = (pthread_mutex_t*)RP_get_root(RPMRoot::LRULocks);
     }
 
     /* Want a wide lock table, but don't waste memory */
@@ -101,13 +105,22 @@ void memcached_thread_init(int nthreads, void *arg) {
     item_lock_count = hashsize(power);
     item_lock_hashpower = power;
 
-    item_locks = (pthread_mutex_t*)calloc(item_lock_count, sizeof(pthread_mutex_t));
-    if (! item_locks) {
-        perror("Can't allocate item locks");
-        exit(1);
-    }
-    for (i = 0; i < item_lock_count; i++) {
-        pthread_mutex_init(&item_locks[i], NULL);
+    if (am_server){
+      item_locks = (pthread_mutex_t*)RP_calloc(item_lock_count, sizeof(pthread_mutex_t));
+      stats_lock = (pthread_mutex_t*)RP_malloc(sizeof(pthread_mutex_t));
+      if (! item_locks) {
+          perror("Can't allocate item locks");
+          exit(1);
+      }
+      for (i = 0; i < item_lock_count; i++) {
+          pthread_mutex_init(&item_locks[i], NULL);
+      }
+      pthread_mutex_init(stats_lock, NULL);
+      RP_set_root(item_locks, RPMRoot::ItemLocks);
+      RP_set_root(stats_lock, RPMRoot::StatLock);
+    } else {
+      item_locks = (pthread_mutex_t*)RP_get_root(RPMRoot::ItemLocks);
+      stats_lock = (pthread_mutex_t*)RP_get_root(RPMRoot::StatLock);
     }
 }
 
@@ -230,9 +243,9 @@ enum store_item_type store_item(item *item, int comm) {
 /******************************* GLOBAL STATS ******************************/
 
 void STATS_LOCK() {
-    pthread_mutex_lock(&stats_lock);
+    pthread_mutex_lock(stats_lock);
 }
 
 void STATS_UNLOCK() {
-    pthread_mutex_unlock(&stats_lock);
+    pthread_mutex_unlock(stats_lock);
 }

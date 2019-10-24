@@ -3,7 +3,6 @@ PROT_OBJ = obj/memcached.o obj/hash.o obj/jenkins_hash.o \
 	   obj/murmur3_hash.o obj/items.o obj/assoc.o obj/thread.o obj/daemon.o\
 	   obj/stats.o obj/util.o obj/bipbuffer.o obj/crawler.o \
 	   obj/itoa_ljust.o obj/slab_automove.o obj/slabs.o obj/pku_memcached.o 
-UPRO_OBJ = obj/testapp.o 
 
 #OPT_LEVEL = -O0 -g
 OPT_LEVEL =-O2
@@ -28,11 +27,14 @@ DEFLINK  = --hash-style=gnu --no-add-needed --build-id --eh-frame-hdr -m \
 
 LIBS = lib/libhodor.a lib/libthreadcached.so lib/librpmalloc.a
 LINKOPTS = $(DEFLINK) -lpthread -levent -ldl -T scripts/ldscript.lds
+EXE = server client
 
 .PHONY : all
-all: $(LIBS) $(UPRO_OBJ)
-	ld $(LINKOPTS) -o exec $(UPRO_OBJ) $(LIBS)
-
+all: $(EXE)
+server: $(LIBS) obj/server.o
+	ld $(LINKOPTS) -o server obj/server.o $(LIBS)
+client: $(LIBS) obj/testapp.o
+	ld $(LINKOPTS) -o client obj/testapp.o $(LIBS)
 lib/libhodor.a:
 	cp ~/hodor/libhodor/libhodor.a lib/
 lib/libthreadcached.so: $(PROT_OBJ)
@@ -50,7 +52,7 @@ obj/%.o: unprotected/%.cc
 
 .PHONY : clean
 clean: 
-	rm -f $(PROT_OBJ) $(UPRO_OBJ) exec *.d /dev/shm/memcached*
+	rm -f obj/* exec *.d /dev/shm/memcached* $(EXE)
 .PHONY : reset
 reset:
 	rm -f /dev/shm/memcached*

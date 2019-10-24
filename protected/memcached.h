@@ -122,6 +122,20 @@
 #define STAT_KEY_LEN 128
 #define STAT_VAL_LEN 128
 
+/* RPMalloc Root IDs */
+enum RPMRoot {
+  PrimaryHT = 0,
+  OldHT = 1,
+  StatLock = 2,
+  ItemLocks = 3,
+  LRULocks = 4,
+  Heads = 5,
+  Tails = 6,
+  ItemStats = 7,
+  Sizes = 8,
+  SizesBytes = 9
+};
+
 
 /** Item client flag conversion */
 #define FLAGS_CONV(iar, it, flag) { \

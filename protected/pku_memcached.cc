@@ -7,13 +7,9 @@
 #include <sys/mman.h>
 #include <rpmalloc.hpp>
 
+int is_restart;
+
 extern pthread_mutex_t end_mutex;
-extern pthread_mutex_t begin_ops_mutex;
-// Used to store per-thread private stacks here...
-//static unsigned long* t_psp_ar[256];
-static pthread_t _server_thread;
-extern char __linker_plib_addr__;
-extern char __linker_plib_len__;
 
 extern "C" {
 
@@ -36,11 +32,9 @@ HODOR_FUNC_ATTR void memcached_end(int t_id){
   pthread_mutex_unlock(&end_mutex);
 } HODOR_FUNC_EXPORT(memcached_end, 1);
 
+// Start memcached maintainence processes
 void memcached_init(){
-  int restart = RP_init("memcached.rpma");
-  if (restart){
-    // reset roots
-  }
+  is_restart = RP_init("memcached.rpma");
   // TODO: make sure private stack exists... We used to do this.
   void *start, *end;
   int i = 0;
@@ -48,15 +42,6 @@ void memcached_init(){
     ptrdiff_t rp_region_len = (char*)start - (char*)end; 
     pkey_mprotect(start, rp_region_len, PROT_READ | PROT_WRITE | PROT_EXEC, 1);
   }
-
-  // TODO: put locks in a file somewhere
-  pthread_mutex_init(&end_mutex, NULL);
-  pthread_mutex_init(&begin_ops_mutex, NULL);
-  pthread_mutex_lock(&end_mutex);
-  pthread_mutex_lock(&begin_ops_mutex);
-  int ret = pthread_create(&_server_thread, NULL, server_thread, NULL);
-  assert(ret == 0);
-  pthread_mutex_lock(&begin_ops_mutex);
 } HODOR_INIT_FUNC(memcached_init);
-
 }
+

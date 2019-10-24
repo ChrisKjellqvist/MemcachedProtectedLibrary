@@ -12,8 +12,6 @@ void memcached_end    (int t_id);
 void memcached_init();
 }
 
-int start_server_thread(pthread_t *thread, int argc, char** argv);
-
 // include/hodor_plib.h
 // HODOR_FUNC_ATTR
 // HODOR_INIT_FUNC

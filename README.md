@@ -13,6 +13,10 @@ RegionManager.hpp:lookup -- find base pointers for regions
 Make sure to export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/lib
 
 
+QUESTIONS:
+Arguments for sfence?
+mmap from client
+make client seperate from server
 
 Memcached is a high performance multithreaded event-based key/value cache
 store intended to be used in a distributed system.

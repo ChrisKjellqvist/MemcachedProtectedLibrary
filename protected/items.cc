@@ -17,6 +17,8 @@
 #include <unistd.h>
 #include <poll.h>
 
+#include <rpmalloc.hpp>
+
 /* Forward Declarations */
 static void item_link_q(item *it);
 static void item_unlink_q(item *it);
@@ -45,19 +47,45 @@ struct itemstats_t {
   rel_time_t evicted_time;
 };
 
-static item *heads[LARGEST_ID];
-static item *tails[LARGEST_ID];
-static itemstats_t itemstats[LARGEST_ID];
-static unsigned int sizes[LARGEST_ID];
-static uint64_t sizes_bytes[LARGEST_ID];
-static unsigned int *stats_sizes_hist = NULL;
-static uint64_t stats_sizes_cas_min = 0;
-static int stats_sizes_buckets = 0;
+static pptr<item> *heads; // LARGEST_ID
+static pptr<item> *tails; // LARGEST_ID
+static itemstats_t *itemstats; // LARGEST_ID
+static unsigned int *sizes; // LARGEST_ID
+static uint64_t *sizes_bytes; // LARGEST_ID
 
 static volatile int do_run_lru_maintainer_thread = 0;
 static int lru_maintainer_initialized = 0;
+
+// These (AFAIK) should only be used by the server, and so we don't need
+// to make heads for them in the mmapped region 
 static pthread_mutex_t lru_maintainer_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t cas_id_lock = PTHREAD_MUTEX_INITIALIZER;
+
+// PLIB variables
+extern int am_server;
+extern int is_restart;
+
+void items_init(){
+  if (!am_server || is_restart){
+    // get roots
+    heads = (pptr<item>*)RP_get_root(RPMRoot::Heads);
+    tails = (pptr<item>*)RP_get_root(RPMRoot::Tails);
+    itemstats = (itemstats_t*)RP_get_root(RPMRoot::ItemStats);
+    sizes = (unsigned int*)RP_get_root(RPMRoot::Sizes);
+    sizes_bytes = (uint64_t*)RP_get_root(RPMRoot::SizesBytes);
+  } else {
+    heads = (pptr<item>*)RP_malloc(sizeof(item*)*LARGEST_ID);
+    tails = (pptr<item>*)RP_malloc(sizeof(item*)*LARGEST_ID);
+    itemstats = (itemstats_t*)RP_malloc(sizeof(item*)*LARGEST_ID);
+    sizes = (unsigned int*)RP_malloc(sizeof(item*)*LARGEST_ID);
+    sizes_bytes = (uint64_t*)RP_malloc(sizeof(item*)*LARGEST_ID);
+    RP_set_root(heads, RPMRoot::Heads);
+    RP_set_root(tails, RPMRoot::Tails);
+    RP_set_root(itemstats, RPMRoot::ItemStats);
+    RP_set_root(sizes, RPMRoot::Sizes);
+    RP_set_root(sizes_bytes, RPMRoot::Sizes);
+  }
+}
 
 void item_stats_reset(void) {
   int i;
@@ -379,7 +407,7 @@ bool item_size_ok(const size_t nkey, const int flags, const int nbytes) {
 }
 
 static void do_item_link_q(item *it) { /* item is the new head */
-  item **head, **tail;
+  pptr<item> *head, *tail;
   assert((it->it_flags & ITEM_SLABBED) == 0);
 
   head = &heads[it->slabs_clsid];
@@ -411,7 +439,7 @@ static void item_link_q_warm(item *it) {
 }
 
 static void do_item_unlink_q(item *it) {
-  item **head, **tail;
+  pptr<item> *head, *tail;
   head = &heads[it->slabs_clsid];
   tail = &tails[it->slabs_clsid];
 
@@ -641,24 +669,11 @@ void fill_item_stats_automove(item_stats_automove *am) {
 }
 
 void item_stats_sizes_add(item *it) {
-  if (stats_sizes_hist == NULL || stats_sizes_cas_min > ITEM_get_cas(it))
-    return;
-  int ntotal = ITEM_ntotal(it);
-  int bucket = ntotal / 32;
-  if ((ntotal % 32) != 0) bucket++;
-  if (bucket < stats_sizes_buckets) stats_sizes_hist[bucket]++;
+  return;
 }
 
-/* I think there's no way for this to be accurate without using the CAS value.
- * Since items getting their time value bumped will pass this validation.
- */
 void item_stats_sizes_remove(item *it) {
-  if (stats_sizes_hist == NULL || stats_sizes_cas_min > ITEM_get_cas(it))
-    return;
-  int ntotal = ITEM_ntotal(it);
-  int bucket = ntotal / 32;
-  if ((ntotal % 32) != 0) bucket++;
-  if (bucket < stats_sizes_buckets) stats_sizes_hist[bucket]--;
+  return;
 }
 
 /** wrapper around assoc_find which does the lazy expiration logic */
@@ -666,53 +681,14 @@ item *do_item_get(const char *key, const size_t nkey, const uint32_t hv, const b
   item *it = assoc_find(key, nkey, hv);
   if (it != NULL) {
     refcount_incr(it);
-    /* Optimization for slab reassignment. prevents popular items from
-     * jamming in busy wait. Can only do this here to satisfy lock order
-     * of item_lock, slabs_lock. */
-    /* This was made unsafe by removal of the cache_lock:
-     * slab_rebalance_signal and slab_rebal.* are modified in a separate
-     * thread under slabs_lock. If slab_rebalance_signal = 1, slab_start =
-     * NULL (0), but slab_end is still equal to some value, this would end
-     * up unlinking every item fetched.
-     * This is either an acceptable loss, or if slab_rebalance_signal is
-     * true, slab_start/slab_end should be put behind the slabs_lock.
-     * Which would cause a huge potential slowdown.
-     * Could also use a specific lock for slab_rebal.* and
-     * slab_rebalance_signal (shorter lock?)
-     */
-    /*if (slab_rebalance_signal &&
-      ((void *)it >= slab_rebal.slab_start && (void *)it < slab_rebal.slab_end)) {
-      do_item_unlink(it, hv);
-      do_item_remove(it);
-      it = NULL;
-      }*/
   }
-
-  if (settings.verbose > 2) {
-    size_t ii;
-    if (it == NULL) {
-      fprintf(stderr, "> NOT FOUND ");
-    } else {
-      fprintf(stderr, "> FOUND KEY ");
-    }
-    for (ii = 0; ii < nkey; ++ii) {
-      fprintf(stderr, "%c", key[ii]);
-    }
-  }
-
   if (it != NULL) {
     if (item_is_flushed(it)) {
       do_item_unlink(it, hv);
-      if (settings.verbose > 2) {
-        fprintf(stderr, " -nuked by flush");
-      }
     } else if (it->exptime != 0 && it->exptime <= current_time) {
       do_item_unlink(it, hv);
       do_item_remove(it);
       it = NULL;
-      if (settings.verbose > 2) {
-        fprintf(stderr, " -nuked by expire");
-      }
     } else {
       if (do_update) {
         /* We update the hit markers only during fetches.
@@ -1318,7 +1294,7 @@ int init_lru_maintainer(void) {
 
 /* Tail linkers and crawler for the LRU crawler. */
 void do_item_linktail_q(item *it) { /* item is the new tail */
-  item **head, **tail;
+  pptr<item> *head, *tail;
   assert(it->it_flags == 1);
   assert(it->nbytes == 0);
 
@@ -1339,7 +1315,7 @@ void do_item_linktail_q(item *it) { /* item is the new tail */
 }
 
 void do_item_unlinktail_q(item *it) {
-  item **head, **tail;
+  pptr<item> *head, *tail;
   head = &heads[it->slabs_clsid];
   tail = &tails[it->slabs_clsid];
 
@@ -1362,7 +1338,7 @@ void do_item_unlinktail_q(item *it) {
 /* This is too convoluted, but it's a difficult shuffle. Try to rewrite it
  * more clearly. */
 item *do_item_crawl_q(item *it) {
-  item **head, **tail;
+  pptr<item> *head, *tail;
   assert(it->it_flags == 1);
   assert(it->nbytes == 0);
   head = &heads[it->slabs_clsid];
