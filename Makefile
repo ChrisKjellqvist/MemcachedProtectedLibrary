@@ -2,7 +2,7 @@ CC = g++
 PROT_OBJ = obj/memcached.o obj/hash.o obj/jenkins_hash.o \
 	   obj/murmur3_hash.o obj/items.o obj/assoc.o obj/thread.o obj/daemon.o\
 	   obj/stats.o obj/util.o obj/bipbuffer.o obj/crawler.o \
-	   obj/itoa_ljust.o obj/slab_automove.o obj/slabs.o obj/pku_memcached.o 
+	   obj/itoa_ljust.o obj/slab_automove.o obj/pku_memcached.o 
 
 #OPT_LEVEL = -O0 -g
 OPT_LEVEL =-O2

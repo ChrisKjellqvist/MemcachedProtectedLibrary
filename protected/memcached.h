@@ -152,6 +152,8 @@ struct pthread_args {
   char **argv;
 };
 
+#define tcd_hash Murmur3_x86_32;
+
 #include "pku_memcached.h"
 
 void pause_accesses(void);
@@ -301,53 +303,33 @@ struct stats_state {
 struct settings {
     size_t maxbytes;
     int maxconns;
-    int port;
-    int udpport;
-    char *inter;
-    int verbose;
     rel_time_t oldest_live; /* ignore existing items older than this */
     uint64_t oldest_cas; /* ignore existing items with CAS values lower than this */
     int evict_to_free;
-    char *socketpath;   /* path to unix socket if using local socket */
     int access;  /* access mask (a la chmod) for unix domain socket */
     double factor;          /* chunk size growth factor */
     int chunk_size;
-    int num_threads;        /* number of worker (without dispatcher) libevent threads to run */
-    int num_threads_per_udp; /* number of worker threads serving each udp socket */
     char prefix_delimiter;  /* character that marks a key prefix (for stats) */
     int detail_enabled;     /* nonzero if we're collecting detailed stats */
     int reqs_per_event;     /* Maximum number of io to process on each
                                io-event. */
-    bool use_cas;
-    int backlog;
     int item_size_max;        /* Maximum item size */
     int slab_chunk_size_max;  /* Upper end for chunks within slab pages. */
     int slab_page_size;     /* Slab's page units. */
-    bool maxconns_fast;     /* Whether or not to early close connections */
     bool lru_crawler;        /* Whether or not to enable the autocrawler thread */
     bool lru_maintainer_thread; /* LRU maintainer background thread */
-    bool lru_segmented;     /* Use split or flat LRU's */
     bool slab_reassign;     /* Whether or not slab reassignment is allowed */
     int slab_automove;     /* Whether or not to automatically move slabs */
     double slab_automove_ratio; /* youngest must be within pct of oldest */
     unsigned int slab_automove_window; /* window mover for algorithm */
     int hashpower_init;     /* Starting hash power level */
-    bool shutdown_command; /* allow shutdown command */
     int tail_repair_time;   /* LRU tail refcount leak repair time */
-    bool flush_enabled;     /* flush_all enabled */
-    bool dump_enabled;      /* whether cachedump/metadump commands work */
-    std::string hash_algorithm;     /* Hash algorithm in use */
     int lru_crawler_sleep;  /* Microsecond sleep between items */
     uint32_t lru_crawler_tocrawl; /* Number of items to crawl per run */
     int hot_lru_pct; /* percentage of slab space for HOT_LRU */
-    int warm_lru_pct; /* percentage of slab space for WARM_LRU */
     double hot_max_factor; /* HOT tail age relative to COLD tail */
     double warm_max_factor; /* WARM tail age relative to COLD tail */
     int crawls_persleep; /* Number of LRU crawls to run before sleeping */
-    bool inline_ascii_response; /* pre-format the VALUE line for ASCII responses */
-    bool temp_lru; /* TTL < temporary_ttl uses TEMP_LRU */
-    uint32_t temporary_ttl; /* temporary LRU threshold */
-    int idle_timeout;       /* Number of seconds to let connections idle */
     unsigned int logger_watcher_buf_size; /* size of logger's per-watcher buffer */
     unsigned int logger_buf_size; /* size of per-thread logger buffer */
     bool relaxed_privileges;   /* Relax process restrictions when running testapp */
@@ -488,10 +470,6 @@ struct st_st {
 };
 struct st_st *mk_st (enum store_item_type my_sit, size_t my_cas);
 
-enum delta_result_type do_add_delta(const char *key,
-                                    const size_t nkey, const bool incr,
-                                    const int64_t delta, char *buf,
-                                    uint64_t *cas, const uint32_t hv);
 struct st_st *do_store_item(item *item, int comm, const uint32_t hv);
 extern int daemonize(int nochdir, int noclose);
 
@@ -513,7 +491,7 @@ extern int daemonize(int nochdir, int noclose);
  * in the current thread) are called via "dispatch_" frontends, which are
  * also #define-d to directly call the underlying code in singlethreaded mode.
  */
-void memcached_thread_init(int nthreads, void *arg);
+void memcached_thread_init();
 
 /* Lock wrappers for cache functions that are called from main loop. */
 enum delta_result_type add_delta(const char *key,

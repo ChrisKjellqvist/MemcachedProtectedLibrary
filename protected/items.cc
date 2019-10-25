@@ -186,15 +186,10 @@ unsigned int do_get_lru_size(uint32_t id) {
  */
 static size_t item_make_header(const uint8_t nkey, const unsigned int flags, const int nbytes,
     char *suffix, uint8_t *nsuffix) {
-  if (settings.inline_ascii_response) {
-    /* suffix is defined at 40 chars elsewhere.. */
-    *nsuffix = (uint8_t) snprintf(suffix, 40, " %u %d\r\n", flags, nbytes - 2);
+  if (flags == 0) {
+    *nsuffix = 0;
   } else {
-    if (flags == 0) {
-      *nsuffix = 0;
-    } else {
-      *nsuffix = sizeof(flags);
-    }
+    *nsuffix = sizeof(flags);
   }
   return sizeof(item) + nkey + *nsuffix + nbytes;
 }
@@ -210,21 +205,12 @@ item *do_item_alloc_pull(const size_t ntotal, const unsigned int id) {
   for (i = 0; i < 10; i++) {
     uint64_t total_bytes;
     /* Try to reclaim memory first */
-    if (!settings.lru_segmented) {
-      lru_pull_tail(id, COLD_LRU, 0, 0, 0, NULL);
-    }
+    lru_pull_tail(id, COLD_LRU, 0, 0, 0, NULL);
     it = (item*)slabs_alloc(ntotal, id, &total_bytes, 0);
-
-    if (settings.temp_lru)
-      total_bytes -= temp_lru_size(id);
 
     if (it == NULL) {
       if (lru_pull_tail(id, COLD_LRU, total_bytes, LRU_PULL_EVICT, 0, NULL) <= 0) {
-        if (settings.lru_segmented) {
-          lru_pull_tail(id, HOT_LRU, total_bytes, 0, 0, NULL);
-        } else {
-          break;
-        }
+        lru_pull_tail(id, HOT_LRU, total_bytes, 0, 0, NULL);
       }
     } else {
       break;
@@ -280,9 +266,7 @@ item *do_item_alloc(char *key, const size_t nkey, const unsigned int flags,
     return 0;
 
   size_t ntotal = item_make_header(nkey + 1, flags, nbytes, suffix, &nsuffix);
-  if (settings.use_cas) {
-    ntotal += sizeof(uint64_t);
-  }
+  ntotal += sizeof(uint64_t);
 
   unsigned int id = slabs_clsid(ntotal);
   unsigned int hdr_id = 0;
@@ -297,10 +281,8 @@ item *do_item_alloc(char *key, const size_t nkey, const unsigned int flags,
      * we're pulling a header from an entirely different slab class. The
      * free routines handle large items specifically.
      */
-    int htotal = nkey + 1 + nsuffix + sizeof(item) + sizeof(item_chunk);
-    if (settings.use_cas) {
-      htotal += sizeof(uint64_t);
-    }
+    int htotal = nkey + 1 + nsuffix + sizeof(item) + sizeof(item_chunk) 
+      + sizeof(uint64_t);
 #ifdef NEED_ALIGN
     // header chunk needs to be padded on some systems
     int remain = htotal % 8;
@@ -333,26 +315,16 @@ item *do_item_alloc(char *key, const size_t nkey, const unsigned int flags,
   /* Items are initially loaded into the HOT_LRU. This is '0' but I want at
    * least a note here. Compiler (hopefully?) optimizes this out.
    */
-  if (settings.temp_lru &&
-      exptime - current_time <= settings.temporary_ttl) {
-    id |= TEMP_LRU;
-  } else if (settings.lru_segmented) {
-    id |= HOT_LRU;
-  } else {
-    /* There is only COLD in compat-mode */
-    id |= COLD_LRU;
-  }
+  id |= HOT_LRU;
   it->slabs_clsid = id;
 
   DEBUG_REFCNT(it, '*');
-  it->it_flags |= settings.use_cas ? ITEM_CAS : 0;
+  it->it_flags |= ITEM_CAS;
   it->nkey = nkey;
   it->nbytes = nbytes;
   memcpy(ITEM_key(it), key, nkey);
   it->exptime = exptime;
-  if (settings.inline_ascii_response) {
-    memcpy(ITEM_suffix(it), suffix, (size_t)nsuffix);
-  } else if (nsuffix > 0) {
+  if (nsuffix > 0) {
     memcpy(ITEM_suffix(it), &flags, sizeof(flags));
   }
   it->nsuffix = nsuffix;
@@ -399,10 +371,7 @@ bool item_size_ok(const size_t nkey, const int flags, const int nbytes) {
 
   size_t ntotal = item_make_header(nkey + 1, flags, nbytes,
       prefix, &nsuffix);
-  if (settings.use_cas) {
     ntotal += sizeof(uint64_t);
-  }
-
   return slabs_clsid(ntotal) != 0;
 }
 
@@ -480,7 +449,7 @@ int do_item_link(item *it, const uint32_t hv) {
   STATS_UNLOCK();
 
   /* Allocate a new CAS ID on link. */
-  ITEM_set_cas(it, (settings.use_cas) ? get_cas_id() : 0);
+  ITEM_set_cas(it, get_cas_id());
   assoc_insert(it, hv);
   item_link_q(it);
   refcount_incr(it);
@@ -550,27 +519,17 @@ void do_item_update(item *it) {
   MEMCACHED_ITEM_UPDATE(ITEM_key(it), it->nkey, it->nbytes);
 
   /* Hits to COLD_LRU immediately move to WARM. */
-  if (settings.lru_segmented) {
-    assert((it->it_flags & ITEM_SLABBED) == 0);
-    if ((it->it_flags & ITEM_LINKED) != 0) {
-      if (ITEM_lruid(it) == COLD_LRU && (it->it_flags & ITEM_ACTIVE)) {
-        it->time = current_time;
-        item_unlink_q(it);
-        it->slabs_clsid = ITEM_clsid(it);
-        it->slabs_clsid |= WARM_LRU;
-        it->it_flags &= ~ITEM_ACTIVE;
-        item_link_q_warm(it);
-      } else if (it->time < current_time - ITEM_UPDATE_INTERVAL) {
-        it->time = current_time;
-      }
-    }
-  } else if (it->time < current_time - ITEM_UPDATE_INTERVAL) {
-    assert((it->it_flags & ITEM_SLABBED) == 0);
-
-    if ((it->it_flags & ITEM_LINKED) != 0) {
+  assert((it->it_flags & ITEM_SLABBED) == 0);
+  if ((it->it_flags & ITEM_LINKED) != 0) {
+    if (ITEM_lruid(it) == COLD_LRU && (it->it_flags & ITEM_ACTIVE)) {
       it->time = current_time;
       item_unlink_q(it);
-      item_link_q(it);
+      it->slabs_clsid = ITEM_clsid(it);
+      it->slabs_clsid |= WARM_LRU;
+      it->it_flags &= ~ITEM_ACTIVE;
+      item_link_q_warm(it);
+    } else if (it->time < current_time - ITEM_UPDATE_INTERVAL) {
+      it->time = current_time;
     }
   }
 }
@@ -697,20 +656,15 @@ item *do_item_get(const char *key, const size_t nkey, const uint32_t hv, const b
          * afterward.
          * FETCHED tells if an item has ever been active.
          */
-        if (settings.lru_segmented) {
-          if ((it->it_flags & ITEM_ACTIVE) == 0) {
-            if ((it->it_flags & ITEM_FETCHED) == 0) {
-              it->it_flags |= ITEM_FETCHED;
-            } else {
-              it->it_flags |= ITEM_ACTIVE;
-              if (ITEM_lruid(it) != COLD_LRU) {
-                do_item_update(it); // bump LA time
-              }
+        if ((it->it_flags & ITEM_ACTIVE) == 0) {
+          if ((it->it_flags & ITEM_FETCHED) == 0) {
+            it->it_flags |= ITEM_FETCHED;
+          } else {
+            it->it_flags |= ITEM_ACTIVE;
+            if (ITEM_lruid(it) != COLD_LRU) {
+              do_item_update(it); // bump LA time
             }
           }
-        } else {
-          it->it_flags |= ITEM_FETCHED;
-          do_item_update(it);
         }
       }
       DEBUG_REFCNT(it, '+');
@@ -813,10 +767,10 @@ int lru_pull_tail(const int orig_id, const int cur_lru,
      */
     switch (cur_lru) {
       case HOT_LRU:
-        limit = total_bytes * settings.hot_lru_pct / 100;
+        limit = total_bytes * 20 / 100;
       case WARM_LRU:
         if (limit == 0)
-          limit = total_bytes * settings.warm_lru_pct / 100;
+          limit = total_bytes * 40 / 100;
         /* Rescue ACTIVE items aggressively */
         if ((search->it_flags & ITEM_ACTIVE) != 0) {
           search->it_flags &= ~ITEM_ACTIVE;
@@ -873,8 +827,7 @@ int lru_pull_tail(const int orig_id, const int cur_lru,
           /* Keep a reference to this item and return it. */
           ret_it->it = it;
           ret_it->hv = hv;
-        } else if ((search->it_flags & ITEM_ACTIVE) != 0
-            && settings.lru_segmented) {
+        } else if ((search->it_flags & ITEM_ACTIVE) != 0) {
           itemstats[id].moves_to_warm++;
           search->it_flags &= ~ITEM_ACTIVE;
           move_to_lru = WARM_LRU;
@@ -999,31 +952,17 @@ static int lru_maintainer_juggle(const int slabs_clsid) {
   /* TODO: if free_chunks below high watermark, increase aggressiveness */
   slabs_available_chunks(slabs_clsid, NULL,
       &total_bytes, &chunks_perslab);
-  if (settings.temp_lru) {
-    /* Only looking for reclaims. Run before we size the LRU. */
-    for (i = 0; i < 500; i++) {
-      if (lru_pull_tail(slabs_clsid, TEMP_LRU, 0, 0, 0, NULL) <= 0) {
-        break;
-      } else {
-        did_moves++;
-      }
-    }
-    total_bytes -= temp_lru_size(slabs_clsid);
-  }
-
   rel_time_t cold_age = 0;
   rel_time_t hot_age = 0;
   rel_time_t warm_age = 0;
   /* If LRU is in flat mode, force items to drain into COLD via max age */
-  if (settings.lru_segmented) {
-    pthread_mutex_lock(&lru_locks[slabs_clsid|COLD_LRU]);
-    if (tails[slabs_clsid|COLD_LRU]) {
-      cold_age = current_time - tails[slabs_clsid|COLD_LRU]->time;
-    }
-    pthread_mutex_unlock(&lru_locks[slabs_clsid|COLD_LRU]);
-    hot_age = cold_age * settings.hot_max_factor;
-    warm_age = cold_age * settings.warm_max_factor;
+  pthread_mutex_lock(&lru_locks[slabs_clsid|COLD_LRU]);
+  if (tails[slabs_clsid|COLD_LRU]) {
+    cold_age = current_time - tails[slabs_clsid|COLD_LRU]->time;
   }
+  pthread_mutex_unlock(&lru_locks[slabs_clsid|COLD_LRU]);
+  hot_age = cold_age * settings.hot_max_factor;
+  warm_age = cold_age * settings.warm_max_factor;
 
   /* Juggle HOT/WARM up to N times */
   for (i = 0; i < 500; i++) {
@@ -1032,9 +971,7 @@ static int lru_maintainer_juggle(const int slabs_clsid) {
         lru_pull_tail(slabs_clsid, WARM_LRU, total_bytes, LRU_PULL_CRAWL_BLOCKS, warm_age, NULL)) {
       do_more++;
     }
-    if (settings.lru_segmented) {
-      do_more += lru_pull_tail(slabs_clsid, COLD_LRU, total_bytes, LRU_PULL_CRAWL_BLOCKS, 0, NULL);
-    }
+    do_more += lru_pull_tail(slabs_clsid, COLD_LRU, total_bytes, LRU_PULL_CRAWL_BLOCKS, 0, NULL);
     if (do_more == 0)
       break;
     did_moves++;
@@ -1156,8 +1093,7 @@ static void *lru_maintainer_thread(void *arg) {
   void *am = sam->init(&settings);
 
   pthread_mutex_lock(&lru_maintainer_lock);
-  if (settings.verbose > 2)
-    fprintf(stderr, "Starting LRU maintainer background thread\n");
+  // LRU maintainer background thread
   while (do_run_lru_maintainer_thread) {
     pthread_mutex_unlock(&lru_maintainer_lock);
     if (to_sleep)
@@ -1203,7 +1139,7 @@ static void *lru_maintainer_thread(void *arg) {
     }
 
     /* Minimize the sleep if we had async LRU bumps to process */
-    if (settings.lru_segmented && lru_maintainer_bumps() && to_sleep > 1000) {
+    if (lru_maintainer_bumps() && to_sleep > 1000) {
       to_sleep = 1000;
     }
 
@@ -1235,11 +1171,8 @@ static void *lru_maintainer_thread(void *arg) {
   }
   pthread_mutex_unlock(&lru_maintainer_lock);
   sam->free(am);
-  // LRU crawler *must* be stopped.
   free(cdata);
-  if (settings.verbose > 2)
-    fprintf(stderr, "LRU maintainer thread stopping\n");
-
+  // LRU maintainer thread stopping
   return NULL;
 }
 
