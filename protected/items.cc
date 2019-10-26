@@ -208,13 +208,13 @@ item *do_item_alloc_pull(const size_t ntotal, const unsigned int id) {
     lru_pull_tail(id, COLD_LRU, 0, 0, 0, NULL);
     it = (item*)slabs_alloc(ntotal, id, &total_bytes, 0);
 
-    if (it == NULL) {
-      if (lru_pull_tail(id, COLD_LRU, total_bytes, LRU_PULL_EVICT, 0, NULL) <= 0) {
-        lru_pull_tail(id, HOT_LRU, total_bytes, 0, 0, NULL);
-      }
-    } else {
-      break;
-    }
+     if (it == NULL) {
+       if (lru_pull_tail(id, COLD_LRU, total_bytes, LRU_PULL_EVICT, 0, NULL) <= 0) {
+         break;
+       }
+     } else {
+       break;
+     }
   }
 
   if (i > 0) {
@@ -315,7 +315,7 @@ item *do_item_alloc(char *key, const size_t nkey, const unsigned int flags,
   /* Items are initially loaded into the HOT_LRU. This is '0' but I want at
    * least a note here. Compiler (hopefully?) optimizes this out.
    */
-  id |= HOT_LRU;
+  id |= COLD_LRU;
   it->slabs_clsid = id;
 
   DEBUG_REFCNT(it, '*');
@@ -519,18 +519,13 @@ void do_item_update_nolock(item *it) {
 void do_item_update(item *it) {
   MEMCACHED_ITEM_UPDATE(ITEM_key(it), it->nkey, it->nbytes);
 
-  /* Hits to COLD_LRU immediately move to WARM. */
-  assert((it->it_flags & ITEM_SLABBED) == 0);
-  if ((it->it_flags & ITEM_LINKED) != 0) {
-    if (ITEM_lruid(it) == COLD_LRU && (it->it_flags & ITEM_ACTIVE)) {
+  if (it->time < current_time - ITEM_UPDATE_INTERVAL) {
+    assert((it->it_flags & ITEM_SLABBED) == 0);
+
+    if ((it->it_flags & ITEM_LINKED) != 0) {
       it->time = current_time;
       item_unlink_q(it);
-      it->slabs_clsid = ITEM_clsid(it);
-      it->slabs_clsid |= WARM_LRU;
-      it->it_flags &= ~ITEM_ACTIVE;
-      item_link_q_warm(it);
-    } else if (it->time < current_time - ITEM_UPDATE_INTERVAL) {
-      it->time = current_time;
+      item_link_q(it);
     }
   }
 }
@@ -657,16 +652,8 @@ item *do_item_get(const char *key, const size_t nkey, const uint32_t hv, const b
          * afterward.
          * FETCHED tells if an item has ever been active.
          */
-        if ((it->it_flags & ITEM_ACTIVE) == 0) {
-          if ((it->it_flags & ITEM_FETCHED) == 0) {
-            it->it_flags |= ITEM_FETCHED;
-          } else {
-            it->it_flags |= ITEM_ACTIVE;
-            if (ITEM_lruid(it) != COLD_LRU) {
-              do_item_update(it); // bump LA time
-            }
-          }
-        }
+        it->it_flags |= ITEM_FETCHED;
+        do_item_update(it);
       }
       DEBUG_REFCNT(it, '+');
     }
@@ -828,12 +815,6 @@ int lru_pull_tail(const int orig_id, const int cur_lru,
           /* Keep a reference to this item and return it. */
           ret_it->it = it;
           ret_it->hv = hv;
-        } else if ((search->it_flags & ITEM_ACTIVE) != 0) {
-          itemstats[id].moves_to_warm++;
-          search->it_flags &= ~ITEM_ACTIVE;
-          move_to_lru = WARM_LRU;
-          do_item_unlink_q(search);
-          removed++;
         }
         break;
       case TEMP_LRU:
@@ -956,13 +937,6 @@ static int lru_maintainer_juggle(const int slabs_clsid) {
   rel_time_t hot_age = 0;
   rel_time_t warm_age = 0;
   /* If LRU is in flat mode, force items to drain into COLD via max age */
-  pthread_mutex_lock(&lru_locks[slabs_clsid|COLD_LRU]);
-  if (tails[slabs_clsid|COLD_LRU]) {
-    cold_age = current_time - tails[slabs_clsid|COLD_LRU]->time;
-  }
-  pthread_mutex_unlock(&lru_locks[slabs_clsid|COLD_LRU]);
-  hot_age = cold_age * settings.hot_max_factor;
-  warm_age = cold_age * settings.warm_max_factor;
 
   /* Juggle HOT/WARM up to N times */
   for (i = 0; i < 500; i++) {
@@ -971,7 +945,6 @@ static int lru_maintainer_juggle(const int slabs_clsid) {
         lru_pull_tail(slabs_clsid, WARM_LRU, total_bytes, LRU_PULL_CRAWL_BLOCKS, warm_age, NULL)) {
       do_more++;
     }
-    do_more += lru_pull_tail(slabs_clsid, COLD_LRU, total_bytes, LRU_PULL_CRAWL_BLOCKS, 0, NULL);
     if (do_more == 0)
       break;
     did_moves++;
@@ -1136,11 +1109,6 @@ static void *lru_maintainer_thread(void *arg) {
       next_juggles[i] = backoff_juggles[i];
       if (next_juggles[i] < to_sleep)
         to_sleep = next_juggles[i];
-    }
-
-    /* Minimize the sleep if we had async LRU bumps to process */
-    if (lru_maintainer_bumps() && to_sleep > 1000) {
-      to_sleep = 1000;
     }
 
     /* Once per second at most */
