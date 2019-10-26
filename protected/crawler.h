@@ -2,6 +2,7 @@
 #define CRAWLER_H
 
 #define LRU_CRAWLER_CAP_REMAINING -1
+#include "memcached.h"
 
 struct crawlerstats_t {
     uint64_t histo[61];

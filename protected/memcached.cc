@@ -148,8 +148,6 @@ static void settings_init(void) {
   settings.hashpower_init = 0;
   settings.tail_repair_time = TAIL_REPAIR_TIME_DEFAULT;
   settings.crawls_persleep = 1000;
-  settings.logger_watcher_buf_size = LOGGER_WATCHER_BUF_SIZE;
-  settings.logger_buf_size = LOGGER_BUF_SIZE;
 }
 
 /* Destination must always be chunked */

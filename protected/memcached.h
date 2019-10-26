@@ -23,10 +23,25 @@
 #include <grp.h>
 #include <string>
 
-#include "itoa_ljust.h"
-#include "logger.h"
-
 #include <pptr.hpp>
+
+// THRADCACHED
+using rel_time_t = unsigned int;
+#include "murmur3_hash.h"
+#define tcd_hash MurmurHash3_x86_32
+/* RPMalloc Root IDs */
+enum RPMRoot {
+  PrimaryHT = 0,
+  OldHT = 1,
+  StatLock = 2,
+  ItemLocks = 3,
+  LRULocks = 4,
+  Heads = 5,
+  Tails = 6,
+  ItemStats = 7,
+  Sizes = 8,
+  SizesBytes = 9
+};
 
 /** Maximum length of a key. */
 #define KEY_MAX_LENGTH 250
@@ -322,8 +337,6 @@ struct settings {
   bool temp_lru; /* TTL < temporary_ttl uses TEMP_LRU */
   uint32_t temporary_ttl; /* temporary LRU threshold */
   int idle_timeout;       /* Number of seconds to let connections idle */
-  unsigned int logger_watcher_buf_size; /* size of logger's per-watcher buffer */
-  unsigned int logger_buf_size; /* size of per-thread logger buffer */
   bool relaxed_privileges;   /* Relax process restrictions when running testapp */
 };
 
@@ -516,23 +529,6 @@ void STATS_UNLOCK(void);
 void threadlocal_stats_reset(void);
 void threadlocal_stats_aggregate(struct thread_stats *stats);
 void slab_stats_aggregate(struct thread_stats *stats, struct slab_stats *out);
-
-// THRADCACHED
-#include "murmur3_hash.h"
-#define tcd_hash MurmurHash3_x86_32
-/* RPMalloc Root IDs */
-enum RPMRoot {
-  PrimaryHT = 0,
-  OldHT = 1,
-  StatLock = 2,
-  ItemLocks = 3,
-  LRULocks = 4,
-  Heads = 5,
-  Tails = 6,
-  ItemStats = 7,
-  Sizes = 8,
-  SizesBytes = 9
-};
 
 /* If supported, give compiler hints for branch prediction. */
 #if !defined(__GNUC__) || (__GNUC__ == 2 && __GNUC_MINOR__ < 96)

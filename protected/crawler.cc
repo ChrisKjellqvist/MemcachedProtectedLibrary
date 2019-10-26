@@ -22,7 +22,7 @@
 #include <poll.h>
 
 #include "pptr.hpp"
-
+#include "bipbuffer.h"
 #define LARGEST_ID POWER_LARGEST
 
 struct crawler_module_reg_t;
