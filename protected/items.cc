@@ -382,7 +382,8 @@ static void do_item_link_q(item *it) { /* item is the new head */
   head = &heads[it->slabs_clsid];
   tail = &tails[it->slabs_clsid];
   assert(it != *head);
-  assert((*head && *tail) || (*head == 0 && *tail == 0));
+  // && operator on a pointer?
+  assert(((item*)(*head) && (item*)(*tail)) || (*head == 0 && *tail == 0));
   it->prev = 0;
   it->next = *head;
   if (it->next != nullptr) it->next->prev = it;
@@ -618,7 +619,7 @@ void fill_item_stats_automove(item_stats_automove *am) {
     i = n | COLD_LRU;
     pthread_mutex_lock(&lru_locks[i]);
     cur->evicted = itemstats[i].evicted;
-    if (tails[i]) {
+    if (tails[i] != nullptr) {
       cur->age = current_time - tails[i]->time;
     } else {
       cur->age = 0;
@@ -950,8 +951,7 @@ static int lru_maintainer_juggle(const int slabs_clsid) {
   unsigned int chunks_perslab = 0;
   //unsigned int chunks_free = 0;
   /* TODO: if free_chunks below high watermark, increase aggressiveness */
-  slabs_available_chunks(slabs_clsid, NULL,
-      &total_bytes, &chunks_perslab);
+  slabs_available_chunks(slabs_clsid, NULL, &total_bytes, &chunks_perslab);
   rel_time_t cold_age = 0;
   rel_time_t hot_age = 0;
   rel_time_t warm_age = 0;
