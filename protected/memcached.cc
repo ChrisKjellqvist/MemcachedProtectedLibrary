@@ -129,20 +129,17 @@ static rel_time_t realtime(const time_t exptime) {
 static void settings_init(void) {
   /* By default this string should be NULL for getaddrinfo() */
   settings.maxbytes = 64 * 1024 * 1024; /* default is 64MB */
-  settings.maxconns = 1024;         /* to limit connections-related memory to about 5MB */
   settings.oldest_live = 0;
   settings.oldest_cas = 0;          /* supplements accuracy of oldest_live */
   settings.evict_to_free = 1;       /* push old items out of cache when memory runs out */
   settings.factor = 1.25;
   settings.chunk_size = 48;         /* space for a modest key and value */
   settings.prefix_delimiter = ':';
-  settings.detail_enabled = 0;
   settings.reqs_per_event = 20;
   settings.item_size_max = 1024 * 1024; /* The famous 1MB upper limit. */
   settings.lru_crawler = false;
   settings.lru_crawler_sleep = 100;
   settings.lru_crawler_tocrawl = 0;
-  settings.lru_maintainer_thread = false;
   settings.hot_max_factor = 0.2;
   settings.warm_max_factor = 2.0;
   settings.hashpower_init = 0;
@@ -307,7 +304,7 @@ struct st_st *do_store_item(item *it, int comm, const uint32_t hv) {
       if (stored == NOT_STORED) {
 	/* we have it and old_it here - alloc memory to hold both */
 	/* flags was already lost - so recover them from ITEM_suffix(it) */
-	FLAGS_CONV(settings.inline_ascii_response, old_it, flags);
+	FLAGS_CONV(false, old_it, flags);
 	new_it = do_item_alloc(key, it->nkey, flags, old_it->exptime, it->nbytes + old_it->nbytes - 2 /* CRLF */);
 
 	/* copy data from it and old_it to new_it */
@@ -472,12 +469,8 @@ void* server_thread (void *pargs) {
   printf("server started\n");
   fflush(stdout);
   bool lock_memory = false;
-  bool preallocate = false;
-  int maxcore = 0;
   char *username = NULL;
   struct passwd *pw;
-  struct rlimit rlim;
-  enum hashfunc_type hash_type = MURMUR3_HASH;
   enum {
     MAXCONNS_FAST = 0,
     HASHPOWER_INIT,
@@ -523,49 +516,6 @@ void* server_thread (void *pargs) {
 
   /* set stderr non-buffering (for running under, say, daemontools) */
   setbuf(stderr, NULL);
-
-  if (maxcore != 0) {
-    struct rlimit rlim_new;
-    /*
-     * First try raising to infinity; if that fails, try bringing
-     * the soft limit to the hard.
-     */
-    if (getrlimit(RLIMIT_CORE, &rlim) == 0) {
-      rlim_new.rlim_cur = rlim_new.rlim_max = RLIM_INFINITY;
-      if (setrlimit(RLIMIT_CORE, &rlim_new)!= 0) {
-	/* failed. try raising just to the old max */
-	rlim_new.rlim_cur = rlim_new.rlim_max = rlim.rlim_max;
-	(void)setrlimit(RLIMIT_CORE, &rlim_new);
-      }
-    }
-    /*
-     * getrlimit again to see what we ended up with. Only fail if
-     * the soft limit ends up 0, because then no core files will be
-     * created at all.
-     */
-
-    if ((getrlimit(RLIMIT_CORE, &rlim) != 0) || rlim.rlim_cur == 0) {
-      fprintf(stderr, "failed to ensure corefile creation\n");
-      exit(EX_OSERR);
-    }
-  }
-
-  /*
-   * If needed, increase rlimits to allow as many connections
-   * as needed.
-   */
-
-  if (getrlimit(RLIMIT_NOFILE, &rlim) != 0) {
-    fprintf(stderr, "failed to getrlimit number of files\n");
-    exit(EX_OSERR);
-  } else {
-    rlim.rlim_cur = settings.maxconns;
-    rlim.rlim_max = settings.maxconns;
-    if (setrlimit(RLIMIT_NOFILE, &rlim) != 0) {
-      fprintf(stderr, "failed to set rlimit for open files. Try starting as root or requesting smaller maxconns value.\n");
-      exit(EX_OSERR);
-    }
-  }
 
   /* lose root privileges if we have them */
   if (getuid() == 0 || geteuid() == 0) {
@@ -616,9 +566,6 @@ void* server_thread (void *pargs) {
   assert(start_lru_maintainer_thread(NULL) == 0);
   /* initialise clock event */
   clock_handler(0, 0, 0);
-
-  /* Initialize the uriencode lookup table. */
-  uriencode_init();
 
   /* enter the event loop */
   // TODO chnage to wait on maintenance threads

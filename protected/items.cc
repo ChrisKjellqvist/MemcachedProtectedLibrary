@@ -1186,7 +1186,6 @@ int stop_lru_maintainer_thread(void) {
     fprintf(stderr, "Failed to stop LRU maintainer thread: %s\n", strerror(ret));
     return -1;
   }
-  settings.lru_maintainer_thread = false;
   return 0;
 }
 
@@ -1195,7 +1194,6 @@ int start_lru_maintainer_thread(void *arg) {
 
   pthread_mutex_lock(&lru_maintainer_lock);
   do_run_lru_maintainer_thread = 1;
-  settings.lru_maintainer_thread = true;
   if ((ret = pthread_create(&lru_maintainer_tid, NULL,
           lru_maintainer_thread, arg)) != 0) {
     fprintf(stderr, "Can't create LRU maintainer thread: %s\n",

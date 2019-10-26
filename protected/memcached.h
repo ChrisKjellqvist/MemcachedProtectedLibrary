@@ -152,7 +152,8 @@ struct pthread_args {
   char **argv;
 };
 
-#define tcd_hash Murmur3_x86_32;
+#include "murmur3_hash.h"
+#define tcd_hash MurmurHash3_x86_32
 
 #include "pku_memcached.h"
 
@@ -302,7 +303,6 @@ struct stats_state {
  */
 struct settings {
     size_t maxbytes;
-    int maxconns;
     rel_time_t oldest_live; /* ignore existing items older than this */
     uint64_t oldest_cas; /* ignore existing items with CAS values lower than this */
     int evict_to_free;
@@ -310,14 +310,12 @@ struct settings {
     double factor;          /* chunk size growth factor */
     int chunk_size;
     char prefix_delimiter;  /* character that marks a key prefix (for stats) */
-    int detail_enabled;     /* nonzero if we're collecting detailed stats */
     int reqs_per_event;     /* Maximum number of io to process on each
                                io-event. */
     int item_size_max;        /* Maximum item size */
     int slab_chunk_size_max;  /* Upper end for chunks within slab pages. */
     int slab_page_size;     /* Slab's page units. */
     bool lru_crawler;        /* Whether or not to enable the autocrawler thread */
-    bool lru_maintainer_thread; /* LRU maintainer background thread */
     bool slab_reassign;     /* Whether or not slab reassignment is allowed */
     int slab_automove;     /* Whether or not to automatically move slabs */
     double slab_automove_ratio; /* youngest must be within pct of oldest */
@@ -326,7 +324,6 @@ struct settings {
     int tail_repair_time;   /* LRU tail refcount leak repair time */
     int lru_crawler_sleep;  /* Microsecond sleep between items */
     uint32_t lru_crawler_tocrawl; /* Number of items to crawl per run */
-    int hot_lru_pct; /* percentage of slab space for HOT_LRU */
     double hot_max_factor; /* HOT tail age relative to COLD tail */
     double warm_max_factor; /* WARM tail age relative to COLD tail */
     int crawls_persleep; /* Number of LRU crawls to run before sleeping */
@@ -482,8 +479,6 @@ extern int daemonize(int nochdir, int noclose);
 #include "items.h"
 #include "crawler.h"
 #include "trace.h"
-#include "hash.h"
-#include "util.h"
 
 /*
  * Functions such as the libevent-related calls that need to do cross-thread
