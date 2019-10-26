@@ -82,7 +82,7 @@ void memcached_thread_init() {
       perror("Can't allocate item locks");
       exit(1);
     }
-    for (i = 0; i < item_lock_count; i++) {
+    for (unsigned i = 0; i < item_lock_count; i++) {
       pthread_mutex_init(&item_locks[i], NULL);
     }
     pthread_mutex_init(stats_lock, NULL);

@@ -89,32 +89,32 @@
 #define MAX_NUMBER_OF_SLAB_CLASSES (63 + 1)
 
 /** How long an object can reasonably be assumed to be locked before
-    harvesting it on a low memory condition. Default: disabled. */
+  harvesting it on a low memory condition. Default: disabled. */
 #define TAIL_REPAIR_TIME_DEFAULT 0
 
 /* warning: don't use these macros with a function, as it evals its arg twice */
 #define ITEM_get_cas(i) (((i)->it_flags & ITEM_CAS) ? \
-        (i)->data->cas : (uint64_t)0)
+    (i)->data->cas : (uint64_t)0)
 
 #define ITEM_set_cas(i,v) { \
-    if ((i)->it_flags & ITEM_CAS) { \
-        (i)->data->cas = v; \
-    } \
+  if ((i)->it_flags & ITEM_CAS) { \
+    (i)->data->cas = v; \
+  } \
 }
 
 #define ITEM_key(it) (((char*)&((it)->data)) \
-         + (((it)->it_flags & ITEM_CAS) ? sizeof(uint64_t) : 0))
+    + (((it)->it_flags & ITEM_CAS) ? sizeof(uint64_t) : 0))
 
 #define ITEM_suffix(it) ((char*) &((it)->data) + (it)->nkey + 1 \
-         + (((it)->it_flags & ITEM_CAS) ? sizeof(uint64_t) : 0))
+    + (((it)->it_flags & ITEM_CAS) ? sizeof(uint64_t) : 0))
 
 #define ITEM_data(it) ((char*) &((it)->data) + (it)->nkey + 1 \
-         + (it)->nsuffix \
-         + (((it)->it_flags & ITEM_CAS) ? sizeof(uint64_t) : 0))
+    + (it)->nsuffix \
+    + (((it)->it_flags & ITEM_CAS) ? sizeof(uint64_t) : 0))
 
 #define ITEM_ntotal(it) (sizeof(item) + (it)->nkey + 1 \
-         + (it)->nsuffix + (it)->nbytes \
-         + (((it)->it_flags & ITEM_CAS) ? sizeof(uint64_t) : 0))
+    + (it)->nsuffix + (it)->nbytes \
+    + (((it)->it_flags & ITEM_CAS) ? sizeof(uint64_t) : 0))
 
 #define ITEM_clsid(it) ((it)->slabs_clsid & ~(3<<6))
 #define ITEM_lruid(it) ((it)->slabs_clsid & (3<<6))
@@ -125,13 +125,13 @@
 
 /** Item client flag conversion */
 #define FLAGS_CONV(iar, it, flag) { \
-    if ((iar)) { \
-        flag = (uint32_t) strtoul(ITEM_suffix((it)), (char **) NULL, 10); \
-    } else if ((it)->nsuffix > 0) { \
-        flag = *((uint32_t *)ITEM_suffix((it))); \
-    } else { \
-        flag = 0; \
-    } \
+  if ((iar)) { \
+    flag = (uint32_t) strtoul(ITEM_suffix((it)), (char **) NULL, 10); \
+  } else if ((it)->nsuffix > 0) { \
+    flag = *((uint32_t *)ITEM_suffix((it))); \
+  } else { \
+    flag = 0; \
+  } \
 }
 struct pthread_args {
   int argc;
@@ -153,10 +153,10 @@ void pku_memcached_insert(char* key, size_t nkey, char* data, size_t datan,
  * NOTE: If you modify this table you _MUST_ update the function state_text
  */
 enum pause_thread_types {
-    PAUSE_WORKER_THREADS = 0,
-    PAUSE_ALL_THREADS,
-    RESUME_ALL_THREADS,
-    RESUME_WORKER_THREADS
+  PAUSE_WORKER_THREADS = 0,
+  PAUSE_ALL_THREADS,
+  RESUME_ALL_THREADS,
+  RESUME_WORKER_THREADS
 };
 
 #define IS_TCP(x) (x == tcp_transport)
@@ -170,11 +170,11 @@ enum pause_thread_types {
 #define NREAD_CAS 6
 
 enum store_item_type {
-    NOT_STORED=0, STORED, EXISTS, NOT_FOUND, TOO_LARGE, NO_MEMORY
+  NOT_STORED=0, STORED, EXISTS, NOT_FOUND, TOO_LARGE, NO_MEMORY
 };
 
 enum delta_result_type {
-    OK, NON_NUMERIC, EOM, DELTA_ITEM_NOT_FOUND, DELTA_ITEM_CAS_MISMATCH
+  OK, NON_NUMERIC, EOM, DELTA_ITEM_NOT_FOUND, DELTA_ITEM_CAS_MISMATCH
 };
 
 
@@ -187,77 +187,77 @@ enum delta_result_type {
  */
 
 #define SLAB_STATS_FIELDS \
-    X(set_cmds) \
-    X(get_hits) \
-    X(touch_hits) \
-    X(delete_hits) \
-    X(cas_hits) \
-    X(cas_badval) \
-    X(incr_hits) \
-    X(decr_hits)
+  X(set_cmds) \
+  X(get_hits) \
+  X(touch_hits) \
+  X(delete_hits) \
+  X(cas_hits) \
+  X(cas_badval) \
+  X(incr_hits) \
+  X(decr_hits)
 
 /** Stats stored per slab (and per thread). */
 struct slab_stats {
 #define X(name) uint64_t    name;
-    SLAB_STATS_FIELDS
+  SLAB_STATS_FIELDS
 #undef X
 };
 
 #define THREAD_STATS_FIELDS \
-    X(get_cmds) \
-    X(get_misses) \
-    X(get_expired) \
-    X(get_flushed) \
-    X(touch_cmds) \
-    X(touch_misses) \
-    X(delete_misses) \
-    X(incr_misses) \
-    X(decr_misses) \
-    X(cas_misses) \
-    X(bytes_read) \
-    X(bytes_written) \
-    X(flush_cmds) \
-    X(conn_yields) /* # of yields for connections (-R option)*/ \
-    X(auth_cmds) \
-    X(auth_errors) \
-    X(idle_kicks) /* idle connections killed */
+  X(get_cmds) \
+  X(get_misses) \
+  X(get_expired) \
+  X(get_flushed) \
+  X(touch_cmds) \
+  X(touch_misses) \
+  X(delete_misses) \
+  X(incr_misses) \
+  X(decr_misses) \
+  X(cas_misses) \
+  X(bytes_read) \
+  X(bytes_written) \
+  X(flush_cmds) \
+  X(conn_yields) /* # of yields for connections (-R option)*/ \
+  X(auth_cmds) \
+  X(auth_errors) \
+  X(idle_kicks) /* idle connections killed */
 
 /**
  * Stats stored per-thread.
  */
 struct thread_stats {
-    pthread_mutex_t   mutex;
+  pthread_mutex_t   mutex;
 #define X(name) uint64_t    name;
-    THREAD_STATS_FIELDS
+  THREAD_STATS_FIELDS
 #undef X
     struct slab_stats slab_stats[MAX_NUMBER_OF_SLAB_CLASSES];
-    uint64_t lru_hits[POWER_LARGEST];
+  uint64_t lru_hits[POWER_LARGEST];
 };
 
 /**
  * Global stats. Only resettable stats should go into this structure.
  */
 struct stats {
-    uint64_t      total_items;
-    uint64_t      total_conns;
-    uint64_t      rejected_conns;
-    uint64_t      malloc_fails;
-    uint64_t      listen_disabled_num;
-    uint64_t      slabs_moved;       /* times slabs were moved around */
-    uint64_t      slab_reassign_rescues; /* items rescued during slab move */
-    uint64_t      slab_reassign_evictions_nomem; /* valid items lost during slab move */
-    uint64_t      slab_reassign_inline_reclaim; /* valid items lost during slab move */
-    uint64_t      slab_reassign_chunk_rescues; /* chunked-item chunks recovered */
-    uint64_t      slab_reassign_busy_items; /* valid temporarily unmovable */
-    uint64_t      slab_reassign_busy_deletes; /* refcounted items killed */
-    uint64_t      lru_crawler_starts; /* Number of item crawlers kicked off */
-    uint64_t      lru_maintainer_juggles; /* number of LRU bg pokes */
-    uint64_t      time_in_listen_disabled_us;  /* elapsed time in microseconds while server unable to process new connections */
-    uint64_t      log_worker_dropped; /* logs dropped by worker threads */
-    uint64_t      log_worker_written; /* logs written by worker threads */
-    uint64_t      log_watcher_skipped; /* logs watchers missed */
-    uint64_t      log_watcher_sent; /* logs sent to watcher buffers */
-    struct timeval maxconns_entered;  /* last time maxconns entered */
+  uint64_t      total_items;
+  uint64_t      total_conns;
+  uint64_t      rejected_conns;
+  uint64_t      malloc_fails;
+  uint64_t      listen_disabled_num;
+  uint64_t      slabs_moved;       /* times slabs were moved around */
+  uint64_t      slab_reassign_rescues; /* items rescued during slab move */
+  uint64_t      slab_reassign_evictions_nomem; /* valid items lost during slab move */
+  uint64_t      slab_reassign_inline_reclaim; /* valid items lost during slab move */
+  uint64_t      slab_reassign_chunk_rescues; /* chunked-item chunks recovered */
+  uint64_t      slab_reassign_busy_items; /* valid temporarily unmovable */
+  uint64_t      slab_reassign_busy_deletes; /* refcounted items killed */
+  uint64_t      lru_crawler_starts; /* Number of item crawlers kicked off */
+  uint64_t      lru_maintainer_juggles; /* number of LRU bg pokes */
+  uint64_t      time_in_listen_disabled_us;  /* elapsed time in microseconds while server unable to process new connections */
+  uint64_t      log_worker_dropped; /* logs dropped by worker threads */
+  uint64_t      log_worker_written; /* logs written by worker threads */
+  uint64_t      log_watcher_skipped; /* logs watchers missed */
+  uint64_t      log_watcher_sent; /* logs sent to watcher buffers */
+  struct timeval maxconns_entered;  /* last time maxconns entered */
 };
 
 /**
@@ -265,17 +265,17 @@ struct stats {
  * Ordered for some cache line locality for commonly updated counters.
  */
 struct stats_state {
-    uint64_t      curr_items;
-    uint64_t      curr_bytes;
-    uint64_t      curr_conns;
-    uint64_t      hash_bytes;       /* size used for hash tables */
-    unsigned int  conn_structs;
-    unsigned int  reserved_fds;
-    unsigned int  hash_power_level; /* Better hope it's not over 9000 */
-    bool          hash_is_expanding; /* If the hash table is being expanded */
-    bool          accepting_conns;  /* whether we are currently accepting */
-    bool          slab_reassign_running; /* slab reassign in progress */
-    bool          lru_crawler_running; /* crawl in progress */
+  uint64_t      curr_items;
+  uint64_t      curr_bytes;
+  uint64_t      curr_conns;
+  uint64_t      hash_bytes;       /* size used for hash tables */
+  unsigned int  conn_structs;
+  unsigned int  reserved_fds;
+  unsigned int  hash_power_level; /* Better hope it's not over 9000 */
+  bool          hash_is_expanding; /* If the hash table is being expanded */
+  bool          accepting_conns;  /* whether we are currently accepting */
+  bool          slab_reassign_running; /* slab reassign in progress */
+  bool          lru_crawler_running; /* crawl in progress */
 };
 
 #define MAX_VERBOSITY_LEVEL 2
@@ -285,58 +285,46 @@ struct stats_state {
  * Globally accessible settings as derived from the commandline.
  */
 struct settings {
-    size_t maxbytes;
-    int maxconns;
-    int port;
-    int udpport;
-    char *inter;
-    int verbose;
-    rel_time_t oldest_live; /* ignore existing items older than this */
-    uint64_t oldest_cas; /* ignore existing items with CAS values lower than this */
-    int evict_to_free;
-    char *socketpath;   /* path to unix socket if using local socket */
-    int access;  /* access mask (a la chmod) for unix domain socket */
-    double factor;          /* chunk size growth factor */
-    int chunk_size;
-    int num_threads;        /* number of worker (without dispatcher) libevent threads to run */
-    int num_threads_per_udp; /* number of worker threads serving each udp socket */
-    char prefix_delimiter;  /* character that marks a key prefix (for stats) */
-    int detail_enabled;     /* nonzero if we're collecting detailed stats */
-    int reqs_per_event;     /* Maximum number of io to process on each
-                               io-event. */
-    bool use_cas;
-    int backlog;
-    int item_size_max;        /* Maximum item size */
-    int slab_chunk_size_max;  /* Upper end for chunks within slab pages. */
-    int slab_page_size;     /* Slab's page units. */
-    bool maxconns_fast;     /* Whether or not to early close connections */
-    bool lru_crawler;        /* Whether or not to enable the autocrawler thread */
-    bool lru_maintainer_thread; /* LRU maintainer background thread */
-    bool lru_segmented;     /* Use split or flat LRU's */
-    bool slab_reassign;     /* Whether or not slab reassignment is allowed */
-    int slab_automove;     /* Whether or not to automatically move slabs */
-    double slab_automove_ratio; /* youngest must be within pct of oldest */
-    unsigned int slab_automove_window; /* window mover for algorithm */
-    int hashpower_init;     /* Starting hash power level */
-    bool shutdown_command; /* allow shutdown command */
-    int tail_repair_time;   /* LRU tail refcount leak repair time */
-    bool flush_enabled;     /* flush_all enabled */
-    bool dump_enabled;      /* whether cachedump/metadump commands work */
-    std::string hash_algorithm;     /* Hash algorithm in use */
-    int lru_crawler_sleep;  /* Microsecond sleep between items */
-    uint32_t lru_crawler_tocrawl; /* Number of items to crawl per run */
-    int hot_lru_pct; /* percentage of slab space for HOT_LRU */
-    int warm_lru_pct; /* percentage of slab space for WARM_LRU */
-    double hot_max_factor; /* HOT tail age relative to COLD tail */
-    double warm_max_factor; /* WARM tail age relative to COLD tail */
-    int crawls_persleep; /* Number of LRU crawls to run before sleeping */
-    bool inline_ascii_response; /* pre-format the VALUE line for ASCII responses */
-    bool temp_lru; /* TTL < temporary_ttl uses TEMP_LRU */
-    uint32_t temporary_ttl; /* temporary LRU threshold */
-    int idle_timeout;       /* Number of seconds to let connections idle */
-    unsigned int logger_watcher_buf_size; /* size of logger's per-watcher buffer */
-    unsigned int logger_buf_size; /* size of per-thread logger buffer */
-    bool relaxed_privileges;   /* Relax process restrictions when running testapp */
+  size_t maxbytes;
+  rel_time_t oldest_live; /* ignore existing items older than this */
+  uint64_t oldest_cas; /* ignore existing items with CAS values lower than this */
+  int evict_to_free;
+  int access;  /* access mask (a la chmod) for unix domain socket */
+  double factor;          /* chunk size growth factor */
+  int chunk_size;
+  char prefix_delimiter;  /* character that marks a key prefix (for stats) */
+  int detail_enabled;     /* nonzero if we're collecting detailed stats */
+  int reqs_per_event;     /* Maximum number of io to process on each
+                             io-event. */
+  int backlog;
+  int item_size_max;        /* Maximum item size */
+  int slab_chunk_size_max;  /* Upper end for chunks within slab pages. */
+  int slab_page_size;     /* Slab's page units. */
+  bool maxconns_fast;     /* Whether or not to early close connections */
+  bool lru_crawler;        /* Whether or not to enable the autocrawler thread */
+  bool lru_maintainer_thread; /* LRU maintainer background thread */
+  bool slab_reassign;     /* Whether or not slab reassignment is allowed */
+  int slab_automove;     /* Whether or not to automatically move slabs */
+  double slab_automove_ratio; /* youngest must be within pct of oldest */
+  unsigned int slab_automove_window; /* window mover for algorithm */
+  int hashpower_init;     /* Starting hash power level */
+  bool shutdown_command; /* allow shutdown command */
+  int tail_repair_time;   /* LRU tail refcount leak repair time */
+  bool flush_enabled;     /* flush_all enabled */
+  bool dump_enabled;      /* whether cachedump/metadump commands work */
+  std::string hash_algorithm;     /* Hash algorithm in use */
+  int lru_crawler_sleep;  /* Microsecond sleep between items */
+  uint32_t lru_crawler_tocrawl; /* Number of items to crawl per run */
+  double hot_max_factor; /* HOT tail age relative to COLD tail */
+  double warm_max_factor; /* WARM tail age relative to COLD tail */
+  int crawls_persleep; /* Number of LRU crawls to run before sleeping */
+  bool inline_ascii_response; /* pre-format the VALUE line for ASCII responses */
+  bool temp_lru; /* TTL < temporary_ttl uses TEMP_LRU */
+  uint32_t temporary_ttl; /* temporary LRU threshold */
+  int idle_timeout;       /* Number of seconds to let connections idle */
+  unsigned int logger_watcher_buf_size; /* size of logger's per-watcher buffer */
+  unsigned int logger_buf_size; /* size of per-thread logger buffer */
+  bool relaxed_privileges;   /* Relax process restrictions when running testapp */
 };
 
 extern struct stats stats;
@@ -362,83 +350,83 @@ extern struct settings settings;
  * Structure for storing items within memcached.
  */
 struct item{
-    /* Protected by LRU locks */
-    pptr<item>      next;
-    pptr<item>      prev;
-    /* Rest are protected by an item lock */
-    pptr<item>      h_next;    /* hash chain next */
-    rel_time_t      time;       /* least recent access */
-    rel_time_t      exptime;    /* expire time */
-    int             nbytes;     /* size of data */
-    unsigned short  refcount;
-    uint8_t         nsuffix;    /* length of flags-and-length string */
-    uint8_t         it_flags;   /* ITEM_* above */
-    uint8_t         slabs_clsid;/* which slab class we're in */
-    uint8_t         nkey;       /* key length, w/terminating null and padding */
-    /* this odd type prevents type-punning issues when we do
-     * the little shuffle to save space when not using CAS. */
-    union {
-        uint64_t cas;
-        char end;
-    } data[];
-    /* if it_flags & ITEM_CAS we have 8 bytes CAS */
-    /* then null-terminated key */
-    /* then " flags length\r\n" (no terminating null) */
-    /* then data with terminating \r\n (no terminating null; it's binary!) */
+  /* Protected by LRU locks */
+  pptr<item>      next;
+  pptr<item>      prev;
+  /* Rest are protected by an item lock */
+  pptr<item>      h_next;    /* hash chain next */
+  rel_time_t      time;       /* least recent access */
+  rel_time_t      exptime;    /* expire time */
+  int             nbytes;     /* size of data */
+  unsigned short  refcount;
+  uint8_t         nsuffix;    /* length of flags-and-length string */
+  uint8_t         it_flags;   /* ITEM_* above */
+  uint8_t         slabs_clsid;/* which slab class we're in */
+  uint8_t         nkey;       /* key length, w/terminating null and padding */
+  /* this odd type prevents type-punning issues when we do
+   * the little shuffle to save space when not using CAS. */
+  union {
+    uint64_t cas;
+    char end;
+  } data[];
+  /* if it_flags & ITEM_CAS we have 8 bytes CAS */
+  /* then null-terminated key */
+  /* then " flags length\r\n" (no terminating null) */
+  /* then data with terminating \r\n (no terminating null; it's binary!) */
 };
 
 // TODO: If we eventually want user loaded modules, we can't use an enum :(
 enum crawler_run_type {
-    CRAWLER_AUTOEXPIRE=0, CRAWLER_EXPIRED, CRAWLER_METADUMP
+  CRAWLER_AUTOEXPIRE=0, CRAWLER_EXPIRED, CRAWLER_METADUMP
 };
 
 struct crawler{
-    item *next;
-    item *prev;
-    item *h_next;    /* hash chain next */
-    rel_time_t      time;       /* least recent access */
-    rel_time_t      exptime;    /* expire time */
-    int             nbytes;     /* size of data */
-    unsigned short  refcount;
-    uint8_t         nsuffix;    /* length of flags-and-length string */
-    uint8_t         it_flags;   /* ITEM_* above */
-    uint8_t         slabs_clsid;/* which slab class we're in */
-    uint8_t         nkey;       /* key length, w/terminating null and padding */
-    uint32_t        remaining;  /* Max keys to crawl per slab per invocation */
-    uint64_t        reclaimed;  /* items reclaimed during this crawl. */
-    uint64_t        unfetched;  /* items reclaimed unfetched during this crawl. */
-    uint64_t        checked;    /* items examined during this crawl. */
+  item *next;
+  item *prev;
+  item *h_next;    /* hash chain next */
+  rel_time_t      time;       /* least recent access */
+  rel_time_t      exptime;    /* expire time */
+  int             nbytes;     /* size of data */
+  unsigned short  refcount;
+  uint8_t         nsuffix;    /* length of flags-and-length string */
+  uint8_t         it_flags;   /* ITEM_* above */
+  uint8_t         slabs_clsid;/* which slab class we're in */
+  uint8_t         nkey;       /* key length, w/terminating null and padding */
+  uint32_t        remaining;  /* Max keys to crawl per slab per invocation */
+  uint64_t        reclaimed;  /* items reclaimed during this crawl. */
+  uint64_t        unfetched;  /* items reclaimed unfetched during this crawl. */
+  uint64_t        checked;    /* items examined during this crawl. */
 };
 
 /* Header when an item is actually a chunk of another item. */
 struct item_chunk {
-    item_chunk *next;     /* points within its own chain. */
-    item_chunk *prev;     /* can potentially point to the head. */
-    item  *head;     /* always points to the owner chunk */
-    int              size;      /* available chunk space in bytes */
-    int              used;      /* chunk space used */
-    int              nbytes;    /* used. */
-    unsigned short   refcount;  /* used? */
-    uint8_t          orig_clsid; /* For obj hdr chunks slabs_clsid is fake. */
-    uint8_t          it_flags;  /* ITEM_* above. */
-    uint8_t          slabs_clsid; /* Same as above. */
-    char data[];
+  item_chunk *next;     /* points within its own chain. */
+  item_chunk *prev;     /* can potentially point to the head. */
+  item  *head;     /* always points to the owner chunk */
+  int              size;      /* available chunk space in bytes */
+  int              used;      /* chunk space used */
+  int              nbytes;    /* used. */
+  unsigned short   refcount;  /* used? */
+  uint8_t          orig_clsid; /* For obj hdr chunks slabs_clsid is fake. */
+  uint8_t          it_flags;  /* ITEM_* above. */
+  uint8_t          slabs_clsid; /* Same as above. */
+  char data[];
 };
 
 #ifdef NEED_ALIGN
 static inline char *ITEM_schunk(item *it) {
-    int offset = it->nkey + 1 + it->nsuffix
-        + ((it->it_flags & ITEM_CAS) ? sizeof(uint64_t) : 0);
-    int remain = offset % 8;
-    if (remain != 0) {
-        offset += 8 - remain;
-    }
-    return ((char *) &(it->data)) + offset;
+  int offset = it->nkey + 1 + it->nsuffix
+    + ((it->it_flags & ITEM_CAS) ? sizeof(uint64_t) : 0);
+  int remain = offset % 8;
+  if (remain != 0) {
+    offset += 8 - remain;
+  }
+  return ((char *) &(it->data)) + offset;
 }
 #else
 #define ITEM_schunk(item) ((char*) &((item)->data) + (item)->nkey + 1 \
-         + (item)->nsuffix \
-         + (((item)->it_flags & ITEM_CAS) ? sizeof(uint64_t) : 0))
+    + (item)->nsuffix \
+    + (((item)->it_flags & ITEM_CAS) ? sizeof(uint64_t) : 0))
 #endif
 
 /* current time of day (updated periodically) */
@@ -448,19 +436,19 @@ extern volatile rel_time_t current_time;
 extern volatile int slab_rebalance_signal;
 
 struct slab_rebalance {
-    void *slab_start;
-    void *slab_end;
-    void *slab_pos;
-    int s_clsid;
-    int d_clsid;
-    uint32_t busy_items;
-    uint32_t rescues;
-    uint32_t evictions_nomem;
-    uint32_t inline_reclaim;
-    uint32_t chunk_rescues;
-    uint32_t busy_deletes;
-    uint32_t busy_loops;
-    uint8_t done;
+  void *slab_start;
+  void *slab_end;
+  void *slab_pos;
+  int s_clsid;
+  int d_clsid;
+  uint32_t busy_items;
+  uint32_t rescues;
+  uint32_t evictions_nomem;
+  uint32_t inline_reclaim;
+  uint32_t chunk_rescues;
+  uint32_t busy_deletes;
+  uint32_t busy_loops;
+  uint8_t done;
 };
 
 extern struct slab_rebalance slab_rebal;
@@ -475,9 +463,9 @@ struct st_st {
 struct st_st *mk_st (enum store_item_type my_sit, size_t my_cas);
 
 enum delta_result_type do_add_delta(const char *key,
-                                    const size_t nkey, const bool incr,
-                                    const int64_t delta, char *buf,
-                                    uint64_t *cas, const uint32_t hv);
+    const size_t nkey, const bool incr,
+    const int64_t delta, char *buf,
+    uint64_t *cas, const uint32_t hv);
 struct st_st *do_store_item(item *item, int comm, const uint32_t hv);
 extern int daemonize(int nochdir, int noclose);
 
@@ -490,8 +478,6 @@ extern int daemonize(int nochdir, int noclose);
 #include "items.h"
 #include "crawler.h"
 #include "trace.h"
-#include "hash.h"
-#include "util.h"
 
 /*
  * Functions such as the libevent-related calls that need to do cross-thread
@@ -499,14 +485,13 @@ extern int daemonize(int nochdir, int noclose);
  * in the current thread) are called via "dispatch_" frontends, which are
  * also #define-d to directly call the underlying code in singlethreaded mode.
  */
-void memcached_thread_init(int nthreads, void *arg);
+void memcached_thread_init();
 
 /* Lock wrappers for cache functions that are called from main loop. */
 enum delta_result_type add_delta(const char *key,
-                                 const size_t nkey, bool incr,
-                                 const int64_t delta, char *buf,
-                                 uint64_t *cas);
-void accept_new_conns(const bool do_accept);
+    const size_t nkey, bool incr,
+    const int64_t delta, char *buf,
+    uint64_t *cas);
 item *item_alloc(char *key, size_t nkey, int flags, rel_time_t exptime, int nbytes);
 #define DO_UPDATE true
 #define DONT_UPDATE false
@@ -531,6 +516,23 @@ void STATS_UNLOCK(void);
 void threadlocal_stats_reset(void);
 void threadlocal_stats_aggregate(struct thread_stats *stats);
 void slab_stats_aggregate(struct thread_stats *stats, struct slab_stats *out);
+
+// THRADCACHED
+#include "murmur3_hash.h"
+#define tcd_hash MurmurHash3_x86_32
+/* RPMalloc Root IDs */
+enum RPMRoot {
+  PrimaryHT = 0,
+  OldHT = 1,
+  StatLock = 2,
+  ItemLocks = 3,
+  LRULocks = 4,
+  Heads = 5,
+  Tails = 6,
+  ItemStats = 7,
+  Sizes = 8,
+  SizesBytes = 9
+};
 
 /* If supported, give compiler hints for branch prediction. */
 #if !defined(__GNUC__) || (__GNUC__ == 2 && __GNUC_MINOR__ < 96)

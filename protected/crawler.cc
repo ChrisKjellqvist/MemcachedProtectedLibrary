@@ -99,6 +99,24 @@ static int lru_crawler_initialized = 0;
 static pthread_mutex_t lru_crawler_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t  lru_crawler_cond = PTHREAD_COND_INITIALIZER;
 
+static char *uriencode_map[256];
+static bool uriencode(const char *src, char *dst, const size_t srclen, const size_t dstlen) {
+    size_t x;
+    size_t d = 0;
+    for (x = 0; x < srclen; x++) {
+        if (d + 4 > dstlen)
+            return false;
+        if (uriencode_map[(unsigned char) src[x]] != NULL) {
+            memcpy(&dst[d], uriencode_map[(unsigned char) src[x]], 3);
+            d += 3;
+        } else {
+            dst[d] = src[x];
+            d++;
+        }
+    }
+    dst[d] = '\0';
+    return true;
+}
 /* Will crawl all slab classes a minimum of once per hour */
 #define MAX_MAINTCRAWL_WAIT 60 * 60
 
@@ -585,51 +603,6 @@ int lru_crawler_start(uint8_t *ids, uint32_t remaining,
   }
   pthread_mutex_unlock(&lru_crawler_lock);
   return starts;
-}
-
-/*
- * Also only clear the crawlerstats once per sid.
- */
-enum crawler_result_type lru_crawler_crawl(char *slabs, const enum crawler_run_type type,
-    void *c, const int sfd, unsigned int remaining) {
-  char *b = NULL;
-  uint32_t sid = 0;
-  int starts = 0;
-  uint8_t tocrawl[POWER_LARGEST];
-
-  /* FIXME: I added this while debugging. Don't think it's needed? */
-  memset(tocrawl, 0, sizeof(uint8_t) * POWER_LARGEST);
-  if (strcmp(slabs, "all") == 0) {
-    for (sid = 0; sid < POWER_LARGEST; sid++) {
-      tocrawl[sid] = 1;
-    }
-  } else {
-    for (char *p = strtok_r(slabs, ",", &b);
-        p != NULL;
-        p = strtok_r(NULL, ",", &b)) {
-
-      if (!safe_strtoul(p, &sid) || sid < POWER_SMALLEST
-          || sid >= MAX_NUMBER_OF_SLAB_CLASSES) {
-        pthread_mutex_unlock(&lru_crawler_lock);
-        return CRAWLER_BADCLASS;
-      }
-      tocrawl[sid | TEMP_LRU] = 1;
-      tocrawl[sid | HOT_LRU] = 1;
-      tocrawl[sid | WARM_LRU] = 1;
-      tocrawl[sid | COLD_LRU] = 1;
-    }
-  }
-
-  starts = lru_crawler_start(tocrawl, remaining, type, NULL, c, sfd);
-  if (starts == -1) {
-    return CRAWLER_RUNNING;
-  } else if (starts == -2) {
-    return CRAWLER_ERROR; /* FIXME: not very helpful. */
-  } else if (starts) {
-    return CRAWLER_OK;
-  } else {
-    return CRAWLER_NOTSTARTED;
-  }
 }
 
 /* If we hold this lock, crawler can't wake up or move */

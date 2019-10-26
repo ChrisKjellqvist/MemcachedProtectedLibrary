@@ -146,16 +146,6 @@ int item_is_flushed(item *it) {
   return 0;
 }
 
-static unsigned int temp_lru_size(int slabs_clsid) {
-  int id = CLEAR_LRU(slabs_clsid);
-  id |= TEMP_LRU;
-  unsigned int ret;
-  pthread_mutex_lock(&lru_locks[id]);
-  ret = sizes_bytes[id];
-  pthread_mutex_unlock(&lru_locks[id]);
-  return ret;
-}
-
 /* must be locked before call */
 unsigned int do_get_lru_size(uint32_t id) {
   return sizes[id];
@@ -398,13 +388,6 @@ static void do_item_link_q(item *it) { /* item is the new head */
 static void item_link_q(item *it) {
   pthread_mutex_lock(&lru_locks[it->slabs_clsid]);
   do_item_link_q(it);
-  pthread_mutex_unlock(&lru_locks[it->slabs_clsid]);
-}
-
-static void item_link_q_warm(item *it) {
-  pthread_mutex_lock(&lru_locks[it->slabs_clsid]);
-  do_item_link_q(it);
-  itemstats[it->slabs_clsid].moves_to_warm++;
   pthread_mutex_unlock(&lru_locks[it->slabs_clsid]);
 }
 
@@ -882,41 +865,6 @@ void *item_lru_bump_buf_create(void) {
  * If very few hits on cold this would avoid extra memory barriers from LRU
  * maintainer thread. If many hits, they'll just stay in the list.
  */
-static bool lru_maintainer_bumps(void) {
-  lru_bump_buf *b;
-  lru_bump_entry *be;
-  unsigned int size;
-  unsigned int todo;
-  bool bumped = false;
-  pthread_mutex_lock(&bump_buf_lock);
-  for (b = bump_buf_head; b != NULL; b=b->next) {
-    pthread_mutex_lock(&b->mutex);
-    be = (lru_bump_entry *) bipbuf_peek_all(b->buf, &size);
-    pthread_mutex_unlock(&b->mutex);
-
-    if (be == NULL) {
-      continue;
-    }
-    todo = size;
-    bumped = true;
-
-    while (todo) {
-      item_lock(be->hv);
-      do_item_update(be->it);
-      do_item_remove(be->it);
-      item_unlock(be->hv);
-      be++;
-      todo -= sizeof(lru_bump_entry);
-    }
-
-    pthread_mutex_lock(&b->mutex);
-    be = (lru_bump_entry *) bipbuf_poll(b->buf, size);
-    pthread_mutex_unlock(&b->mutex);
-  }
-  pthread_mutex_unlock(&bump_buf_lock);
-  return bumped;
-}
-
 /* Loop up to N times:
  * If too many items are in HOT_LRU, push to COLD_LRU
  * If too many items are in WARM_LRU, push to COLD_LRU
@@ -933,7 +881,6 @@ static int lru_maintainer_juggle(const int slabs_clsid) {
   //unsigned int chunks_free = 0;
   /* TODO: if free_chunks below high watermark, increase aggressiveness */
   slabs_available_chunks(slabs_clsid, NULL, &total_bytes, &chunks_perslab);
-  rel_time_t cold_age = 0;
   rel_time_t hot_age = 0;
   rel_time_t warm_age = 0;
   /* If LRU is in flat mode, force items to drain into COLD via max age */
@@ -1201,7 +1148,7 @@ void do_item_linktail_q(item *it) { /* item is the new tail */
   tail = &tails[it->slabs_clsid];
   //assert(*tail != 0);
   assert(it != *tail);
-  assert((*head && *tail) || (*head == 0 && *tail == 0));
+  assert(((*head != nullptr) && (*tail!=nullptr)) || (*head == 0 && *tail == 0));
   it->prev = *tail;
   it->next = 0;
   if (it->prev != nullptr) {

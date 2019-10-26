@@ -78,6 +78,9 @@ struct stats stats;
 struct stats_state stats_state;
 struct settings settings;
 time_t process_started;     /* when the process was started */
+struct slab_rebalance slab_rebal;
+volatile int slab_rebalance_signal;
+
 
 /* We have to know if we're a server or a client so we can do proper init
  * routines.
