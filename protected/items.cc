@@ -273,13 +273,6 @@ item *do_item_alloc(char *key, const size_t nkey, const unsigned int flags,
      */
     int htotal = nkey + 1 + nsuffix + sizeof(item) + sizeof(item_chunk) 
       + sizeof(uint64_t);
-#ifdef NEED_ALIGN
-    // header chunk needs to be padded on some systems
-    int remain = htotal % 8;
-    if (remain != 0) {
-      htotal += 8 - remain;
-    }
-#endif
     hdr_id = slabs_clsid(htotal);
     it = do_item_alloc_pull(htotal, hdr_id);
     /* setting ITEM_CHUNKED is fine here because we aren't LINKED yet. */

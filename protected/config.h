@@ -85,9 +85,6 @@
 /* Define to 1 if the system has the type `_Bool'. */
 #define HAVE__BOOL 1
 
-/* Machine need alignment */
-/* #undef NEED_ALIGN */
-
 /* Name of package */
 #define PACKAGE "memcached"
 

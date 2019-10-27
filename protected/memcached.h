@@ -426,21 +426,9 @@ struct item_chunk {
   char data[];
 };
 
-#ifdef NEED_ALIGN
-static inline char *ITEM_schunk(item *it) {
-  int offset = it->nkey + 1 + it->nsuffix
-    + ((it->it_flags & ITEM_CAS) ? sizeof(uint64_t) : 0);
-  int remain = offset % 8;
-  if (remain != 0) {
-    offset += 8 - remain;
-  }
-  return ((char *) &(it->data)) + offset;
-}
-#else
 #define ITEM_schunk(item) ((char*) &((item)->data) + (item)->nkey + 1 \
     + (item)->nsuffix \
     + (((item)->it_flags & ITEM_CAS) ? sizeof(uint64_t) : 0))
-#endif
 
 /* current time of day (updated periodically) */
 extern volatile rel_time_t current_time;
