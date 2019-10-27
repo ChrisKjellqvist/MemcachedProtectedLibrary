@@ -296,15 +296,12 @@ static int do_slabs_newslab(const unsigned int id) {
   if ((mem_limit && mem_malloced + len > mem_limit && p->slabs > 0
         && g->slabs == 0)) {
     mem_limit_reached = true;
-    MEMCACHED_SLABS_SLABCLASS_ALLOCATE_FAILED(id);
     return 0;
   }
 
   if ((grow_slab_list(id) == 0) ||
       (((ptr = (char*)get_page_from_global_pool()) == NULL) &&
        ((ptr = (char*)memory_allocate((size_t)len)) == 0))) {
-
-    MEMCACHED_SLABS_SLABCLASS_ALLOCATE_FAILED(id);
     return 0;
   }
 
@@ -312,8 +309,6 @@ static int do_slabs_newslab(const unsigned int id) {
   split_slab_page_into_freelist(ptr, id);
 
   p->slab_list[p->slabs++] = ptr;
-  MEMCACHED_SLABS_SLABCLASS_ALLOCATE(id);
-
   return 1;
 }
 
@@ -324,7 +319,6 @@ static void *do_slabs_alloc(const size_t size, unsigned int id, uint64_t *total_
   void *ret = NULL;
   pptr<item> it = NULL;
   if (id < POWER_SMALLEST || id > (unsigned int)power_largest) {
-    MEMCACHED_SLABS_ALLOCATE_FAILED(size, 0);
     return NULL;
   }
   p = &slabclass[id];
@@ -358,9 +352,7 @@ static void *do_slabs_alloc(const size_t size, unsigned int id, uint64_t *total_
 
   if (ret) {
     p->requested += size;
-    MEMCACHED_SLABS_ALLOCATE(size, id, p->size, ret);
   } else {
-    MEMCACHED_SLABS_ALLOCATE_FAILED(size, id);
   }
 
   return ret;
@@ -432,7 +424,6 @@ static void do_slabs_free(void *ptr, const size_t size, unsigned int id) {
   if (id < POWER_SMALLEST || id > (unsigned int)power_largest)
     return;
 
-  MEMCACHED_SLABS_FREE(size, id, ptr);
   p = &slabclass[id];
 
   it = pptr<item>((item*)ptr);

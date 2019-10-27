@@ -490,7 +490,6 @@ extern int daemonize(int nochdir, int noclose);
 #include "assoc.h"
 #include "items.h"
 #include "crawler.h"
-#include "trace.h"
 
 /*
  * Functions such as the libevent-related calls that need to do cross-thread

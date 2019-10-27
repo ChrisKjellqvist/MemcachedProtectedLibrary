@@ -421,7 +421,6 @@ static void item_unlink_q(item *it) {
 }
 
 int do_item_link(item *it, const uint32_t hv) {
-  MEMCACHED_ITEM_LINK(ITEM_key(it), it->nkey, it->nbytes);
   assert((it->it_flags & (ITEM_LINKED|ITEM_SLABBED)) == 0);
   it->it_flags |= ITEM_LINKED;
   it->time = current_time;
@@ -443,7 +442,6 @@ int do_item_link(item *it, const uint32_t hv) {
 }
 
 void do_item_unlink(item *it, const uint32_t hv) {
-  MEMCACHED_ITEM_UNLINK(ITEM_key(it), it->nkey, it->nbytes);
   if ((it->it_flags & ITEM_LINKED) != 0) {
     it->it_flags &= ~ITEM_LINKED;
     STATS_LOCK();
@@ -459,7 +457,6 @@ void do_item_unlink(item *it, const uint32_t hv) {
 
 /* FIXME: Is it necessary to keep this copy/pasted code? */
 void do_item_unlink_nolock(item *it, const uint32_t hv) {
-  MEMCACHED_ITEM_UNLINK(ITEM_key(it), it->nkey, it->nbytes);
   if ((it->it_flags & ITEM_LINKED) != 0) {
     it->it_flags &= ~ITEM_LINKED;
     STATS_LOCK();
@@ -474,7 +471,6 @@ void do_item_unlink_nolock(item *it, const uint32_t hv) {
 }
 
 void do_item_remove(item *it) {
-  MEMCACHED_ITEM_REMOVE(ITEM_key(it), it->nkey, it->nbytes);
   assert((it->it_flags & ITEM_SLABBED) == 0);
   assert(it->refcount > 0);
 
@@ -486,7 +482,6 @@ void do_item_remove(item *it) {
 /* Copy/paste to avoid adding two extra branches for all common calls, since
  * _nolock is only used in an uncommon case where we want to relink. */
 void do_item_update_nolock(item *it) {
-  MEMCACHED_ITEM_UPDATE(ITEM_key(it), it->nkey, it->nbytes);
   if (it->time < current_time - ITEM_UPDATE_INTERVAL) {
     assert((it->it_flags & ITEM_SLABBED) == 0);
 
@@ -500,7 +495,6 @@ void do_item_update_nolock(item *it) {
 
 /* Bump the last accessed time, or relink if we're in compat mode */
 void do_item_update(item *it) {
-  MEMCACHED_ITEM_UPDATE(ITEM_key(it), it->nkey, it->nbytes);
 
   if (it->time < current_time - ITEM_UPDATE_INTERVAL) {
     assert((it->it_flags & ITEM_SLABBED) == 0);
@@ -514,8 +508,6 @@ void do_item_update(item *it) {
 }
 
 int do_item_replace(item *it, item *new_it, const uint32_t hv) {
-  MEMCACHED_ITEM_REPLACE(ITEM_key(it), it->nkey, it->nbytes,
-      ITEM_key(new_it), new_it->nkey, new_it->nbytes);
   assert((it->it_flags & ITEM_SLABBED) == 0);
 
   do_item_unlink(it, hv);
