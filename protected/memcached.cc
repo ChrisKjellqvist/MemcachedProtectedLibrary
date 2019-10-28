@@ -323,7 +323,6 @@ struct st_st *do_store_item(item *it, int comm, const uint32_t hv) {
 
     if (stored == NOT_STORED && failed_alloc == 0) {
       if (old_it != NULL) {
-	STORAGE_delete(c->thread->storage, old_it);
 	item_replace(old_it, it, hv);
       } else {
 	do_item_link(it, hv);

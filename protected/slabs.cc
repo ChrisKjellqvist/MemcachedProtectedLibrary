@@ -787,7 +787,6 @@ static int slab_rebalance_move(void) {
               slab_rebal.busy_deletes++;
               // Only safe to hold slabs lock because refcount
               // can't drop to 0 until we release item lock.
-              STORAGE_delete(storage, it);
               pthread_mutex_unlock(&slabs_lock);
               do_item_unlink(it, hv);
               pthread_mutex_lock(&slabs_lock);
@@ -897,7 +896,6 @@ static int slab_rebalance_move(void) {
         } else {
           /* restore ntotal in case we tried saving a head chunk. */
           ntotal = ITEM_ntotal(it);
-          STORAGE_delete(storage, it);
           do_item_unlink(it, hv);
           slabs_free(it, ntotal, slab_rebal.s_clsid);
           /* Swing around again later to remove it from the freelist. */

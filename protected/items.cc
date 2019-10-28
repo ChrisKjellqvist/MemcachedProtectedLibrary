@@ -266,6 +266,9 @@ item *do_item_alloc(char *key, const size_t nkey, const unsigned int flags,
   /* This is a large item. Allocate a header object now, lazily allocate
    *  chunks while reading the upload.
    */
+  /*
+   * Threadcached, we won't worry about this
+   */
   if (ntotal > (size_t)settings.slab_chunk_size_max) {
     /* We still link this item into the LRU for the larger slab class, but
      * we're pulling a header from an entirely different slab class. The
@@ -290,7 +293,6 @@ item *do_item_alloc(char *key, const size_t nkey, const unsigned int flags,
   }
 
   assert(it->slabs_clsid == 0);
-  //assert(it != heads[id]);
 
   /* Refcount is seeded to 1 by slabs_alloc() */
   it->next = it->prev = 0;
@@ -643,6 +645,10 @@ item *do_item_touch(const char *key, size_t nkey, uint32_t exptime,
 
 /* Returns number of items remove, expired, or evicted.
  * Callable from worker threads or the LRU maintainer thread */
+/* orig-id -> slab id
+ * cur_lru -> name of lru (COLD/WARM/HOT_LRU)
+ * flags -> options to do (LRU_PULL_EVICT...)
+ */
 int lru_pull_tail(const int orig_id, const int cur_lru,
     const uint64_t total_bytes, const uint8_t flags, const rel_time_t max_age,
     lru_pull_tail_return *ret_it) {
@@ -681,6 +687,9 @@ int lru_pull_tail(const int orig_id, const int cur_lru,
     if ((hold_lock = item_trylock(hv)) == NULL)
       continue;
     /* Now see if the item is refcount locked */
+    // CHRIS - 1 link is for linkage, 1 is from us. If this item is
+    // getting old, expire it and unlink. Use nolock because we already hold the
+    // lru lock
     if (refcount_incr(search) != 2) {
       /* Note pathological case with ref'ed items in tail.
        * Can still unlink the item, but it won't be reusable yet */
@@ -692,7 +701,6 @@ int lru_pull_tail(const int orig_id, const int cur_lru,
         itemstats[id].tailrepairs++;
         search->refcount = 1;
         /* This will call item_remove -> item_free since refcnt is 1 */
-        STORAGE_delete(ext_storage, search);
         do_item_unlink_nolock(search, hv);
         item_trylock_unlock(hold_lock);
         continue;
@@ -700,7 +708,7 @@ int lru_pull_tail(const int orig_id, const int cur_lru,
     }
 
     /* Expired or flushed */
-    if ((search->exptime != 0 && search->exptime < current_time)
+    if ((search->exptime != -1 && search->exptime < current_time)
         || item_is_flushed(search)) {
       itemstats[id].reclaimed++;
       if ((search->it_flags & ITEM_FETCHED) == 0) {
@@ -708,7 +716,6 @@ int lru_pull_tail(const int orig_id, const int cur_lru,
       }
       /* refcnt 2 -> 1 */
       do_item_unlink_nolock(search, hv);
-      STORAGE_delete(ext_storage, search);
       /* refcnt 1 -> 0 -> item_free */
       do_item_remove(search);
       item_trylock_unlock(hold_lock);
@@ -728,6 +735,11 @@ int lru_pull_tail(const int orig_id, const int cur_lru,
         if (limit == 0)
           limit = total_bytes * 40 / 100;
         /* Rescue ACTIVE items aggressively */
+        /* CHRIS - If this item has been used it has a 'active' bit. Mark it as
+         * inactive so next time we can sweep through other LRUs. If it's in the
+         * hot_lru, we move it to warm (if it's active). If it's warm, the item
+         * stays in warm, but just gets its bit switched.
+         */
         if ((search->it_flags & ITEM_ACTIVE) != 0) {
           search->it_flags &= ~ITEM_ACTIVE;
           removed++;
@@ -744,7 +756,8 @@ int lru_pull_tail(const int orig_id, const int cur_lru,
             it = search;
           }
         } else if (sizes_bytes[id] > limit ||
-            current_time - search->time > max_age) {
+          // If it's starting to get old, move to cold
+          current_time - search->time > max_age) {
           itemstats[id].moves_to_cold++;
           move_to_lru = COLD_LRU;
           do_item_unlink_q(search);
@@ -773,7 +786,6 @@ int lru_pull_tail(const int orig_id, const int cur_lru,
           if ((search->it_flags & ITEM_ACTIVE)) {
             itemstats[id].evicted_active++;
           }
-          STORAGE_delete(ext_storage, search);
           do_item_unlink_nolock(search, hv);
           removed++;
           if (settings.slab_automove == 2) {

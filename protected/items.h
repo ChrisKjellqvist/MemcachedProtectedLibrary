@@ -75,5 +75,3 @@ void lru_maintainer_pause(void);
 void lru_maintainer_resume(void);
 
 void *lru_bump_buf_create(void);
-
-#define STORAGE_delete(...)
