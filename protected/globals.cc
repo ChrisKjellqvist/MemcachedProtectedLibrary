@@ -23,3 +23,10 @@ struct stats stats;
 struct stats_state stats_state;
 struct slab_rebalance slab_rebal;
 volatile int slab_rebalance_signal;
+
+// THREADCACHED
+/* We have to know if we're a server or a client so we can do proper init
+ * routines. Server init makes this 1. Default 0 for clients.
+ */
+int am_server = 0;
+int is_restart;

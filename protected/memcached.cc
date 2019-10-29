@@ -81,12 +81,6 @@ time_t process_started;     /* when the process was started */
 struct slab_rebalance slab_rebal;
 volatile int slab_rebalance_signal;
 
-
-/* We have to know if we're a server or a client so we can do proper init
- * routines.
- */
-int am_server = 0;
-
 struct st_st *mk_st (enum store_item_type my_sit, size_t my_cas){
   struct st_st *temp = (struct st_st*)malloc(sizeof(struct st_st));
   temp->sit = my_sit;
@@ -140,6 +134,7 @@ static void settings_init(void) {
   settings.prefix_delimiter = ':';
   settings.reqs_per_event = 20;
   settings.item_size_max = 1024 * 1024; /* The famous 1MB upper limit. */
+  settings.slab_page_size = 1024 * 1024;
   settings.lru_crawler = false;
   settings.lru_crawler_sleep = 100;
   settings.lru_crawler_tocrawl = 0;

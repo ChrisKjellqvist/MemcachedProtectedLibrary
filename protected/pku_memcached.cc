@@ -7,8 +7,6 @@
 #include <sys/mman.h>
 #include <rpmalloc.hpp>
 
-int is_restart;
-
 extern pthread_mutex_t end_mutex;
 
 extern "C" {

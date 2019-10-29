@@ -25,7 +25,7 @@
 
 #include <pptr.hpp>
 
-// THRADCACHED
+// THREADCACHED
 using rel_time_t = unsigned int;
 #include "murmur3_hash.h"
 #define tcd_hash MurmurHash3_x86_32
@@ -40,8 +40,11 @@ enum RPMRoot {
   Tails = 6,
   ItemStats = 7,
   Sizes = 8,
-  SizesBytes = 9
+  SizesBytes = 9,
+  SlabclassAr = 10
 };
+extern int is_server;
+extern int is_restart;
 
 /** Maximum length of a key. */
 #define KEY_MAX_LENGTH 250
@@ -318,7 +321,7 @@ struct settings {
   bool maxconns_fast;     /* Whether or not to early close connections */
   bool lru_crawler;        /* Whether or not to enable the autocrawler thread */
   bool lru_maintainer_thread; /* LRU maintainer background thread */
-  bool slab_reassign;     /* Whether or not slab reassignment is allowed */
+//  bool slab_reassign always true. Whether or not slab reassignment is allowed
   int slab_automove;     /* Whether or not to automatically move slabs */
   double slab_automove_ratio; /* youngest must be within pct of oldest */
   unsigned int slab_automove_window; /* window mover for algorithm */

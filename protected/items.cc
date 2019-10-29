@@ -61,10 +61,6 @@ static int lru_maintainer_initialized = 0;
 static pthread_mutex_t lru_maintainer_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t cas_id_lock = PTHREAD_MUTEX_INITIALIZER;
 
-// PLIB variables
-extern int am_server;
-extern int is_restart;
-
 void items_init(){
   if (!am_server || is_restart){
     // get roots

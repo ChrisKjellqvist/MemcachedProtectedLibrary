@@ -40,6 +40,9 @@ struct slabclass_t{
   size_t requested; /* The number of requested bytes */
 };
 
+// CHRIS NOTES:
+//    slabclass[0] is a special slabclass to store reassignable pages...
+//    Refer to memcached.h:104
 static pptr<slabclass_t> slabclass;// [MAX_NUMBER_OF_SLAB_CLASSES];
 static size_t mem_limit = 0;
 static size_t mem_malloced = 0;
@@ -48,7 +51,6 @@ static size_t mem_malloced = 0;
 static bool mem_limit_reached = false;
 static int power_largest;
 
-static void *mem_base = NULL;
 static void *mem_current = NULL;
 static size_t mem_avail = 0;
 /**
@@ -90,102 +92,45 @@ unsigned int slabs_clsid(const size_t size) {
   return res;
 }
 
-#if defined(__linux__) && defined(MADV_HUGEPAGE)
-/* Function split out for better error path handling */
-static void * alloc_large_chunk_linux(const size_t limit)
-{
-  size_t pagesize = 0;
-  void *ptr = NULL;
-  FILE *fp;
-  int ret;
-
-  /* Get the size of huge pages */
-  fp = fopen("/proc/meminfo", "r");
-  if (fp != NULL) {
-    char buf[64];
-
-    while ((fgets(buf, sizeof(buf), fp)))
-      if (!strncmp(buf, "Hugepagesize:", 13)) {
-        ret = sscanf(buf + 13, "%zu\n", &pagesize);
-
-        /* meminfo huge page size is in KiBs */
-        pagesize <<= 10;
-      }
-    fclose(fp);
-  }
-
-  if (!pagesize) {
-    fprintf(stderr, "Failed to get supported huge page size\n");
-    return NULL;
-  }
-
-  /* This works because glibc simply uses mmap when the alignment is
-   * above a certain limit. */
-  ret = posix_memalign(&ptr, pagesize, limit);
-  if (ret != 0) {
-    fprintf(stderr, "Failed to get aligned memory chunk: %d\n", ret);
-    return NULL;
-  }
-
-  ret = madvise(ptr, limit, MADV_HUGEPAGE);
-  if (ret < 0) {
-    fprintf(stderr, "Failed to set transparent hugepage hint: %d\n", ret);
-    free(ptr);
-    ptr = NULL;
-  }
-
-  return ptr;
-}
-#endif
-
 /**
  * Determines the chunk sizes and initializes the slab class descriptors
  * accordingly.
+ * limit      - amount of memory we allocate in total?
+ * factor     - Growth ratio in between slabs. size(slab[k+1])/size(slab[k]).
  */
-void slabs_init(const size_t limit, const double factor,
-                const uint32_t *slab_sizes) {
+void slabs_init(const size_t limit, const double factor) {
   int i = POWER_SMALLEST - 1;
   unsigned int size = sizeof(item) + settings.chunk_size;
+  // set global var mem_limit
   mem_limit = limit;
-  slabclass = pptr<slabclass_t>((slabclass_t*)
-      RP_malloc(sizeof(slabclass_t)*MAX_NUMBER_OF_SLAB_CLASSES));
-  memset((slabclass_t*)slabclass, 0,
-      sizeof(slabclass_t)*MAX_NUMBER_OF_SLAB_CLASSES);
+  // CHRIS - we used to have a statically allocated set of slabclasses. Make
+  // them dynamically allocated so that we can make them persistent
+  if (am_server && !is_restart){
+    slabclass = pptr<slabclass_t>((slabclass_t*)
+        RP_malloc(sizeof(slabclass_t)*MAX_NUMBER_OF_SLAB_CLASSES));
+    memset((slabclass_t*)slabclass, 0,
+        sizeof(slabclass_t)*MAX_NUMBER_OF_SLAB_CLASSES);
+    while (++i < MAX_NUMBER_OF_SLAB_CLASSES-1) {
+      /* Make sure items are always n-byte aligned */
+      // CHRIS - 8 byte alignment
+      if (size % CHUNK_ALIGN_BYTES)
+        size += CHUNK_ALIGN_BYTES - (size % CHUNK_ALIGN_BYTES);
 
-  while (++i < MAX_NUMBER_OF_SLAB_CLASSES-1) {
-    if (slab_sizes != NULL) {
-      if (slab_sizes[i-1] == 0)
-        break;
-      size = slab_sizes[i-1];
-    } else if (size >= settings.slab_chunk_size_max / factor) {
-      break;
-    }
-    /* Make sure items are always n-byte aligned */
-    if (size % CHUNK_ALIGN_BYTES)
-      size += CHUNK_ALIGN_BYTES - (size % CHUNK_ALIGN_BYTES);
-
-    slabclass[i].size = size;
-    slabclass[i].perslab = settings.slab_page_size / slabclass[i].size;
-    if (slab_sizes == NULL)
+      slabclass[i].size = size;
+      slabclass[i].perslab = settings.slab_page_size / slabclass[i].size;
       size *= factor;
+    }
+
+    power_largest = i;
+    slabclass[power_largest].size = settings.slab_chunk_size_max;
+    slabclass[power_largest].perslab =
+      settings.slab_page_size / settings.slab_chunk_size_max;
+  } else {
+    // you are not the server or this is a restart
+    slabclass = pptr<slabclass_t>(
+        (slabclass_t*)RP_get_root(RPMRoot::SlabclassAr));
+    power_largest = MAX_NUMBER_OF_SLAB_CLASSES - 1;
   }
-
-  power_largest = i;
-  slabclass[power_largest].size = settings.slab_chunk_size_max;
-  slabclass[power_largest].perslab = settings.slab_page_size / settings.slab_chunk_size_max;
-}
-
-void slabs_prefill_global(void) {
-  void *ptr;
-  slabclass_t *p = &slabclass[0];
-  int len = settings.slab_page_size;
-
-  while (mem_malloced < mem_limit
-      && (ptr = memory_allocate(len)) != NULL) {
-    grow_slab_list(0);
-    p->slab_list[p->slabs++] = ptr;
-  }
-  mem_limit_reached = true;
 }
 
 static int grow_slab_list (const unsigned int id) {
@@ -212,9 +157,12 @@ static void split_slab_page_into_freelist(char *ptr, const unsigned int id) {
 /* Fast FIFO queue */
 static void *get_page_from_global_pool(void) {
   slabclass_t *p = &slabclass[SLAB_GLOBAL_PAGE_POOL];
+  // we have no slabs to reassign...
   if (p->slabs < 1) {
     return NULL;
   }
+  // We have a slab of some size. Reassign it from the global pool and decrement
+  // the number of slabs that live in slabclass[0].
   char *ret = (char*)p->slab_list[p->slabs - 1];
   p->slabs--;
   return ret;
@@ -402,47 +350,18 @@ unsigned int global_page_pool_size(bool *mem_flag) {
 }
 
 static void *memory_allocate(size_t size) {
-  void *ret;
-
-  if (mem_base == NULL) {
-    /* We are not using a preallocated large memory chunk */
-    ret = malloc(size);
-  } else {
-    ret = mem_current;
-
-    if (size > mem_avail) {
-      return NULL;
-    }
-
-    /* mem_current pointer _must_ be aligned!!! */
-    if (size % CHUNK_ALIGN_BYTES) {
-      size += CHUNK_ALIGN_BYTES - (size % CHUNK_ALIGN_BYTES);
-    }
-
-    mem_current = ((char*)mem_current) + size;
-    if (size < mem_avail) {
-      mem_avail -= size;
-    } else {
-      mem_avail = 0;
-    }
-  }
+  /* We are not using a preallocated large memory chunk */
+  void *ret = RP_malloc(size);
   mem_malloced += size;
-
   return ret;
 }
 
 /* Must only be used if all pages are item_size_max */
 static void memory_release() {
   void *p = NULL;
-  if (mem_base != NULL)
-    return;
-
-  if (!settings.slab_reassign)
-    return;
-
   while (mem_malloced > mem_limit &&
       (p = get_page_from_global_pool()) != NULL) {
-    free(p);
+    RP_free(p);
     mem_malloced -= settings.slab_page_size;
   }
 }
@@ -450,7 +369,6 @@ static void memory_release() {
 void *slabs_alloc(size_t size, unsigned int id, uint64_t *total_bytes,
     unsigned int flags) {
   void *ret;
-
   pthread_mutex_lock(&slabs_lock);
   ret = do_slabs_alloc(size, id, total_bytes, flags);
   pthread_mutex_unlock(&slabs_lock);

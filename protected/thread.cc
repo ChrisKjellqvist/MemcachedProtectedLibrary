@@ -26,8 +26,6 @@ pthread_mutex_t *item_locks;
 /* size of the item lock hash table */
 static uint32_t item_lock_count;
 unsigned int item_lock_hashpower = 11;
-extern int is_restart;
-extern int am_server;
 #define hashsize(n) ((unsigned long int)1<<(n))
 #define hashmask(n) (hashsize(n)-1)
 
