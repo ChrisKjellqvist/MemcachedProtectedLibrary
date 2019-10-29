@@ -25,7 +25,7 @@
 //#define DEBUG_SLAB_MOVER
 /* powers-of-N allocation structures */
 
-typedef struct {
+struct slabclass_t{
   unsigned int size;      /* sizes of items */
   unsigned int perslab;   /* how many items per slab */
 
@@ -38,9 +38,9 @@ typedef struct {
   unsigned int list_size; /* size of prev array */
 
   size_t requested; /* The number of requested bytes */
-} slabclass_t;
+};
 
-static slabclass_t slabclass[MAX_NUMBER_OF_SLAB_CLASSES];
+static pptr<slabclass_t> slabclass;// [MAX_NUMBER_OF_SLAB_CLASSES];
 static size_t mem_limit = 0;
 static size_t mem_malloced = 0;
 /* If the memory limit has been hit once. Used as a hint to decide when to
@@ -65,13 +65,6 @@ static int do_slabs_newslab(const unsigned int id);
 static void *memory_allocate(size_t size);
 static void do_slabs_free(void *ptr, const size_t size, unsigned int id);
 
-/* Preallocate as many slab pages as possible (called from slabs_init)
-   on start-up, so users don't get confused out-of-memory errors when
-   they do have free (in-slab) space, but no space to make new slabs.
-   if maxslabs is 18 (POWER_LARGEST - POWER_SMALLEST + 1), then all
-   slab types can be made.  if max memory is less than 18 MB, only the
-   smaller ones will be made.  */
-static void slabs_preallocate (const unsigned int maxslabs);
 /*
  * Figures out which slab class (chunk size) is required to store an item of
  * a given size.
@@ -149,38 +142,15 @@ static void * alloc_large_chunk_linux(const size_t limit)
  * Determines the chunk sizes and initializes the slab class descriptors
  * accordingly.
  */
-void slabs_init(const size_t limit, const double factor, const bool prealloc, const uint32_t *slab_sizes) {
+void slabs_init(const size_t limit, const double factor,
+                const uint32_t *slab_sizes) {
   int i = POWER_SMALLEST - 1;
   unsigned int size = sizeof(item) + settings.chunk_size;
-
-  /* Some platforms use runtime transparent hugepages. If for any reason
-   * the initial allocation fails, the required settings do not persist
-   * for remaining allocations. As such it makes little sense to do slab
-   * preallocation. */
-  bool __attribute__ ((unused)) do_slab_prealloc = false;
-
   mem_limit = limit;
-
-  if (prealloc) {
-#if defined(__linux__) && defined(MADV_HUGEPAGE)
-    mem_base = alloc_large_chunk_linux(mem_limit);
-    if (mem_base)
-      do_slab_prealloc = true;
-#else
-    /* Allocate everything in a big chunk with malloc */
-    mem_base = malloc(mem_limit);
-    do_slab_prealloc = true;
-#endif
-    if (mem_base != NULL) {
-      mem_current = mem_base;
-      mem_avail = mem_limit;
-    } else {
-      fprintf(stderr, "Warning: Failed to allocate requested memory in"
-          " one large chunk.\nWill allocate in smaller chunks\n");
-    }
-  }
-
-  memset(slabclass, 0, sizeof(slabclass));
+  slabclass = pptr<slabclass_t>((slabclass_t*)
+      RP_malloc(sizeof(slabclass_t)*MAX_NUMBER_OF_SLAB_CLASSES));
+  memset((slabclass_t*)slabclass, 0,
+      sizeof(slabclass_t)*MAX_NUMBER_OF_SLAB_CLASSES);
 
   while (++i < MAX_NUMBER_OF_SLAB_CLASSES-1) {
     if (slab_sizes != NULL) {
@@ -203,19 +173,6 @@ void slabs_init(const size_t limit, const double factor, const bool prealloc, co
   power_largest = i;
   slabclass[power_largest].size = settings.slab_chunk_size_max;
   slabclass[power_largest].perslab = settings.slab_page_size / settings.slab_chunk_size_max;
-
-  /* for the test suite:  faking of how much we've already malloc'd */
-  {
-    char *t_initial_malloc = getenv("T_MEMD_INITIAL_MALLOC");
-    if (t_initial_malloc) {
-      mem_malloced = (size_t)atol(t_initial_malloc);
-    }
-
-  }
-
-  if (prealloc && do_slab_prealloc) {
-    slabs_preallocate(power_largest);
-  }
 }
 
 void slabs_prefill_global(void) {
@@ -229,28 +186,6 @@ void slabs_prefill_global(void) {
     p->slab_list[p->slabs++] = ptr;
   }
   mem_limit_reached = true;
-}
-
-static void slabs_preallocate (const unsigned int maxslabs) {
-  int i;
-  unsigned int prealloc = 0;
-
-  /* pre-allocate a 1MB slab in every size class so people don't get
-     confused by non-intuitive "SERVER_ERROR out of memory"
-     messages.  this is the most common question on the mailing
-     list.  if you really don't want this, you can rebuild without
-     these three lines.  */
-
-  for (i = POWER_SMALLEST; i < MAX_NUMBER_OF_SLAB_CLASSES; i++) {
-    if (++prealloc > maxslabs)
-      return;
-    if (do_slabs_newslab(i) == 0) {
-      fprintf(stderr, "Error while preallocating slab memory!\n"
-          "If using -L or other prealloc options, max memory must be "
-          "at least %d megabytes.\n", power_largest);
-      exit(1);
-    }
-  }
 }
 
 static int grow_slab_list (const unsigned int id) {
@@ -311,50 +246,52 @@ static int do_slabs_newslab(const unsigned int id) {
   p->slab_list[p->slabs++] = ptr;
   return 1;
 }
-
-/*@null@*/
+/* size         - amt of memory requested
+ * id           - size class requested memory from
+ * total_bytes  - pointer to local variable to return how much memory allocated
+ * flags        - flags, for our reduced memcached, only the flag
+ *                SLABS_ALLOC_NO_NEWPAGE is used or no flags
+ */
 static void *do_slabs_alloc(const size_t size, unsigned int id, uint64_t *total_bytes,
     unsigned int flags) {
-  slabclass_t *p;
+  slabclass_t *SCp;
   void *ret = NULL;
   pptr<item> it = NULL;
   if (id < POWER_SMALLEST || id > (unsigned int)power_largest) {
     return NULL;
   }
   p = &slabclass[id];
-  assert(p->sl_curr == 0 || (pptr<item>((item*)(p->slots)))->slabs_clsid == 0);
+  assert(SCp->sl_curr == 0 || (pptr<item>((item*)(SCp->slots)))->slabs_clsid == 0);
   if (total_bytes != NULL) {
-    *total_bytes = p->requested;
+    *total_bytes = SCp->requested;
   }
 
-  assert(size <= p->size);
+  assert(size <= SCp->size);
   /* fail unless we have space at the end of a recently allocated page,
      we have something on our freelist, or we could allocate a new page */
-  if (p->sl_curr == 0 && flags != SLABS_ALLOC_NO_NEWPAGE) {
+  if (SCp->sl_curr == 0 && flags != SLABS_ALLOC_NO_NEWPAGE) {
     fflush(stdout);
     do_slabs_newslab(id);
   }
 
-  if (p->sl_curr != 0) {
+  if (SCp->sl_curr != 0) {
     /* return off our freelist */
-    it = pptr<item>((item*)(p->slots));
-    p->slots = it->next;
+    it = pptr<item>((item*)(SCp->slots));
+    SCp->slots = it->next;
     if (it->next != nullptr) it->next->prev = 0;
     /* Kill flag and initialize refcount here for lock safety in slab
      * mover's freeness detection. */
     it->it_flags &= ~ITEM_SLABBED;
     it->refcount = 1;
-    p->sl_curr--;
+    SCp->sl_curr--;
     ret = (void *)it;
   } else {
     ret = NULL;
   }
 
   if (ret) {
-    p->requested += size;
-  } else {
+    SCp->requested += size;
   }
-
   return ret;
 }
 
@@ -523,39 +460,6 @@ void *slabs_alloc(size_t size, unsigned int id, uint64_t *total_bytes,
 void slabs_free(void *ptr, size_t size, unsigned int id) {
   pthread_mutex_lock(&slabs_lock);
   do_slabs_free(ptr, size, id);
-  pthread_mutex_unlock(&slabs_lock);
-}
-
-static bool do_slabs_adjust_mem_limit(size_t new_mem_limit) {
-  /* Cannot adjust memory limit at runtime if prealloc'ed */
-  if (mem_base != NULL)
-    return false;
-  settings.maxbytes = new_mem_limit;
-  mem_limit = new_mem_limit;
-  mem_limit_reached = false; /* Will reset on next alloc */
-  memory_release(); /* free what might already be in the global pool */
-  return true;
-}
-
-bool slabs_adjust_mem_limit(size_t new_mem_limit) {
-  bool ret;
-  pthread_mutex_lock(&slabs_lock);
-  ret = do_slabs_adjust_mem_limit(new_mem_limit);
-  pthread_mutex_unlock(&slabs_lock);
-  return ret;
-}
-
-void slabs_adjust_mem_requested(unsigned int id, size_t old, size_t ntotal)
-{
-  pthread_mutex_lock(&slabs_lock);
-  slabclass_t *p;
-  if (id < POWER_SMALLEST || id > (unsigned int)power_largest) {
-    fprintf(stderr, "Internal error! Invalid slab class\n");
-    abort();
-  }
-
-  p = &slabclass[id];
-  p->requested = p->requested - old + ntotal;
   pthread_mutex_unlock(&slabs_lock);
 }
 
@@ -1067,70 +971,6 @@ static void *slab_rebalance_thread(void *arg) {
     }
   }
   return NULL;
-}
-
-/* Iterate at most once through the slab classes and pick a "random" source.
- * I like this better than calling rand() since rand() is slow enough that we
- * can just check all of the classes once instead.
- */
-static int slabs_reassign_pick_any(int dst) {
-  static int cur = POWER_SMALLEST - 1;
-  int tries = power_largest - POWER_SMALLEST + 1;
-  for (; tries > 0; tries--) {
-    cur++;
-    if (cur > power_largest)
-      cur = POWER_SMALLEST;
-    if (cur == dst)
-      continue;
-    if (slabclass[cur].slabs > 1) {
-      return cur;
-    }
-  }
-  return -1;
-}
-
-static enum reassign_result_type do_slabs_reassign(int src, int dst) {
-  bool nospare = false;
-  if (slab_rebalance_signal != 0)
-    return REASSIGN_RUNNING;
-
-  if (src == dst)
-    return REASSIGN_SRC_DST_SAME;
-
-  /* Special indicator to choose ourselves. */
-  if (src == -1) {
-    src = slabs_reassign_pick_any(dst);
-    /* TODO: If we end up back at -1, return a new error type */
-  }
-
-  if (src < SLAB_GLOBAL_PAGE_POOL || src > power_largest ||
-      dst < SLAB_GLOBAL_PAGE_POOL || dst > power_largest)
-    return REASSIGN_BADCLASS;
-
-  pthread_mutex_lock(&slabs_lock);
-  if (slabclass[src].slabs < 2)
-    nospare = true;
-  pthread_mutex_unlock(&slabs_lock);
-  if (nospare)
-    return REASSIGN_NOSPARE;
-
-  slab_rebal.s_clsid = src;
-  slab_rebal.d_clsid = dst;
-
-  slab_rebalance_signal = 1;
-  pthread_cond_signal(&slab_rebalance_cond);
-
-  return REASSIGN_OK;
-}
-
-enum reassign_result_type slabs_reassign(int src, int dst) {
-  enum reassign_result_type ret;
-  if (pthread_mutex_trylock(&slabs_rebalance_lock) != 0) {
-    return REASSIGN_RUNNING;
-  }
-  ret = do_slabs_reassign(src, dst);
-  pthread_mutex_unlock(&slabs_rebalance_lock);
-  return ret;
 }
 
 /* If we hold this lock, rebalancer can't wake up or move */

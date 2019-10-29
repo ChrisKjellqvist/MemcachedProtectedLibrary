@@ -666,6 +666,7 @@ int lru_pull_tail(const int orig_id, const int cur_lru,
   uint64_t limit = 0;
 
   id |= cur_lru;
+  // Each slab class has a HOT/WARM/COLD LRU
   pthread_mutex_lock(&lru_locks[id]);
   search = tails[id];
   /* We walk up *only* for locked items, and if bottom is expired. */
