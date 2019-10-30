@@ -53,6 +53,13 @@ static pptr<slabclass_t> slabclass;// [MAX_NUMBER_OF_SLAB_CLASSES];
 //static size_t mem_malloced = 0;
 /* If the memory limit has been hit once. Used as a hint to decide when to
  * early-wake the LRU maintenance thread */
+
+// THREADCACHED
+// All communicating threads need to be able to say if they find that malloc is
+// out of memory. Memory is only allocated when a lock is held(CHECK THIS), so
+// this ~probably~ doesn't need its own lock
+static pptr<bool> mem_limit_reached;
+
 static int power_largest;
 
 static void *mem_current = NULL;
@@ -111,6 +118,9 @@ void slabs_init(const size_t limit, const double factor) {
   if (am_server && !is_restart){
     slabclass = pptr<slabclass_t>((slabclass_t*)
         RP_malloc(sizeof(slabclass_t)*MAX_NUMBER_OF_SLAB_CLASSES));
+    mem_limit_reached = pptr<bool>((bool*)RP_malloc(sizeof(bool)));
+
+    *mem_limit_reached = 0;
     memset((slabclass_t*)slabclass, 0,
         sizeof(slabclass_t)*MAX_NUMBER_OF_SLAB_CLASSES);
     while (++i < MAX_NUMBER_OF_SLAB_CLASSES-1) {
@@ -132,18 +142,22 @@ void slabs_init(const size_t limit, const double factor) {
     // you are not the server or this is a restart
     slabclass = pptr<slabclass_t>(
         (slabclass_t*)RP_get_root(RPMRoot::SlabclassAr));
+    mem_limit_reached = pptr<bool>((bool*)RPMRoot::MemLimit);
     power_largest = MAX_NUMBER_OF_SLAB_CLASSES - 1;
   }
 }
 
 // We want to add more slabs to the slab_list inside the slab class. Allocate
-// more space.
+// more space. Return 0 if no more space.
 static int grow_slab_list (const unsigned int id) {
   slabclass_t *p = &slabclass[id];
   if (p->slabs == p->list_size) {
     size_t new_size = (p->list_size != 0) ? p->list_size * 2 : 16;
     void *new_list = RP_realloc(p->slab_list, new_size * sizeof(pptr<void>));
-    if (new_list == 0) return 0;
+    if (new_list == 0) {
+      mem_limit_reached = 1;
+      return 0;
+    }
     p->list_size = new_size;
     p->slab_list = pptr<pptr<void> >(pptr<void>*)new_list;
   }
@@ -172,17 +186,18 @@ static void *get_page_from_global_pool(void) {
   return ret;
 }
 
+// We try to either allocate a new slab or recycle an old one
 static int do_slabs_newslab(const unsigned int id) {
   slabclass_t *p = &slabclass[id];
   slabclass_t *g = &slabclass[SLAB_GLOBAL_PAGE_POOL];
   int len = settings.slab_page_size;
   char *ptr;
 
-  if ((mem_limit && mem_malloced + len > mem_limit && p->slabs > 0
-        && g->slabs == 0)) {
+  // No slabs in global list or in our slabclass. No memory to allocate. Give up
+  if (!(*mem_limit_reached) && p->slabs > 0 && g->slabs == 0)
     return 0;
-  }
 
+  // This branch will happen if we're out of memory.
   if ((grow_slab_list(id) == 0) ||
       (((ptr = (char*)get_page_from_global_pool()) == NULL) &&
        ((ptr = (char*)memory_allocate((size_t)len)) == 0))) {
@@ -206,6 +221,7 @@ static void *do_slabs_alloc(const size_t size, unsigned int id, uint64_t *total_
   slabclass_t *SCp;
   void *ret = NULL;
   pptr<item> it = NULL;
+  // Referencing a slabclass that doesn't exist
   if (id < POWER_SMALLEST || id > (unsigned int)power_largest) {
     return NULL;
   }
@@ -238,9 +254,8 @@ static void *do_slabs_alloc(const size_t size, unsigned int id, uint64_t *total_
     ret = NULL;
   }
 
-  if (ret) {
+  if (ret)
     SCp->requested += size;
-  }
   return ret;
 }
 
@@ -353,6 +368,10 @@ unsigned int global_page_pool_size(bool *mem_flag) {
 static void *memory_allocate(size_t size) {
   /* We are not using a preallocated large memory chunk */
   void *ret = RP_malloc(size);
+  if (ret == nullptr){
+    *mem_limit_reached = 1;
+    return nullptr;
+  }
   mem_malloced += size;
   return ret;
 }

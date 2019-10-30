@@ -41,7 +41,8 @@ enum RPMRoot {
   ItemStats = 7,
   Sizes = 8,
   SizesBytes = 9,
-  SlabclassAr = 10
+  SlabclassAr = 10,
+  MemLimit = 11
 };
 extern int is_server;
 extern int is_restart;
