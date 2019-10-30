@@ -135,6 +135,7 @@ static void settings_init(void) {
   settings.reqs_per_event = 20;
   settings.item_size_max = 1024 * 1024; /* The famous 1MB upper limit. */
   settings.slab_page_size = 1024 * 1024;
+  settings.slab_chunk_size_max = settings.slab_page_size / 2;
   settings.lru_crawler = false;
   settings.lru_crawler_sleep = 100;
   settings.lru_crawler_tocrawl = 0;

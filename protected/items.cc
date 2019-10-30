@@ -262,14 +262,15 @@ item *do_item_alloc(char *key, const size_t nkey, const unsigned int flags,
   /* This is a large item. Allocate a header object now, lazily allocate
    *  chunks while reading the upload.
    */
-  /*
-   * Threadcached, we won't worry about this
-   */
   if (ntotal > (size_t)settings.slab_chunk_size_max) {
     /* We still link this item into the LRU for the larger slab class, but
      * we're pulling a header from an entirely different slab class. The
      * free routines handle large items specifically.
      */
+    // CHRIS - We sneak in an item chunk object right behind the header. Refer
+    // to memcached.h:433. You put the key, null term, etc... and then chunk
+    // behind it. You can access the chunk as a chunk object (even though the
+    // item doesn't have a chunk field by using the ITEM_schunk macro.) 
     int htotal = nkey + 1 + nsuffix + sizeof(item) + sizeof(item_chunk) 
       + sizeof(uint64_t);
     hdr_id = slabs_clsid(htotal);
