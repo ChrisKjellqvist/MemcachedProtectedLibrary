@@ -64,7 +64,7 @@ void assoc_init(const int hashtable_init) {
   if (hashtable_init) {
     hashpower = hashtable_init;
   }
-  if (is_restart || !am_server){
+  if (is_restart || !is_server){
     // reuse old roots
     // definitions in memcached.h::RPMRoot
     primary_hashtable = 

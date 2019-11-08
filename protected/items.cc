@@ -62,7 +62,7 @@ static pthread_mutex_t lru_maintainer_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t cas_id_lock = PTHREAD_MUTEX_INITIALIZER;
 
 void items_init(){
-  if (!am_server || is_restart){
+  if (!is_server || is_restart){
     // get roots
     heads = (pptr<item>*)RP_get_root(RPMRoot::Heads);
     tails = (pptr<item>*)RP_get_root(RPMRoot::Tails);
@@ -70,11 +70,14 @@ void items_init(){
     sizes = (unsigned int*)RP_get_root(RPMRoot::Sizes);
     sizes_bytes = (uint64_t*)RP_get_root(RPMRoot::SizesBytes);
   } else {
-    heads = (pptr<item>*)RP_malloc(sizeof(item*)*LARGEST_ID);
-    tails = (pptr<item>*)RP_malloc(sizeof(item*)*LARGEST_ID);
-    itemstats = (itemstats_t*)RP_malloc(sizeof(item*)*LARGEST_ID);
-    sizes = (unsigned int*)RP_malloc(sizeof(item*)*LARGEST_ID);
-    sizes_bytes = (uint64_t*)RP_malloc(sizeof(item*)*LARGEST_ID);
+    heads = (pptr<item>*)RP_calloc(sizeof(pptr<item>), LARGEST_ID);
+    tails = (pptr<item>*)RP_calloc(sizeof(pptr<item>), LARGEST_ID);
+    itemstats = (itemstats_t*)RP_calloc(sizeof(itemstats_t), LARGEST_ID);
+    sizes = (unsigned int*)RP_calloc(sizeof(unsigned int), LARGEST_ID);
+    sizes_bytes = (uint64_t*)RP_calloc(sizeof(uint64_t), LARGEST_ID);
+    for(unsigned i = 0; i < LARGEST_ID; ++i)
+      heads[i] = tails[i] = pptr<item>(nullptr);
+
     RP_set_root(heads, RPMRoot::Heads);
     RP_set_root(tails, RPMRoot::Tails);
     RP_set_root(itemstats, RPMRoot::ItemStats);
@@ -786,9 +789,6 @@ int lru_pull_tail(const int orig_id, const int cur_lru,
           }
           do_item_unlink_nolock(search, hv);
           removed++;
-          if (settings.slab_automove == 2) {
-            slabs_reassign(-1, orig_id);
-          }
         } else if (flags & LRU_PULL_RETURN_ITEM) {
           /* Keep a reference to this item and return it. */
           ret_it->it = it;
@@ -923,7 +923,7 @@ static void lru_maintainer_crawler_check(crawler_expired_data *cdata) {
     /* We've not successfully kicked off a crawl yet. */
     if (s->run_complete) {
       pthread_mutex_lock(&cdata->lock);
-      uint32_t x;
+      int32_t x;
       /* Should we crawl again? */
       uint64_t possible_reclaims = s->seen - s->noexp;
       uint64_t available_reclaims = 0;
@@ -1059,7 +1059,7 @@ static void *lru_maintainer_thread(void *arg) {
       last_crawler_check = current_time;
     }
 
-    if (settings.slab_automove == 1 && last_automove_check != current_time) {
+    if (last_automove_check != current_time) {
       if (last_ratio != settings.slab_automove_ratio) {
         sam->free(am);
         am = sam->init(&settings);

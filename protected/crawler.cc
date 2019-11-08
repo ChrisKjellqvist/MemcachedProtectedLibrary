@@ -21,18 +21,20 @@
 #include <unistd.h>
 #include <poll.h>
 
-#include "pptr.hpp"
 #include "bipbuffer.h"
+// threadcached
+#include <pptr.hpp>
+#include <rpmalloc.hpp>
 #define LARGEST_ID POWER_LARGEST
 
 struct crawler_module_reg_t;
-struct crawler_module_t;
 struct crawler_client_t {
-  void *c; /* original connection structure. still with source thread attached. */
+  void *c; /* I don't think this is used... */
   int sfd; /* client fd. */
   bipbuf_t *buf; /* output buffer */
   char *cbuf; /* current buffer */
 };
+struct crawler_module_t;
 
 typedef void (*crawler_eval_func)(crawler_module_t *cm, item *it, uint32_t hv, int slab_cls);
 typedef int (*crawler_init_func)(crawler_module_t *cm, void *data); // TODO: init args?
@@ -50,9 +52,9 @@ struct crawler_module_reg_t {
 };
 
 struct crawler_module_t {
-  void *data; /* opaque data pointer */
+  pptr<crawler_expired_data> data; /* opaque data pointer */
   crawler_client_t c;
-  crawler_module_reg_t *mod;
+  pptr<crawler_module_reg_t> mod;
 };
 
 static int crawler_expired_init(crawler_module_t *cm, void *data);
@@ -126,7 +128,6 @@ static bool uriencode(const char *src, char *dst, const size_t srclen, const siz
 
 static void lru_crawler_close_client(crawler_client_t *c) {
   //fprintf(stderr, "CRAWLER: Closing client\n");
-  c->c = NULL;
   c->cbuf = NULL;
   bipbuf_free(c->buf);
   c->buf = NULL;
@@ -134,8 +135,6 @@ static void lru_crawler_close_client(crawler_client_t *c) {
 
 static void lru_crawler_release_client(crawler_client_t *c) {
   //fprintf(stderr, "CRAWLER: Closing client\n");
-  c->c = NULL;
-  c->cbuf = NULL;
   bipbuf_free(c->buf);
   c->buf = NULL;
 }
@@ -145,10 +144,10 @@ static int crawler_expired_init(crawler_module_t *cm, void *data) {
   if (data != NULL) {
     d = (crawler_expired_data*)data;
     d->is_external = true;
-    cm->data = data;
+    cm->data = pptr<crawler_expired_data>((crawler_expired_data*)data);
   } else {
     // allocate data.
-    d = (crawler_expired_data*)calloc(1, sizeof(crawler_expired_data));
+    d = (crawler_expired_data*)RP_calloc(1, sizeof(crawler_expired_data));
     if (d == NULL) {
       return -1;
     }
@@ -157,7 +156,7 @@ static int crawler_expired_init(crawler_module_t *cm, void *data) {
     d->is_external = false;
     d->start_time = current_time;
 
-    cm->data = d;
+    cm->data = pptr<crawler_expired_data>(d);
   }
   pthread_mutex_lock(&d->lock);
   memset(&d->crawlerstats, 0, sizeof(crawlerstats_t) * POWER_LARGEST);
@@ -314,17 +313,7 @@ static int lru_crawler_poll(crawler_client_t *c) {
  * Return NULL if closed.
  */
 static int lru_crawler_client_getbuf(crawler_client_t *c) {
-  void *buf = NULL;
-  if (c->c == NULL) return -1;
-  /* not enough space. */
-  while ((buf = bipbuf_request(c->buf, LRU_CRAWLER_WRITEBUF)) == NULL) {
-    // TODO: max loops before closing.
-    int ret = lru_crawler_poll(c);
-    if (ret < 0) return ret;
-  }
-
-  c->cbuf = (char*)buf;
-  return 0;
+  return -1;
 }
 
 static void lru_crawler_class_done(int i) {
@@ -538,9 +527,6 @@ static int do_lru_crawler_start(uint32_t id, uint32_t remaining) {
 
 static int lru_crawler_set_client(crawler_module_t *cm, void *c, const int sfd) {
   crawler_client_t *crawlc = &cm->c;
-  if (crawlc->c != NULL) {
-    return -1;
-  }
   crawlc->c = c;
   crawlc->sfd = sfd;
 

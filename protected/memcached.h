@@ -26,7 +26,7 @@
 #include <pptr.hpp>
 
 // THREADCACHED
-using rel_time_t = unsigned int;
+using rel_time_t = int;
 #include "murmur3_hash.h"
 #define tcd_hash MurmurHash3_x86_32
 /* RPMalloc Root IDs */
@@ -46,6 +46,8 @@ enum RPMRoot {
 };
 extern int is_server;
 extern int is_restart;
+// 4GB
+const size_t MEMORY_MAX = 4*1024*1024*1024ULL;
 
 /** Maximum length of a key. */
 #define KEY_MAX_LENGTH 250
@@ -323,7 +325,6 @@ struct settings {
   bool lru_crawler;        /* Whether or not to enable the autocrawler thread */
   bool lru_maintainer_thread; /* LRU maintainer background thread */
 //  bool slab_reassign always true. Whether or not slab reassignment is allowed
-  int slab_automove;     /* Whether or not to automatically move slabs */
   double slab_automove_ratio; /* youngest must be within pct of oldest */
   unsigned int slab_automove_window; /* window mover for algorithm */
   int hashpower_init;     /* Starting hash power level */
@@ -352,7 +353,7 @@ extern struct settings settings;
 #define ITEM_LINKED 1
 #define ITEM_CAS 2
 
-/* temp */
+// Item is stored in a slab freelist
 #define ITEM_SLABBED 4
 
 /* Item was fetched at least once in its lifetime */
@@ -418,9 +419,9 @@ struct crawler{
 
 /* Header when an item is actually a chunk of another item. */
 struct item_chunk {
-  item_chunk *next;     /* points within its own chain. */
-  item_chunk *prev;     /* can potentially point to the head. */
-  item  *head;     /* always points to the owner chunk */
+  pptr<item_chunk> next;     /* points within its own chain. */
+  pptr<item_chunk> prev;     /* can potentially point to the head. */
+  pptr<item> head;     /* always points to the owner chunk */
   int              size;      /* available chunk space in bytes */
   int              used;      /* chunk space used */
   int              nbytes;    /* used. */
@@ -442,9 +443,9 @@ extern volatile rel_time_t current_time;
 extern volatile int slab_rebalance_signal;
 
 struct slab_rebalance {
-  void *slab_start;
-  void *slab_end;
-  void *slab_pos;
+  char *slab_start;
+  char *slab_end;
+  char *slab_pos;
   int s_clsid;
   int d_clsid;
   uint32_t busy_items;
@@ -490,6 +491,7 @@ extern int daemonize(int nochdir, int noclose);
  * also #define-d to directly call the underlying code in singlethreaded mode.
  */
 void memcached_thread_init();
+void agnostic_init();
 
 /* Lock wrappers for cache functions that are called from main loop. */
 enum delta_result_type add_delta(const char *key,

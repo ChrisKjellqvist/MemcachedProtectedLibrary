@@ -15,12 +15,16 @@
 
 
 #define ITEMS_PER_ALLOC 64
+ 
+// The following sets of locks ~probably~ don't have to be persistent, but they
+// DO have to be shared among processes, which mean they have to live in
+// rpmalloc
 
 /* Locks for cache LRU operations */
-pthread_mutex_t *lru_locks;
+pthread_mutex_t* lru_locks;
 
 /* Lock for global stats */
-pthread_mutex_t *stats_lock;
+pthread_mutex_t* stats_lock;
 
 pthread_mutex_t *item_locks;
 /* size of the item lock hash table */
@@ -62,18 +66,22 @@ void item_unlock(uint32_t hv) {
  * Initializes the thread subsystem, creating various worker threads.
  */
 void memcached_thread_init() {
-  if (am_server){
+  if (is_server && !is_restart){
     lru_locks = (pthread_mutex_t*)RP_malloc(sizeof(pthread_mutex_t)*POWER_LARGEST);
     for (unsigned i = 0; i < POWER_LARGEST; i++)
       pthread_mutex_init(&lru_locks[i], NULL);
     RP_set_root(lru_locks, RPMRoot::LRULocks);
   } else {
     lru_locks = (pthread_mutex_t*)RP_get_root(RPMRoot::LRULocks);
+    if (is_server){
+      for (unsigned i = 0; i < POWER_LARGEST; ++i)
+        pthread_mutex_init(&lru_locks[i], NULL);
+    }
   }
 
   item_lock_count = hashsize(item_lock_hashpower);
 
-  if (am_server){
+;  if (is_server){
     item_locks = (pthread_mutex_t*)RP_calloc(item_lock_count, sizeof(pthread_mutex_t));
     stats_lock = (pthread_mutex_t*)RP_malloc(sizeof(pthread_mutex_t));
     if (! item_locks) {

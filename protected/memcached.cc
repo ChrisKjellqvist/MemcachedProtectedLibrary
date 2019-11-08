@@ -68,6 +68,9 @@
  * forward declarations
  */
 
+/* THREADCACHED */
+int is_server, is_restart;
+
 /* defaults */
 static void settings_init(void);
 
@@ -144,6 +147,8 @@ static void settings_init(void) {
   settings.hashpower_init = 0;
   settings.tail_repair_time = TAIL_REPAIR_TIME_DEFAULT;
   settings.crawls_persleep = 1000;
+  settings.slab_automove_ratio = .8;
+  settings.slab_automove_window = 30;
 }
 
 /* Destination must always be chunked */
@@ -152,7 +157,7 @@ static int _store_item_copy_chunks(item *d_it, item *s_it, const int len) {
   item_chunk *dch = (item_chunk *) ITEM_schunk(d_it);
   /* Advance dch until we find free space */
   while (dch->size == dch->used) {
-    if (dch->next) {
+    if (dch->next != nullptr) {
       dch = dch->next;
     } else {
       break;
@@ -442,31 +447,8 @@ static int sigignore(int sig) {
  * Do basic sanity check of the runtime environment
  * @return true if no errors found, false if we can't use this env
  */
-static bool sanitycheck(void) {
-    /* One of our biggest problems is old and bogus libevents */
-    const char *ever = event_get_version();
-    if (ever != NULL) {
-        if (strncmp(ever, "1.", 2) == 0) {
-            /* Require at least 1.3 (that's still a couple of years old) */
-            if (('0' <= ever[2] && ever[2] < '3') && !isdigit(ever[3])) {
-                fprintf(stderr, "You are using libevent %s.\nPlease upgrade to"
-                        " a more recent version (1.3 or newer)\n",
-                        event_get_version());
-                return false;
-            }
-        }
-    }
-
-    return true;
-}
-
-void* server_thread (void *pargs) {
-  am_server = 1;
-  printf("server started\n");
-  fflush(stdout);
-  bool lock_memory = false;
-  char *username = NULL;
-  struct passwd *pw;
+// run this regardless of whether you're a server or a client
+void agnostic_init(){
   enum {
     MAXCONNS_FAST = 0,
     HASHPOWER_INIT,
@@ -495,15 +477,6 @@ void* server_thread (void *pargs) {
     NO_LRU_CRAWLER,
     NO_LRU_MAINTAINER
   };
-
-  if (!sanitycheck()) {
-    return (void*)0xDEAFBEEF;
-  }
-
-  /* handle SIGINT and SIGTERM */
-  signal(SIGINT, sig_handler);
-  signal(SIGTERM, sig_handler);
-
   /* init settings */
   settings_init();
 
@@ -513,48 +486,30 @@ void* server_thread (void *pargs) {
   /* set stderr non-buffering (for running under, say, daemontools) */
   setbuf(stderr, NULL);
 
-  /* lose root privileges if we have them */
-  if (getuid() == 0 || geteuid() == 0) {
-    if (username == 0 || *username == '\0') {
-      fprintf(stderr, "can't run as root without the -u switch\n");
-      exit(EX_USAGE);
-    }
-    if ((pw = getpwnam(username)) == 0) {
-      fprintf(stderr, "can't find the user %s to switch to\n", username);
-      exit(EX_NOUSER);
-    }
-    if (setgroups(0, NULL) < 0) {
-      fprintf(stderr, "failed to drop supplementary groups\n");
-      exit(EX_OSERR);
-    }
-    if (setgid(pw->pw_gid) < 0 || setuid(pw->pw_uid) < 0) {
-      fprintf(stderr, "failed to assume identity of user %s\n", username);
-      exit(EX_OSERR);
-    }
-  }
-
-  /* lock paged memory if needed */
-  if (lock_memory) {
-#ifdef HAVE_MLOCKALL
-    int res = mlockall(MCL_CURRENT | MCL_FUTURE);
-    if (res != 0) {
-      fprintf(stderr, "warning: -k invalid, mlockall() failed: %s\n",
-	  strerror(errno));
-    }
-#else
-    fprintf(stderr, "warning: -k invalid, mlockall() not supported on this platform.  proceeding without.\n");
-#endif
-  }
-
   /* initialize other stuff */
+  items_init();
+  memcached_thread_init();
   assoc_init(settings.hashpower_init);
+  slabs_init(settings.factor);
+}
+
+void* server_thread (void *pargs) {
+  is_server = 1;
+  printf("server started\n");
+  fflush(stdout);
+
+  agnostic_init();
+
+  /* handle SIGINT and SIGTERM */
+  signal(SIGINT, sig_handler);
+  signal(SIGTERM, sig_handler);
+
   if (sigignore(SIGPIPE) == -1) {
     perror("failed to ignore SIGPIPE; sigaction");
     exit(EX_OSERR);
   }
   /* start up worker threads if MT mode */
   // num_threads
-  memcached_thread_init();
   init_lru_crawler(NULL);
 
   assert(start_assoc_maintenance_thread() != -1);

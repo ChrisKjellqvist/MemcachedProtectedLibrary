@@ -54,6 +54,7 @@ void item_stats_sizes_init(void);
 void item_stats_sizes_add(item *it);
 void item_stats_sizes_remove(item *it);
 bool item_stats_sizes_status(void);
+void items_init();
 
 /* stats getter for slab automover */
 struct item_stats_automove{

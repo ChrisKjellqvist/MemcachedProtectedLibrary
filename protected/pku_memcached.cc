@@ -33,13 +33,15 @@ HODOR_FUNC_ATTR void memcached_end(int t_id){
 // Start memcached maintainence processes
 void memcached_init(){
   is_restart = RP_init("memcached.rpma");
-  // TODO: make sure private stack exists... We used to do this.
-  void *start, *end;
+  is_server = 0;
   int i = 0;
+  void *start, *end;
   while (!RP_region_range(i++, &start, &end)){
-    ptrdiff_t rp_region_len = (char*)start - (char*)end; 
+    ptrdiff_t rp_region_len = (char*)start - (char*)end;
     pkey_mprotect(start, rp_region_len, PROT_READ | PROT_WRITE | PROT_EXEC, 1);
   }
+  agnostic_init();
+
 } HODOR_INIT_FUNC(memcached_init);
 }
 

@@ -8,7 +8,7 @@
     3rd argument specifies if the slab allocator should allocate all memory
     up front (if true), or allocate memory in chunks as it is needed (if false)
 */
-void slabs_init(const size_t limit, const double factor);
+void slabs_init(const double factor);
 
 /**
  * Given object size, return id to use when allocating/freeing memory for object
@@ -35,7 +35,6 @@ struct slab_stats_automove {
     long int total_pages;
 };
 void fill_slab_stats_automove(slab_stats_automove *am);
-unsigned int global_page_pool_size(bool *mem_flag);
 
 /** Fill buffer with stats */ /*@null@*/
 void slabs_stats();
@@ -54,6 +53,8 @@ enum reassign_result_type {
     REASSIGN_OK=0, REASSIGN_RUNNING, REASSIGN_BADCLASS, REASSIGN_NOSPARE,
     REASSIGN_SRC_DST_SAME
 };
+
+enum reassign_result_type slabs_reassign(int src, int dst);
 
 void slabs_rebalancer_pause(void);
 void slabs_rebalancer_resume(void);

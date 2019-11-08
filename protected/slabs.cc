@@ -21,6 +21,9 @@
 #include <signal.h>
 #include <assert.h>
 #include <pthread.h>
+// threadcached
+#include <rpmalloc.hpp>
+#include <pptr.hpp>
 
 //#define DEBUG_SLAB_MOVER
 /* powers-of-N allocation structures */
@@ -34,23 +37,19 @@ struct slabclass_t{
 
   unsigned int slabs;     /* how many slabs were allocated for this class */
 
-  pptr<pptr<void> > slab_list;       /* array of slab pointers */
+  pptr<pptr<char> > slab_list;       /* array of slab pointers */
   unsigned int list_size; /* size of prev array */
 
   size_t requested; /* The number of requested bytes */
 };
 
+
 // CHRIS NOTES:
 //    slabclass[0] is a special slabclass to store reassignable pages...
 //    Refer to memcached.h:104
 static pptr<slabclass_t> slabclass;// [MAX_NUMBER_OF_SLAB_CLASSES];
-// THREADCACHED - We will no longer take care of memory limit and instead rely
-// on Wentao's allocator to do this. If malloc returns nullptr, then we're out.
-// This presents the benefit that we don't need to keep track and *persist*
-// these changes to static variables. Mem_limit_reached is a flag to trigger
-// some memory recycling and so it doesn't need to be persisted.
-//static size_t mem_limit = 0;
-//static size_t mem_malloced = 0;
+// THREADCACHED - Replace dynamic limits with static limits
+static size_t mem_malloced = 0;
 /* If the memory limit has been hit once. Used as a hint to decide when to
  * early-wake the LRU maintenance thread */
 
@@ -58,12 +57,9 @@ static pptr<slabclass_t> slabclass;// [MAX_NUMBER_OF_SLAB_CLASSES];
 // All communicating threads need to be able to say if they find that malloc is
 // out of memory. Memory is only allocated when a lock is held(CHECK THIS), so
 // this ~probably~ doesn't need its own lock
-static pptr<bool> mem_limit_reached;
+static pptr<bool> MEMORY_MAX_reached;
 
 static int power_largest;
-
-static void *mem_current = NULL;
-static size_t mem_avail = 0;
 /**
  * Access to the slab allocator is protected by this lock
  */
@@ -108,20 +104,15 @@ unsigned int slabs_clsid(const size_t size) {
  * limit      - amount of memory we allocate in total?
  * factor     - Growth ratio in between slabs. size(slab[k+1])/size(slab[k]).
  */
-void slabs_init(const size_t limit, const double factor) {
+void slabs_init(const double factor) {
   int i = POWER_SMALLEST - 1;
   unsigned int size = sizeof(item) + settings.chunk_size;
-  // set global var mem_limit
-  mem_limit = limit;
   // CHRIS - we used to have a statically allocated set of slabclasses. Make
   // them dynamically allocated so that we can make them persistent
-  if (am_server && !is_restart){
+  if (is_server && !is_restart){
     slabclass = pptr<slabclass_t>((slabclass_t*)
         RP_malloc(sizeof(slabclass_t)*MAX_NUMBER_OF_SLAB_CLASSES));
-    mem_limit_reached = pptr<bool>((bool*)RP_malloc(sizeof(bool)));
-
-    *mem_limit_reached = 0;
-    memset((slabclass_t*)slabclass, 0,
+    memset(slabclass, 0,
         sizeof(slabclass_t)*MAX_NUMBER_OF_SLAB_CLASSES);
     while (++i < MAX_NUMBER_OF_SLAB_CLASSES-1) {
       /* Make sure items are always n-byte aligned */
@@ -142,7 +133,6 @@ void slabs_init(const size_t limit, const double factor) {
     // you are not the server or this is a restart
     slabclass = pptr<slabclass_t>(
         (slabclass_t*)RP_get_root(RPMRoot::SlabclassAr));
-    mem_limit_reached = pptr<bool>((bool*)RPMRoot::MemLimit);
     power_largest = MAX_NUMBER_OF_SLAB_CLASSES - 1;
   }
 }
@@ -153,13 +143,15 @@ static int grow_slab_list (const unsigned int id) {
   slabclass_t *p = &slabclass[id];
   if (p->slabs == p->list_size) {
     size_t new_size = (p->list_size != 0) ? p->list_size * 2 : 16;
-    void *new_list = RP_realloc(p->slab_list, new_size * sizeof(pptr<void>));
-    if (new_list == 0) {
-      mem_limit_reached = 1;
+    pptr<char> *sl_list_ptr = p->slab_list;
+    void *vptr = (void*)sl_list_ptr;
+    // this should be fine. all pptrs are the same size
+    size_t amt = new_size * sizeof(pptr<int>);
+    void *new_list = RP_realloc(vptr, amt);
+    if (new_list == 0)
       return 0;
-    }
     p->list_size = new_size;
-    p->slab_list = pptr<pptr<void> >(pptr<void>*)new_list;
+    p->slab_list = pptr<pptr<char> >((pptr<char>*)new_list);
   }
   return 1;
 }
@@ -181,7 +173,7 @@ static void *get_page_from_global_pool(void) {
   }
   // We have a slab of some size. Reassign it from the global pool and decrement
   // the number of slabs that live in slabclass[0].
-  void *ret = (void*)p->slab_list[p->slabs - 1];
+  char *ret = static_cast<char*>(p->slab_list[p->slabs - 1]);
   p->slabs--;
   return ret;
 }
@@ -194,8 +186,10 @@ static int do_slabs_newslab(const unsigned int id) {
   char *ptr;
 
   // No slabs in global list or in our slabclass. No memory to allocate. Give up
-  if (!(*mem_limit_reached) && p->slabs > 0 && g->slabs == 0)
+  if (mem_malloced > MEMORY_MAX &&  p->slabs > 0 && g->slabs == 0) {
+    *MEMORY_MAX_reached = 1;
     return 0;
+  }
 
   // This branch will happen if we're out of memory.
   if ((grow_slab_list(id) == 0) ||
@@ -207,7 +201,7 @@ static int do_slabs_newslab(const unsigned int id) {
   memset(ptr, 0, (size_t)len);
   split_slab_page_into_freelist(ptr, id);
 
-  p->slab_list[p->slabs++] = ptr;
+  p->slab_list[p->slabs++] = pptr<char>(ptr);
   return 1;
 }
 /* size         - amt of memory requested
@@ -225,7 +219,7 @@ static void *do_slabs_alloc(const size_t size, unsigned int id, uint64_t *total_
   if (id < POWER_SMALLEST || id > (unsigned int)power_largest) {
     return NULL;
   }
-  p = &slabclass[id];
+  SCp = &slabclass[id];
   assert(SCp->sl_curr == 0 || (SCp->slots)->slabs_clsid == 0);
   if (total_bytes != NULL) {
     *total_bytes = SCp->requested;
@@ -268,7 +262,7 @@ static void do_slabs_free_chunked(pptr<item> it, const size_t size) {
   it->prev = 0;
   // header object's original classid is stored in chunk.
   p = &slabclass[chunk->orig_clsid];
-  if (chunk->next) {
+  if (chunk->next != nullptr) {
     chunk = chunk->next;
     chunk->prev = 0;
   } else {
@@ -287,6 +281,10 @@ static void do_slabs_free_chunked(pptr<item> it, const size_t size) {
   p->requested -= sizeof(uint64_t);
 
   item_chunk *next_chunk;
+  // What I think is going on here is that we're reclaiming all chunks in a slab
+  // but we have to link them back together for the slabclass. So, we go through
+  // the item and its chunk headers and link them back together and set p's slot
+  // pointer... I think...
   while (chunk) {
     assert(chunk->it_flags == ITEM_CHUNK);
     chunk->it_flags = ITEM_SLABBED;
@@ -295,9 +293,9 @@ static void do_slabs_free_chunked(pptr<item> it, const size_t size) {
     next_chunk = chunk->next;
 
     chunk->prev = 0;
-    chunk->next = (item_chunk*)p->slots;
-    if (chunk->next) chunk->next->prev = chunk;
-    p->slots = chunk;
+    chunk->next = pptr<item_chunk>((item_chunk*)&*(p->slots));
+    if (chunk->next != nullptr) chunk->next->prev = chunk;
+    p->slots = pptr<item>((item*)chunk);
     p->sl_curr++;
     p->requested -= chunk->size + sizeof(item_chunk);
 
@@ -338,6 +336,7 @@ static void do_slabs_free(void *ptr, const size_t size, unsigned int id) {
 /* With refactoring of the various stats code the automover won't need a
  * custom function here.
  */
+// Grab global slab lock and inform lru maintainer thread of chunk info
 void fill_slab_stats_automove(slab_stats_automove *am) {
   int n;
   pthread_mutex_lock(&slabs_lock);
@@ -352,24 +351,10 @@ void fill_slab_stats_automove(slab_stats_automove *am) {
   pthread_mutex_unlock(&slabs_lock);
 }
 
-/* TODO: slabs_available_chunks should grow up to encompass this.
- * mem_flag is redundant with the other function.
- */
-unsigned int global_page_pool_size(bool *mem_flag) {
-  unsigned int ret = 0;
-  pthread_mutex_lock(&slabs_lock);
-  if (mem_flag != NULL)
-    *mem_flag = mem_malloced >= mem_limit ? true : false;
-  ret = slabclass[SLAB_GLOBAL_PAGE_POOL].slabs;
-  pthread_mutex_unlock(&slabs_lock);
-  return ret;
-}
-
 static void *memory_allocate(size_t size) {
   /* We are not using a preallocated large memory chunk */
   void *ret = RP_malloc(size);
   if (ret == nullptr){
-    *mem_limit_reached = 1;
     return nullptr;
   }
   mem_malloced += size;
@@ -379,7 +364,7 @@ static void *memory_allocate(size_t size) {
 /* Must only be used if all pages are item_size_max */
 static void memory_release() {
   void *p = NULL;
-  while (mem_malloced > mem_limit &&
+  while (mem_malloced > MEMORY_MAX &&
       (p = get_page_from_global_pool()) != NULL) {
     RP_free(p);
     mem_malloced -= settings.slab_page_size;
@@ -410,7 +395,7 @@ unsigned int slabs_available_chunks(const unsigned int id, bool *mem_flag,
   p = &slabclass[id];
   ret = p->sl_curr;
   if (mem_flag != NULL)
-    *mem_flag = mem_malloced >= mem_limit ? true : false;
+    *mem_flag = mem_malloced >= MEMORY_MAX ? true : false;
   if (total_bytes != NULL)
     *total_bytes = p->requested;
   if (chunks_perslab != NULL)
@@ -723,9 +708,9 @@ static int slab_rebalance_move(void) {
             item_chunk *nch = (item_chunk *) (&*new_it);
             /* Chunks always have head chunk (the main it) */
             ch->prev->next = nch;
-            if (ch->next)
+            if (ch->next != nullptr)
               ch->next->prev = nch;
-            memcpy(nch, ch, ch->used + sizeof(item_chunk));
+            memcpy((void*)nch, ch, ch->used + sizeof(item_chunk));
             ch->refcount = 0;
             ch->it_flags = ITEM_SLABBED|ITEM_FETCHED;
             slab_rebal.chunk_rescues++;
@@ -822,7 +807,7 @@ static void slab_rebalance_finish(void) {
     split_slab_page_into_freelist((char*)slab_rebal.slab_start,
         slab_rebal.d_clsid);
   } else if (slab_rebal.d_clsid == SLAB_GLOBAL_PAGE_POOL) {
-    /* mem_malloc'ed might be higher than mem_limit. */
+    /* mem_malloc'ed might be higher than MEMORY_MAX. */
     memory_release();
   }
 
@@ -944,4 +929,68 @@ void stop_slab_maintenance_thread(void) {
 
   /* Wait for the maintenance thread to stop */
   pthread_join(rebalance_tid, NULL);
+}
+
+/* Iterate at most once through the slab classes and pick a "random" source.
+ * I like this better than calling rand() since rand() is slow enough that we
+ * can just check all of the classes once instead.
+ */
+static int slabs_reassign_pick_any(int dst) {
+    static int cur = POWER_SMALLEST - 1;
+    int tries = power_largest - POWER_SMALLEST + 1;
+    for (; tries > 0; tries--) {
+        cur++;
+        if (cur > power_largest)
+            cur = POWER_SMALLEST;
+        if (cur == dst)
+            continue;
+        if (slabclass[cur].slabs > 1) {
+            return cur;
+        }
+    }
+    return -1;
+}
+
+static enum reassign_result_type do_slabs_reassign(int src, int dst) {
+    bool nospare = false;
+    if (slab_rebalance_signal != 0)
+        return REASSIGN_RUNNING;
+
+    if (src == dst)
+        return REASSIGN_SRC_DST_SAME;
+
+    /* Special indicator to choose ourselves. */
+    if (src == -1) {
+        src = slabs_reassign_pick_any(dst);
+        /* TODO: If we end up back at -1, return a new error type */
+    }
+
+    if (src < SLAB_GLOBAL_PAGE_POOL || src > power_largest ||
+        dst < SLAB_GLOBAL_PAGE_POOL || dst > power_largest)
+        return REASSIGN_BADCLASS;
+
+    pthread_mutex_lock(&slabs_lock);
+    if (slabclass[src].slabs < 2)
+        nospare = true;
+    pthread_mutex_unlock(&slabs_lock);
+    if (nospare)
+        return REASSIGN_NOSPARE;
+
+    slab_rebal.s_clsid = src;
+    slab_rebal.d_clsid = dst;
+
+    slab_rebalance_signal = 1;
+    pthread_cond_signal(&slab_rebalance_cond);
+
+    return REASSIGN_OK;
+}
+
+enum reassign_result_type slabs_reassign(int src, int dst) {
+    enum reassign_result_type ret;
+    if (pthread_mutex_trylock(&slabs_rebalance_lock) != 0) {
+        return REASSIGN_RUNNING;
+    }
+    ret = do_slabs_reassign(src, dst);
+    pthread_mutex_unlock(&slabs_rebalance_lock);
+    return ret;
 }

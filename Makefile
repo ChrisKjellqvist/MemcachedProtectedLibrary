@@ -1,11 +1,11 @@
 CC = g++
-PROT_OBJ = obj/memcached.o \
+PROT_OBJ = obj/memcached.o\
 	   obj/murmur3_hash.o obj/items.o obj/assoc.o obj/thread.o \
 	   obj/bipbuffer.o obj/crawler.o obj/slabs.o \
 	   obj/slab_automove.o obj/pku_memcached.o 
 
-#OPT_LEVEL = -O0 -g
-OPT_LEVEL =-O2
+OPT_LEVEL = -O0 -g
+#OPT_LEVEL =-O2
 OPTS_LENIENT = -Iprotected/ -Iunprotected/ -I../rpmalloc/src \
 	       -I../hodor/include -DHAVE_CONFIG_H -MD -MP -Wall -std=c++17 \
 	       -fPIC -I../hodor/libhodor $(OPT_LEVEL)

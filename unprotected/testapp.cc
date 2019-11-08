@@ -59,6 +59,8 @@ int main(){
     keys[i] = dats[i] = nullptr;
 
   memcached_init();
+  memcached_end(0);
+  return 0;
   srand(42);
 // Necessary until we start testing Hodor. Mohammad's code should make everything easy :) 
 //  hodor_init();
