@@ -27,16 +27,18 @@ DEFLINK  = --hash-style=gnu --no-add-needed --build-id --eh-frame-hdr -m \
 
 LIBS = lib/libhodor.a lib/libthreadcached.so lib/librpmalloc.a
 LINKOPTS = $(DEFLINK) -lpthread -levent -ldl -T scripts/ldscript.lds
-EXE = server client restart
+EXE = server get insert end
 
 .PHONY : all
 all: $(EXE)
 server: $(LIBS) obj/server.o
-	ld $(LINKOPTS) -o server obj/server.o $(LIBS)
-client: $(LIBS) obj/testapp.o
-	ld $(LINKOPTS) -o client obj/testapp.o $(LIBS)
-restart: $(LIBS) obj/restart.o
-	ld $(LINKOPTS) -o restart $^
+	ld $(LINKOPTS) -o $@ $^
+get: $(LIBS) obj/get.o
+	ld $(LINKOPTS) -o $@ $^
+insert: $(LIBS) obj/insert.o
+	ld $(LINKOPTS) -o $@ $^
+end: $(LIBS) obj/end.o
+	ld $(LINKOPTS) -o $@ $^
 lib/libhodor.a:
 	cp ~/hodor/libhodor/libhodor.a lib/
 lib/libthreadcached.so: $(PROT_OBJ)
