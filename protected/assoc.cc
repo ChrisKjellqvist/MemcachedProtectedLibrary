@@ -42,13 +42,13 @@ unsigned int hashpower = HASHPOWER_DEFAULT;
 #define hashmask(n) (hashsize(n)-1)
 
 /* Main hash table. This is where we look except during expansion. */
-static pptr<pptr<item> > primary_hashtable = 0;
+static pptr<item> *primary_hashtable = 0;
 
 /*
  * Previous hash table. During expansion, we look here for keys that haven't
  * been moved over to the primary yet.
  */
-static pptr<pptr<item> > old_hashtable = 0;
+static pptr<item> *old_hashtable = 0;
 
 /* Flag: Are we in the middle of expanding now? */
 static bool expanding = false;
@@ -67,10 +67,8 @@ void assoc_init(const int hashtable_init) {
   if (is_restart || !is_server){
     // reuse old roots
     // definitions in memcached.h::RPMRoot
-    primary_hashtable = 
-      pptr<pptr<item> >((pptr<item>*)RP_get_root(RPMRoot::PrimaryHT));
-    old_hashtable =
-      pptr<pptr<item> >((pptr<item>*)RP_get_root(RPMRoot::OldHT));
+    primary_hashtable = RP_get_root<pptr<item> >(RPMRoot::PrimaryHT);
+    old_hashtable = RP_get_root<pptr<item> >(RPMRoot::OldHT);
   } else {
     primary_hashtable = pptr<pptr<item> >(
         (pptr<item>*)RP_calloc(hashsize(hashpower), sizeof(pptr<item>)));
@@ -79,6 +77,7 @@ void assoc_init(const int hashtable_init) {
       exit(EXIT_FAILURE);
     }
     RP_set_root((void*)(&*primary_hashtable), RPMRoot::PrimaryHT);
+    RP_set_root(nullptr, RPMRoot::OldHT);
   }
   STATS_LOCK();
   stats_state.hash_power_level = hashpower;

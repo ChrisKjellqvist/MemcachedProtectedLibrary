@@ -66,37 +66,32 @@ void item_unlock(uint32_t hv) {
  * Initializes the thread subsystem, creating various worker threads.
  */
 void memcached_thread_init() {
+  item_lock_count = hashsize(item_lock_hashpower);
   if (is_server && !is_restart){
     lru_locks = (pthread_mutex_t*)RP_malloc(sizeof(pthread_mutex_t)*POWER_LARGEST);
-    for (unsigned i = 0; i < POWER_LARGEST; i++)
-      pthread_mutex_init(&lru_locks[i], NULL);
-    RP_set_root(lru_locks, RPMRoot::LRULocks);
-  } else {
-    lru_locks = (pthread_mutex_t*)RP_get_root(RPMRoot::LRULocks);
-    if (is_server){
-      for (unsigned i = 0; i < POWER_LARGEST; ++i)
-        pthread_mutex_init(&lru_locks[i], NULL);
-    }
-  }
-
-  item_lock_count = hashsize(item_lock_hashpower);
-
-;  if (is_server){
     item_locks = (pthread_mutex_t*)RP_calloc(item_lock_count, sizeof(pthread_mutex_t));
     stats_lock = (pthread_mutex_t*)RP_malloc(sizeof(pthread_mutex_t));
-    if (! item_locks) {
-      perror("Can't allocate item locks");
-      exit(1);
-    }
+
+    assert(item_locks != nullptr);
+    assert(stats_lock != nullptr);
+    assert(lru_locks  != nullptr);
+
+    RP_set_root(item_locks, RPMRoot::ItemLocks);
+    RP_set_root(stats_lock, RPMRoot::StatLock);
+    RP_set_root(lru_locks, RPMRoot::LRULocks);
+  } else {
+
+    item_locks = RP_get_root<pthread_mutex_t>(RPMRoot::ItemLocks);
+    stats_lock = RP_get_root<pthread_mutex_t>(RPMRoot::StatLock);
+    lru_locks = RP_get_root<pthread_mutex_t>(RPMRoot::LRULocks);
+  }
+  if (is_server){
+    for (unsigned i = 0; i < POWER_LARGEST; ++i)
+      pthread_mutex_init(&lru_locks[i], NULL);
+    pthread_mutex_init(stats_lock, NULL);
     for (unsigned i = 0; i < item_lock_count; i++) {
       pthread_mutex_init(&item_locks[i], NULL);
     }
-    pthread_mutex_init(stats_lock, NULL);
-    RP_set_root(item_locks, RPMRoot::ItemLocks);
-    RP_set_root(stats_lock, RPMRoot::StatLock);
-  } else {
-    item_locks = (pthread_mutex_t*)RP_get_root(RPMRoot::ItemLocks);
-    stats_lock = (pthread_mutex_t*)RP_get_root(RPMRoot::StatLock);
   }
 }
 

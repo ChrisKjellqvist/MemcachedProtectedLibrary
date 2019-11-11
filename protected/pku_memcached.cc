@@ -7,7 +7,7 @@
 #include <sys/mman.h>
 #include <rpmalloc.hpp>
 
-extern pthread_mutex_t end_mutex;
+extern std::atomic<int> *end_signal;
 
 extern "C" {
 
@@ -27,19 +27,22 @@ HODOR_FUNC_ATTR int  memcached_get(char* key, size_t nkey, uint32_t exptime,
 } HODOR_FUNC_EXPORT(memcached_get, 6);
 
 HODOR_FUNC_ATTR void memcached_end(int t_id){
-  pthread_mutex_unlock(&end_mutex);
+  end_signal->store(1);
 } HODOR_FUNC_EXPORT(memcached_end, 1);
 
 // Start memcached maintainence processes
-void memcached_init(){
+// server is either 0 or 1 to represent whether or not we are initializing
+// for a server process or a client process
+void memcached_init(int server){
   is_restart = RP_init("memcached.rpma");
-  is_server = 0;
+  is_server = server;
   int i = 0;
   void *start, *end;
   while (!RP_region_range(i++, &start, &end)){
     ptrdiff_t rp_region_len = (char*)start - (char*)end;
     pkey_mprotect(start, rp_region_len, PROT_READ | PROT_WRITE | PROT_EXEC, 1);
   }
+
   agnostic_init();
 
 } HODOR_INIT_FUNC(memcached_init);

@@ -55,44 +55,15 @@ char *keys[N_INSERT];
 char *dats[N_INSERT];
 
 int main(){
-  for(unsigned i = 0; i < N_INSERT; ++i)
-    keys[i] = dats[i] = nullptr;
+  memcached_init(0);
+  std::string name = "chris";
+  std::string quality = " tests memcached";
 
-  memcached_init();
-  memcached_end(0);
-  return 0;
-  srand(42);
-// Necessary until we start testing Hodor. Mohammad's code should make everything easy :) 
-//  hodor_init();
+  char nbuff[BUFF_LEN];
+  char qbuff[BUFF_LEN];
+  strcpy(nbuff, name.c_str());
+  strcpy(qbuff, quality.c_str());
 
-
-  unsigned long long count = 0, start, end;
-
-  for(unsigned i = 0; i < N_INSERT; ++i){
-    keys[i] = write_random_string((char*)malloc(BUFF_LEN));
-    dats[i] = write_random_string((char*)malloc(BUFF_LEN));
-    start = get_ticks_start();
-    memcached_insert(keys[i], BUFF_LEN - 5, 0, dats[i], BUFF_LEN - 5, 0);
-    end = get_ticks_end();
-    count += end - start;
-  }
-  printf("insert in %fns\n", GET_NS(count, N_INSERT)); 
-
-  count = 0;
-  for(unsigned i = 0; i < N_GET; ++i){
-    char buff[BUFF_LEN];
-    unsigned idx = GET_RAND_R(N_INSERT);
-    start = get_ticks_start();
-    int res = memcached_get(keys[idx], BUFF_LEN - 5, 0, buff, BUFF_LEN, 0);  
-    end = get_ticks_end();
-    count += end - start;
-    assert(res == 0 && "Get right value");
-    buff[BUFF_LEN-5] = 0;
-    assert(strcmp(buff, dats[idx]) == 0);
-  }
-  printf("get in %fns\n", GET_NS(count, N_GET));
-  
-
-  memcached_end(0);
+  memcached_insert(nbuff, BUFF_LEN - 5, 0, qbuff, BUFF_LEN - 5, 0); 
   return 0;
 }

@@ -64,11 +64,11 @@ static pthread_mutex_t cas_id_lock = PTHREAD_MUTEX_INITIALIZER;
 void items_init(){
   if (!is_server || is_restart){
     // get roots
-    heads = (pptr<item>*)RP_get_root(RPMRoot::Heads);
-    tails = (pptr<item>*)RP_get_root(RPMRoot::Tails);
-    itemstats = (itemstats_t*)RP_get_root(RPMRoot::ItemStats);
-    sizes = (unsigned int*)RP_get_root(RPMRoot::Sizes);
-    sizes_bytes = (uint64_t*)RP_get_root(RPMRoot::SizesBytes);
+    heads = (pptr<item>*)RP_get_root<char>(RPMRoot::Heads);
+    tails = (pptr<item>*)RP_get_root<char>(RPMRoot::Tails);
+    itemstats = RP_get_root<itemstats_t>(RPMRoot::ItemStats);
+    sizes = RP_get_root<unsigned int>(RPMRoot::Sizes);
+    sizes_bytes = RP_get_root<uint64_t>(RPMRoot::SizesBytes);
   } else {
     heads = (pptr<item>*)RP_calloc(sizeof(pptr<item>), LARGEST_ID);
     tails = (pptr<item>*)RP_calloc(sizeof(pptr<item>), LARGEST_ID);
@@ -82,7 +82,7 @@ void items_init(){
     RP_set_root(tails, RPMRoot::Tails);
     RP_set_root(itemstats, RPMRoot::ItemStats);
     RP_set_root(sizes, RPMRoot::Sizes);
-    RP_set_root(sizes_bytes, RPMRoot::Sizes);
+    RP_set_root(sizes_bytes, RPMRoot::SizesBytes);
   }
 }
 

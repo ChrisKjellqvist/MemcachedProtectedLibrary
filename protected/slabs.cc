@@ -43,11 +43,18 @@ struct slabclass_t{
   size_t requested; /* The number of requested bytes */
 };
 
+template<>
+void GarbageCollection::filter_func(slabclass_t *sc){
+  for(unsigned i = 0; i < sc->list_size; ++i){
+    char* c = sc->slab_list[i];
+    mark_func((char*)c);
+  }
+}
 
 // CHRIS NOTES:
 //    slabclass[0] is a special slabclass to store reassignable pages...
 //    Refer to memcached.h:104
-static pptr<slabclass_t> slabclass;// [MAX_NUMBER_OF_SLAB_CLASSES];
+static pptr<slabclass_t> slabclass = pptr<slabclass_t>(nullptr);// [MAX_NUMBER_OF_SLAB_CLASSES];
 // THREADCACHED - Replace dynamic limits with static limits
 static size_t mem_malloced = 0;
 /* If the memory limit has been hit once. Used as a hint to decide when to
@@ -57,7 +64,7 @@ static size_t mem_malloced = 0;
 // All communicating threads need to be able to say if they find that malloc is
 // out of memory. Memory is only allocated when a lock is held(CHECK THIS), so
 // this ~probably~ doesn't need its own lock
-static pptr<bool> MEMORY_MAX_reached;
+static pptr<bool> MEMORY_MAX_reached = pptr<bool>(nullptr);
 
 static int power_largest;
 /**
@@ -129,10 +136,11 @@ void slabs_init(const double factor) {
     slabclass[power_largest].size = settings.slab_chunk_size_max;
     slabclass[power_largest].perslab =
       settings.slab_page_size / settings.slab_chunk_size_max;
+    RP_set_root(&*slabclass, RPMRoot::SlabclassAr);
   } else {
     // you are not the server or this is a restart
     slabclass = pptr<slabclass_t>(
-        (slabclass_t*)RP_get_root(RPMRoot::SlabclassAr));
+        RP_get_root<slabclass_t>(RPMRoot::SlabclassAr));
     power_largest = MAX_NUMBER_OF_SLAB_CLASSES - 1;
   }
 }

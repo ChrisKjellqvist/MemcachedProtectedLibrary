@@ -28,6 +28,9 @@
 // THREADCACHED
 using rel_time_t = int;
 #include "murmur3_hash.h"
+#include <atomic>
+#include <rpmalloc.hpp>
+#include <BaseMeta.hpp>
 #define tcd_hash MurmurHash3_x86_32
 /* RPMalloc Root IDs */
 enum RPMRoot {
@@ -42,7 +45,8 @@ enum RPMRoot {
   Sizes = 8,
   SizesBytes = 9,
   SlabclassAr = 10,
-  MemLimit = 11
+  MemLimit = 11,
+  EndSignal = 12
 };
 extern int is_server;
 extern int is_restart;

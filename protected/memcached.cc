@@ -69,12 +69,13 @@
  */
 
 /* THREADCACHED */
+#include <rpmalloc.hpp>
 int is_server, is_restart;
 
 /* defaults */
 static void settings_init(void);
 
-pthread_mutex_t end_mutex = PTHREAD_MUTEX_INITIALIZER;
+std::atomic<int> *end_signal;
 pthread_mutex_t begin_ops_mutex = PTHREAD_MUTEX_INITIALIZER;
 /** exported globals **/
 struct stats stats;
@@ -449,6 +450,18 @@ static int sigignore(int sig) {
  */
 // run this regardless of whether you're a server or a client
 void agnostic_init(){
+  if (!is_restart && is_server){
+    end_signal = (std::atomic<int>*)RP_malloc(sizeof(std::atomic<int>));
+    assert(end_signal != nullptr);
+    RP_set_root(end_signal, RPMRoot::EndSignal);
+    printf("set endsignal\nset root %d\n", RPMRoot::EndSignal);
+  } else {
+    end_signal = RP_get_root<std::atomic<int> >(RPMRoot::EndSignal);
+  }
+
+  if (is_server){
+    *end_signal = 0;
+  }
   enum {
     MAXCONNS_FAST = 0,
     HASHPOWER_INIT,
@@ -479,6 +492,8 @@ void agnostic_init(){
   };
   /* init settings */
   settings_init();
+  memcached_thread_init();
+  items_init();
 
   /* Run regardless of initializing it later */
   init_lru_maintainer();
@@ -487,18 +502,17 @@ void agnostic_init(){
   setbuf(stderr, NULL);
 
   /* initialize other stuff */
-  items_init();
-  memcached_thread_init();
   assoc_init(settings.hashpower_init);
   slabs_init(settings.factor);
+
+  if (is_server && is_restart)
+    RP_recover();
 }
 
 void* server_thread (void *pargs) {
   is_server = 1;
   printf("server started\n");
   fflush(stdout);
-
-  agnostic_init();
 
   /* handle SIGINT and SIGTERM */
   signal(SIGINT, sig_handler);
@@ -521,9 +535,13 @@ void* server_thread (void *pargs) {
   /* enter the event loop */
   // TODO chnage to wait on maintenance threads
   pthread_mutex_unlock(&begin_ops_mutex);
-  pthread_mutex_init(&end_mutex, nullptr);
-  pthread_mutex_lock(&end_mutex);
-  pthread_mutex_lock(&end_mutex);
+  int q = 0;
+  while(end_signal->load() == 0){
+    sleep(1);
+    printf("slept %d times\n", ++q);
+
+  }
+  printf("exited!\n");
 
   stop_assoc_maintenance_thread();
   return NULL;

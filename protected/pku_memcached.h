@@ -9,7 +9,7 @@ void memcached_insert (char* key, size_t nkey, uint32_t exptime, char *data,    
 int  memcached_get    (char* key, size_t nkey, uint32_t exptime, char *buffer,  size_t buffLen, int t_id);
 void memcached_end    (int t_id);
 
-void memcached_init();
+void memcached_init(int server);
 }
 
 // include/hodor_plib.h
