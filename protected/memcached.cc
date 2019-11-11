@@ -605,6 +605,7 @@ void pku_memcached_insert(char* key, size_t nkey, char* data, size_t datan,
     memcpy(ITEM_data(it) + datan, "\r\n", 2);
     uint32_t hv = tcd_hash(key, nkey);
     if (!(tup =do_store_item(it, NREAD_ADD, hv))->sit) {
+      printf("Couldn't store item!!!\n");
       perror("Couldn't store item!!!\n");
     }
     item_remove(it);         /* release our reference */

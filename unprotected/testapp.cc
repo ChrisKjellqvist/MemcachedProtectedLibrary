@@ -64,6 +64,6 @@ int main(){
   strcpy(nbuff, name.c_str());
   strcpy(qbuff, quality.c_str());
 
-  memcached_insert(nbuff, BUFF_LEN - 5, 0, qbuff, BUFF_LEN - 5, 0); 
+  memcached_insert(nbuff, strlen(nbuff), 0, qbuff, strlen(qbuff), 0); 
   return 0;
 }
