@@ -64,20 +64,20 @@ void assoc_init(const int hashtable_init) {
   if (hashtable_init) {
     hashpower = hashtable_init;
   }
-  if (is_restart || !is_server){
-    // reuse old roots
-    // definitions in memcached.h::RPMRoot
-    primary_hashtable = RP_get_root<pptr<item> >(RPMRoot::PrimaryHT);
-    old_hashtable = RP_get_root<pptr<item> >(RPMRoot::OldHT);
-  } else {
-    primary_hashtable = pptr<pptr<item> >(
-        (pptr<item>*)RP_calloc(hashsize(hashpower), sizeof(pptr<item>)));
-    if (primary_hashtable == nullptr) {
-      fprintf(stderr, "Failed to init hashtable.\n");
-      exit(EXIT_FAILURE);
-    }
+  if (!is_restart && is_server){
+    primary_hashtable = (pptr<item>*)
+      RP_calloc(hashsize(hashpower), sizeof(pptr<item>));
+    assert(primary_hashtable != nullptr);
     RP_set_root((void*)(&*primary_hashtable), RPMRoot::PrimaryHT);
     RP_set_root(nullptr, RPMRoot::OldHT);
+    void ** temp = (void**)primary_hashtable;
+    for(unsigned int i = 0; i < hashsize(hashpower); ++i){
+      temp[i] = (void*)0xDEADBEEF;
+    }
+  } else {
+    primary_hashtable = (pptr<item>*)RP_get_root<char >(RPMRoot::PrimaryHT);
+    old_hashtable =     (pptr<item>*)RP_get_root<char >(RPMRoot::OldHT);
+    printf("Restart seen in assoc!\n");
   }
   STATS_LOCK();
   stats_state.hash_power_level = hashpower;
@@ -86,7 +86,7 @@ void assoc_init(const int hashtable_init) {
 }
 
 item *assoc_find(const char *key, const size_t nkey, const uint32_t hv) {
-  item *it;
+  pptr<item> it;
   unsigned int oldbucket;
 
   if (expanding &&
@@ -94,12 +94,14 @@ item *assoc_find(const char *key, const size_t nkey, const uint32_t hv) {
   {
     it = old_hashtable[oldbucket];
   } else {
-    it = primary_hashtable[hv & hashmask(hashpower)];
+    // UNDO this
+    size_t ind = hv & hashmask(hashpower);
+    it = primary_hashtable[ind];
   }
 
   item *ret = NULL;
   int depth = 0;
-  while (it) {
+  while (it != nullptr) {
     if ((nkey == it->nkey) && (memcmp(key, ITEM_key(it), nkey) == 0)) {
       ret = it;
       break;
@@ -141,7 +143,6 @@ static void assoc_expand(void) {
     // Hash table expansion starting
     RP_set_root((void*)(&*old_hashtable), RPMRoot::OldHT);
     RP_set_root((void*)(&*primary_hashtable), RPMRoot::PrimaryHT);
-    // CHRIS - do I have to persist changes to the roots
     hashpower++;
     expanding = true;
     expand_bucket = 0;
@@ -184,6 +185,7 @@ int assoc_insert(item *it, const uint32_t hv) {
 }
 
 void assoc_delete(const char *key, const size_t nkey, const uint32_t hv) {
+  printf("deleted\n");
   pptr<item> *before = _hashitem_before(key, nkey, hv);
 
   if (*before != nullptr) {
@@ -233,7 +235,7 @@ static void *assoc_maintenance_thread(void *arg) {
         expand_bucket++;
         if (expand_bucket == hashsize(hashpower - 1)) {
           expanding = false;
-          free(old_hashtable);
+          RP_free(old_hashtable);
           STATS_LOCK();
           stats_state.hash_bytes -= hashsize(hashpower - 1) * sizeof(void *);
           stats_state.hash_is_expanding = false;
@@ -261,9 +263,13 @@ static void *assoc_maintenance_thread(void *arg) {
        * allow dynamic hash table expansion without causing significant
        * wait times.
        */
-      pause_accesses();
-      assoc_expand();
-      unpause_accesses();
+      // If stopping thread, we'll get here. Need to check that we're not
+      // ending before we expand
+      if (do_run_maintenance_thread){
+        pause_accesses();
+        assoc_expand();
+        unpause_accesses();
+      }
     }
   }
   return NULL;

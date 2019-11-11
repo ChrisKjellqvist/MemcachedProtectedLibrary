@@ -35,6 +35,7 @@ HODOR_FUNC_ATTR void memcached_end(int t_id){
 // for a server process or a client process
 void memcached_init(int server){
   is_restart = RP_init("memcached.rpma");
+  printf("is restart? %d\n", is_restart);
   is_server = server;
   int i = 0;
   void *start, *end;

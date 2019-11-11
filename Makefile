@@ -39,6 +39,11 @@ insert: $(LIBS) obj/insert.o
 	ld $(LINKOPTS) -o $@ $^
 end: $(LIBS) obj/end.o
 	ld $(LINKOPTS) -o $@ $^
+basic: basic_setup basic_test
+basic_setup: $(LIBS) obj/basic_setup.o
+	ld $(LINKOPTS) -o $@ $^
+basic_test: $(LIBS) obj/basic_test.o
+	ld $(LINKOPTS) -o $@ $^
 lib/libhodor.a:
 	cp ~/hodor/libhodor/libhodor.a lib/
 lib/libthreadcached.so: $(PROT_OBJ)
