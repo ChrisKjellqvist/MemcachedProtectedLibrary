@@ -27,23 +27,16 @@ DEFLINK  = --hash-style=gnu --no-add-needed --build-id --eh-frame-hdr -m \
 
 LIBS = lib/libhodor.a lib/libthreadcached.so lib/librpmalloc.a
 LINKOPTS = $(DEFLINK) -lpthread -levent -ldl -T scripts/ldscript.lds
-EXE = server get insert end
+EXE = server.exe
+TEST_RUN = get.exe insert.exe end.exe
+PERF_RUN = insert_test.exe
+RPMA_RUN = basic_setup.exe basic_test.exe
 
 .PHONY : all
-all: $(EXE)
-server: $(LIBS) obj/server.o
-	ld $(LINKOPTS) -o $@ $^
-get: $(LIBS) obj/get.o
-	ld $(LINKOPTS) -o $@ $^
-insert: $(LIBS) obj/insert.o
-	ld $(LINKOPTS) -o $@ $^
-end: $(LIBS) obj/end.o
-	ld $(LINKOPTS) -o $@ $^
-basic: basic_setup basic_test
-basic_setup: $(LIBS) obj/basic_setup.o
-	ld $(LINKOPTS) -o $@ $^
-basic_test: $(LIBS) obj/basic_test.o
-	ld $(LINKOPTS) -o $@ $^
+all: $(EXE) $(TEST_RUN)
+perf: $(EXE) $(PERF_RUN)
+%.exe: $(LIBS) obj/%.o
+	ld $(LINKOPTS) $^ -o $@
 lib/libhodor.a:
 	cp ~/hodor/libhodor/libhodor.a lib/
 lib/libthreadcached.so: $(PROT_OBJ)
@@ -62,7 +55,7 @@ obj/%.o: unprotected/%.cc
 
 .PHONY : clean
 clean: 
-	rm -f obj/* exec *.d /dev/shm/memcached* $(EXE)
+	rm -f obj/* exec *.d /dev/shm/memcached* $(EXE) $(TEST_RUN)
 .PHONY : reset
 reset:
 	rm -f /dev/shm/memcached*
