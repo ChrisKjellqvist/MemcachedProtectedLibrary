@@ -82,13 +82,13 @@ int main(){
   size_t nkB = 0;
   for(unsigned i = 0; i < 1000; ++i){
     auto p = create_random_packet();
-    memcached_insert((char*)p->key, p->key_len, 0, (char*)p->dat, p->dat_len, 0);
+    memcached_insert((char*)p->key, p->key_len, 0, (char*)p->dat, p->dat_len);
   }
   for(unsigned i = 0; i < n; ++i){
     auto p = create_random_packet();
     nkB += (p->key_len + p->dat_len);
     begin = get_ticks_start();
-    memcached_insert((char*)p->key, p->key_len, 0, (char*)p->dat, p->dat_len, 0);
+    memcached_insert((char*)p->key, p->key_len, 0, (char*)p->dat, p->dat_len);
     end = get_ticks_end();
     count += end - begin;
   }

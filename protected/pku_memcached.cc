@@ -11,22 +11,21 @@ extern std::atomic<int> *end_signal;
 
 extern "C" {
 
-HODOR_FUNC_ATTR void memcached_touch(char* key, size_t nkey, uint32_t exptime,
-    int t_id){
+HODOR_FUNC_ATTR void memcached_touch(char* key, size_t nkey, uint32_t exptime){
   pku_memcached_touch(key, nkey, exptime);
 } HODOR_FUNC_EXPORT(memcached_touch, 4);
 
 HODOR_FUNC_ATTR void memcached_insert(char* key, size_t nkey, uint32_t exptime,
-    char* data, size_t datan, int t_id){ 
+    char* data, size_t datan){ 
   pku_memcached_insert(key, nkey, data, datan, exptime);
 } HODOR_FUNC_EXPORT(memcached_insert, 6);
 
 HODOR_FUNC_ATTR int  memcached_get(char* key, size_t nkey, uint32_t exptime,
-    char* buffer, size_t buffLen, int t_id){
+    char* buffer, size_t buffLen){
   return pku_memcached_get(key, nkey, exptime, buffer, buffLen);
 } HODOR_FUNC_EXPORT(memcached_get, 6);
 
-HODOR_FUNC_ATTR void memcached_end(int t_id){
+HODOR_FUNC_ATTR void memcached_end(){
   end_signal->store(1);
 } HODOR_FUNC_EXPORT(memcached_end, 1);
 

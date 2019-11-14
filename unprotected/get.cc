@@ -61,8 +61,7 @@ int main(){
   char nbuff[BUFF_LEN];
   char gbuff[BUFF_LEN];
   strcpy(nbuff, name.c_str());
-  printf("%d\n",
-      memcached_get(nbuff, strlen(nbuff), 0, gbuff, BUFF_LEN, 0));
+  printf("%d\n", memcached_get(nbuff, strlen(nbuff), 0, gbuff, BUFF_LEN));
 
   printf("%s%s\n",nbuff, gbuff);
   return 0;
