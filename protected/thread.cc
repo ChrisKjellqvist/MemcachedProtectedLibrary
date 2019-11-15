@@ -121,6 +121,26 @@ item *item_get(const char *key, const size_t nkey, uint32_t exptime, const bool 
   return it;
 }
 
+int item_set(const char *key, const size_t nkey, const char* data, const size_t datan, uint32_t exptime, const bool do_update) {
+  item *it;
+  int success;
+  uint32_t hv;
+  hv = tcd_hash(key, nkey);
+  item_lock(hv);
+  it = do_item_get(key, nkey, hv, do_update);
+  if (it == nullptr) {
+    succes = 2;
+  } else if (it->nbytes < datan + 2){
+    success = 1;
+  } else {
+    success = 0;
+    memset(ITEM_data(it), 0, (size_t)it->nbytes);
+    memcpy(ITEM_data(it), val, datan);
+  }
+  item_unlock(hv);
+  return success;
+}
+
 item *item_touch(const char *key, size_t nkey, uint32_t exptime) {
   item *it;
   uint32_t hv;

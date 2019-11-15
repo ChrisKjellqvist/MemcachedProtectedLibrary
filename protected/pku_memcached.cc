@@ -13,21 +13,26 @@ extern "C" {
 
 HODOR_FUNC_ATTR void memcached_touch(char* key, size_t nkey, uint32_t exptime){
   pku_memcached_touch(key, nkey, exptime);
-} HODOR_FUNC_EXPORT(memcached_touch, 4);
+} HODOR_FUNC_EXPORT(memcached_touch, 3);
 
 HODOR_FUNC_ATTR void memcached_insert(char* key, size_t nkey, uint32_t exptime,
     char* data, size_t datan){ 
   pku_memcached_insert(key, nkey, data, datan, exptime);
-} HODOR_FUNC_EXPORT(memcached_insert, 6);
+} HODOR_FUNC_EXPORT(memcached_insert, 5);
 
-HODOR_FUNC_ATTR int  memcached_get(char* key, size_t nkey, uint32_t exptime,
+HODOR_FUNC_ATTR int memcached_get(char* key, size_t nkey, uint32_t exptime,
     char* buffer, size_t buffLen){
   return pku_memcached_get(key, nkey, exptime, buffer, buffLen);
-} HODOR_FUNC_EXPORT(memcached_get, 6);
+} HODOR_FUNC_EXPORT(memcached_get, 5);
+
+HODOR_FUNC_ATTR int memcached_set(char* key, size_t nkey, char *data, 
+    size_t datan, uint32_t exptime){
+  return pku_memcached_set(key, nkey, exptime, buffer, buffLen);
+} HODOR_FUNC_EXPORT(memcached_get, 5);
 
 HODOR_FUNC_ATTR void memcached_end(){
   end_signal->store(1);
-} HODOR_FUNC_EXPORT(memcached_end, 1);
+} HODOR_FUNC_EXPORT(memcached_end, 0);
 
 // Start memcached maintainence processes
 // server is either 0 or 1 to represent whether or not we are initializing

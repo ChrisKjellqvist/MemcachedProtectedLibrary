@@ -172,6 +172,8 @@ int  pku_memcached_get(char* key, size_t nkey, uint32_t exptime, char* buffer,
 void pku_memcached_touch(char* key, size_t nkey, uint32_t exptime);
 void pku_memcached_insert(char* key, size_t nkey, char* data, size_t datan,
     uint32_t exptime);
+int pku_memcached_set(char *key, size_t nkey, char *data, size_t datan,
+    uint32_t exptime);
 
 
 /*
@@ -507,6 +509,7 @@ item *item_alloc(char *key, size_t nkey, int flags, rel_time_t exptime, int nbyt
 #define DONT_UPDATE false
 item *item_get(const char *key, const size_t nkey, uint32_t exptime, const bool do_update);
 item *item_touch(const char *key, const size_t nkey, uint32_t exptime);
+item *item_set(const char *key, const size_t nkey, const char* data, const size_t datan, uint32_t exptime, const bool do_update);
 int   item_link(item *it);
 void  item_remove(item *it);
 int   item_replace(item *it, item *new_it, const uint32_t hv);

@@ -265,7 +265,6 @@ struct st_st *do_store_item(item *it, int comm, const uint32_t hv) {
   size_t cas = 0;
   item *new_it = NULL;
   uint32_t flags;
-
   if (old_it != NULL && comm == NREAD_ADD) {
     /* add only adds a nonexistent item, but promote to head of LRU */
     do_item_update(old_it);
@@ -596,7 +595,6 @@ void pku_memcached_touch(char* key, size_t nkey, uint32_t exptime){
 void pku_memcached_insert(char* key, size_t nkey, char* data, size_t datan,
     uint32_t exptime){
   // do what we're here for
-  struct st_st *tup;
   inc_lookers();
   item *it = item_alloc(key, nkey, 0, realtime(exptime), datan + 2);
 
@@ -604,8 +602,7 @@ void pku_memcached_insert(char* key, size_t nkey, char* data, size_t datan,
     memcpy(ITEM_data(it), data, datan);
     memcpy(ITEM_data(it) + datan, "\r\n", 2);
     uint32_t hv = tcd_hash(key, nkey);
-    if (!(tup =do_store_item(it, NREAD_ADD, hv))->sit) {
-      printf("Couldn't store item!!!\n");
+    if (!(do_store_item(it, NREAD_ADD, hv))->sit) {
       perror("Couldn't store item!!!\n");
     }
     item_remove(it);         /* release our reference */
@@ -616,4 +613,10 @@ void pku_memcached_insert(char* key, size_t nkey, char* data, size_t datan,
   dec_lookers();
 }
 
-
+int pku_memcached_set(char *key, size_t nkey, char *data, size_t datan,
+    uint32_t exptime){
+  inc_lookers();
+  int ret = item_set(key, nkey, data, datan, exptime, 1); 
+  dec_lookers();
+  return ret;
+}
