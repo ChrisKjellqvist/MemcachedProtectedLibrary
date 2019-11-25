@@ -101,24 +101,6 @@ static int lru_crawler_initialized = 0;
 static pthread_mutex_t lru_crawler_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t  lru_crawler_cond = PTHREAD_COND_INITIALIZER;
 
-static char *uriencode_map[256];
-static bool uriencode(const char *src, char *dst, const size_t srclen, const size_t dstlen) {
-    size_t x;
-    size_t d = 0;
-    for (x = 0; x < srclen; x++) {
-        if (d + 4 > dstlen)
-            return false;
-        if (uriencode_map[(unsigned char) src[x]] != NULL) {
-            memcpy(&dst[d], uriencode_map[(unsigned char) src[x]], 3);
-            d += 3;
-        } else {
-            dst[d] = src[x];
-            d++;
-        }
-    }
-    dst[d] = '\0';
-    return true;
-}
 /* Will crawl all slab classes a minimum of once per hour */
 #define MAX_MAINTCRAWL_WAIT 60 * 60
 

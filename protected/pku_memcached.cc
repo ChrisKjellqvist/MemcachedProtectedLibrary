@@ -25,10 +25,20 @@ HODOR_FUNC_ATTR int memcached_get(char* key, size_t nkey, uint32_t exptime,
   return pku_memcached_get(key, nkey, exptime, buffer, buffLen);
 } HODOR_FUNC_EXPORT(memcached_get, 5);
 
-HODOR_FUNC_ATTR int memcached_set(char* key, size_t nkey, char *data, 
+HODOR_FUNC_ATTR int memcached_set(char* key, size_t nkey, char *data,
     size_t datan, uint32_t exptime){
-  return pku_memcached_set(key, nkey, exptime, buffer, buffLen);
-} HODOR_FUNC_EXPORT(memcached_get, 5);
+  return pku_memcached_set(key, nkey, data, datan, exptime);
+} HODOR_FUNC_EXPORT(memcached_set, 5);
+
+HODOR_FUNC_ATTR bool memcached_incr(char* key, size_t nkey,
+    uint64_t delta, char *buf){
+  return add_delta(key, nkey, true, delta, buf);
+} HODOR_FUNC_EXPORT(memcached_incr, 4);
+
+HODOR_FUNC_ATTR bool memcached_decr(char* key, size_t nkey,
+    uint64_t delta, char *buf){
+  return add_delta(key, nkey, false, delta, buf);
+} HODOR_FUNC_EXPORT(memcached_decr, 4);
 
 HODOR_FUNC_ATTR void memcached_end(){
   end_signal->store(1);

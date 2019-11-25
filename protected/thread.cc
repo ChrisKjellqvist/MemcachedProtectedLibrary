@@ -129,13 +129,13 @@ int item_set(const char *key, const size_t nkey, const char* data, const size_t 
   item_lock(hv);
   it = do_item_get(key, nkey, hv, do_update);
   if (it == nullptr) {
-    succes = 2;
-  } else if (it->nbytes < datan + 2){
+    success = 2;
+  } else if ((size_t)it->nbytes < datan + 2){
     success = 1;
   } else {
     success = 0;
     memset(ITEM_data(it), 0, (size_t)it->nbytes);
-    memcpy(ITEM_data(it), val, datan);
+    memcpy(ITEM_data(it), data, datan);
   }
   item_unlock(hv);
   return success;
@@ -196,6 +196,22 @@ void item_unlink(item *item) {
   item_lock(hv);
   do_item_unlink(item, hv);
   item_unlock(hv);
+}
+
+/*
+ * Does arithmetic on a numeric item value.
+ */
+enum delta_result_type add_delta(const char *key,
+                                 const size_t nkey, bool incr,
+                                 const int64_t delta, char *buf) {
+    enum delta_result_type ret;
+    uint32_t hv;
+
+    hv = tcd_hash(key, nkey);
+    item_lock(hv);
+    ret = do_add_delta(key, nkey, incr, delta, buf, hv);
+    item_unlock(hv);
+    return ret;
 }
 
 /*

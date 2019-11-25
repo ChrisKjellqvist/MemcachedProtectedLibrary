@@ -48,10 +48,6 @@
 #include <sysexits.h>
 #include <stddef.h>
 
-#ifdef HAVE_GETOPT_LONG
-#include <getopt.h>
-#endif
-
 /* FreeBSD 4.x doesn't have IOV_MAX exposed. */
 #ifndef IOV_MAX
 #if defined(__FreeBSD__) || defined(__APPLE__) || defined(__GNU__)
@@ -572,6 +568,76 @@ void unpause_accesses(void){
   pause_sig = 0;
 }
 
+enum delta_result_type do_add_delta(const char *key,
+    const size_t nkey, const bool incr,
+    const uint64_t delta, char* buf, const uint32_t hv) {
+    char *ptr;
+    uint64_t value;
+    int res;
+    item *it;
+
+    it = do_item_get(key, nkey, hv, DONT_UPDATE);
+    if (!it) {
+        return DELTA_ITEM_NOT_FOUND;
+    }
+
+    if (it->nbytes <= 2 || (it->it_flags & (ITEM_CHUNKED)) != 0) {
+        do_item_remove(it);
+        return NON_NUMERIC;
+    }
+
+    ptr = ITEM_data(it);
+
+    if (!safe_strtoull(ptr, &value)) {
+        do_item_remove(it);
+        return NON_NUMERIC;
+    }
+
+    if (incr) {
+        value += delta;
+    } else {
+        if(delta > value) {
+            value = 0;
+        } else {
+            value -= delta;
+        }
+    }
+
+    itoa_u64(value, buf);
+    res = strlen(buf);
+    /* refcount == 2 means we are the only ones holding the item, and it is
+     * linked. We hold the item's lock in this function, so refcount cannot
+     * increase. */
+    if (res + 2 <= it->nbytes && it->refcount == 2) { 
+      /* replace in-place */
+      item_stats_sizes_remove(it);
+      item_stats_sizes_add(it);
+      memcpy(ITEM_data(it), buf, res);
+      memset(ITEM_data(it) + res, ' ', it->nbytes - res - 2);
+      do_item_update(it);
+    } else if (it->refcount > 1) {
+      item *new_it;
+      uint32_t flags;
+      FLAGS_CONV(nullptr, it, flags);
+      new_it = do_item_alloc(ITEM_key(it), it->nkey, flags, it->exptime, res + 2);
+      if (new_it == 0) {
+        do_item_remove(it);
+        return EOM;
+      }
+      memcpy(ITEM_data(new_it), buf, res);
+      memcpy(ITEM_data(new_it) + res, "\r\n", 2);
+      item_replace(it, new_it, hv);
+      do_item_remove(new_it);       /* release our reference */
+    } else {
+      /* Should never get here. This means we somehow fetched an unlinked
+       * item. TODO: Add a counter? */
+      if (it->refcount == 1)
+        do_item_remove(it);
+      return DELTA_ITEM_NOT_FOUND;
+    }
+    do_item_remove(it);         /* release our reference */
+    return OK;
+}
 
 int pku_memcached_get(char* key, size_t nkey, uint32_t exptime, char* buffer,
     size_t buffLen){

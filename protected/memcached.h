@@ -23,11 +23,14 @@
 #include <grp.h>
 #include <string>
 
+#include <util.h>
+
 #include <pptr.hpp>
 
 // THREADCACHED
 using rel_time_t = int;
 #include "murmur3_hash.h"
+#include "itoa_ljust.h"
 #include <atomic>
 #include <rpmalloc.hpp>
 #include <BaseMeta.hpp>
@@ -52,6 +55,8 @@ extern int is_server;
 extern int is_restart;
 // 4GB
 const size_t MEMORY_MAX = 4*1024*1024*1024ULL;
+
+
 
 /** Maximum length of a key. */
 #define KEY_MAX_LENGTH 250
@@ -146,8 +151,6 @@ const size_t MEMORY_MAX = 4*1024*1024*1024ULL;
 
 #define STAT_KEY_LEN 128
 #define STAT_VAL_LEN 128
-
-
 /** Item client flag conversion */
 #define FLAGS_CONV(iar, it, flag) { \
   if ((iar)) { \
@@ -158,6 +161,7 @@ const size_t MEMORY_MAX = 4*1024*1024*1024ULL;
     flag = 0; \
   } \
 }
+
 struct pthread_args {
   int argc;
   char **argv;
@@ -477,8 +481,8 @@ struct st_st *mk_st (enum store_item_type my_sit, size_t my_cas);
 
 enum delta_result_type do_add_delta(const char *key,
     const size_t nkey, const bool incr,
-    const int64_t delta, char *buf,
-    uint64_t *cas, const uint32_t hv);
+    const uint64_t delta, char* buf, const uint32_t hv);
+
 struct st_st *do_store_item(item *item, int comm, const uint32_t hv);
 extern int daemonize(int nochdir, int noclose);
 
@@ -502,14 +506,14 @@ void agnostic_init();
 /* Lock wrappers for cache functions that are called from main loop. */
 enum delta_result_type add_delta(const char *key,
     const size_t nkey, bool incr,
-    const int64_t delta, char *buf,
-    uint64_t *cas);
+    const uint64_t delta, char *buf);
+
 item *item_alloc(char *key, size_t nkey, int flags, rel_time_t exptime, int nbytes);
 #define DO_UPDATE true
 #define DONT_UPDATE false
 item *item_get(const char *key, const size_t nkey, uint32_t exptime, const bool do_update);
 item *item_touch(const char *key, const size_t nkey, uint32_t exptime);
-item *item_set(const char *key, const size_t nkey, const char* data, const size_t datan, uint32_t exptime, const bool do_update);
+int   item_set(const char *key, const size_t nkey, const char* data, const size_t datan, uint32_t exptime, const bool do_update);
 int   item_link(item *it);
 void  item_remove(item *it);
 int   item_replace(item *it, item *new_it, const uint32_t hv);
