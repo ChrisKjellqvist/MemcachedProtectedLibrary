@@ -2,13 +2,13 @@
 #define PKU_MEMCACHED_H
 #include <inttypes.h>
 #include <pthread.h>
-#ifndef __cplus_plus
+#ifndef __cplusplus
 #include <stdbool.h>
 #endif
 #include "constants.h"
 
 
-#ifdef __cplus_plus
+#ifdef __cplusplus
 extern "C" {
 #endif
 
@@ -21,22 +21,22 @@ memcached_set
 
 memcached_return_t
 memcached_add 
-  (char* key, size_t nkey, char *data, size_t datan, uint32_t exptime
+  (char* key, size_t nkey, char *data, size_t datan, uint32_t exptime,
    uint32_t flags);
 
 memcached_return_t
 memcached_replace 
-  (char* key, size_t nkey, char *data, size_t datan, uint32_t exptime
+  (char* key, size_t nkey, char *data, size_t datan, uint32_t exptime,
    uint32_t flags);
 
 memcached_return_t
 memcached_prepend 
-  (char* key, size_t nkey, char *data, size_t datan, uint32_t exptime
+  (char* key, size_t nkey, char *data, size_t datan, uint32_t exptime,
    uint32_t flags);
 
 memcached_return_t
 memcached_append 
-  (char* key, size_t nkey, char *data, size_t datan, uint32_t exptime
+  (char* key, size_t nkey, char *data, size_t datan, uint32_t exptime,
    uint32_t flags);
 
 memcached_return_t
@@ -259,7 +259,7 @@ void memcached_init(int server);
 
 // Only have one server on this machine so master key interface is redundant
 
-#ifdef __cplus_plus
+#ifdef __cplusplus
 }
 #endif
 

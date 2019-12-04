@@ -637,8 +637,8 @@ enum delta_result_type do_add_delta(const char *key,
 }
 
 memcached_return_t
-pku_memcached_get(char* key, size_t nkey, uint32_t exptime, char* buffer,
-    size_t buffLen){
+pku_memcached_get(char* key, size_t nkey, char* buffer, size_t buffLen,
+    uint32_t exptime){
   inc_lookers();
   item* it = item_get(key, nkey, exptime, 1);
   if (it == NULL)
@@ -677,7 +677,7 @@ memcached_return_t
 pku_memcached_set(char *key, size_t nkey, char *data, size_t datan,
     uint32_t exptime){
   inc_lookers();
-  int ret = item_set(key, nkey, data, datan, exptime, 1); 
+  memcached_return_t ret = item_set(key, nkey, data, datan, exptime, 1); 
   dec_lookers();
   return ret;
 }
@@ -685,7 +685,6 @@ pku_memcached_set(char *key, size_t nkey, char *data, size_t datan,
 memcached_return_t
 pku_memcached_flush(uint32_t exptime){
   pause_accesses();
-  time_t exptime = 0;
   rel_time_t new_oldest = 0;
   if (exptime > 0) {
     new_oldest = realtime(exptime);
@@ -703,7 +702,7 @@ pku_memcached_delete(char *key, size_t nkey, uint32_t exptime){
   uint32_t hv;
   memcached_return_t ret;
 
-  it = item_get_locked(key, nkey, c, DONT_UPDATE, &hv);
+  it = item_get_locked(key, nkey, DONT_UPDATE, &hv);
   if (it) {
     do_item_unlink(it, hv);
     do_item_remove(it);      /* release our reference */
@@ -727,7 +726,6 @@ pku_memcached_append(char *key, size_t nkey, char *data, size_t datan,
       dec_lookers();
       return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
     }
-    return;
   }
   memcpy(ITEM_data(it), data, datan);
   memcpy(ITEM_data(it) + datan, "\r\n", 2);
@@ -755,7 +753,6 @@ pku_memcached_prepend(char *key, size_t nkey, char *data, size_t datan,
       dec_lookers();
       return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
     }
-    return;
   }
   memcpy(ITEM_data(it), data, datan);
   memcpy(ITEM_data(it) + datan, "\r\n", 2);
@@ -783,7 +780,6 @@ pku_memcached_replace(char *key, size_t nkey, char *data, size_t datan,
       dec_lookers();
       return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
     }
-    return;
   }
   memcpy(ITEM_data(it), data, datan);
   memcpy(ITEM_data(it) + datan, "\r\n", 2);

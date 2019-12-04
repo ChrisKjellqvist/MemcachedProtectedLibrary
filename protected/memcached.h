@@ -172,18 +172,29 @@ struct pthread_args {
 
 void pause_accesses(void);
 void unpause_accesses(void);
-int  pku_memcached_get(char* key, size_t nkey, uint32_t exptime, char* buffer,
-    size_t buffLen);
-void pku_memcached_touch(char* key, size_t nkey, uint32_t exptime);
-void pku_memcached_insert(char* key, size_t nkey, char* data, size_t datan,
-    uint32_t exptime);
-int pku_memcached_set(char *key, size_t nkey, char *data, size_t datan,
-    uint32_t exptime);
-void pku_memcached_flush();
 
 memcached_return_t
+pku_memcached_get(char* key, size_t nkey, char* buffer, size_t buffLen,
+    uint32_t exptime);
+memcached_return_t
+pku_memcached_insert(char* key, size_t nkey, char* data, size_t datan,
+    uint32_t exptime);
+memcached_return_t
+pku_memcached_set(char *key, size_t nkey, char *data, size_t datan,
+    uint32_t exptime);
+memcached_return_t
 pku_memcached_delete(char *key, size_t nkey, uint32_t exptime);
-
+memcached_return_t
+pku_memcached_flush();
+memcached_return_t
+pku_memcached_replace(char *key, size_t nkey, char *data, size_t datan,
+    uint32_t exptime, uint32_t flags);
+memcached_return_t
+pku_memcached_prepend(char *key, size_t nkey, char *data, size_t datan,
+    uint32_t exptime, uint32_t flags);
+memcached_return_t
+pku_memcached_append(char *key, size_t nkey, char *data, size_t datan,
+    uint32_t exptime, uint32_t flags);
 
 /*
  * NOTE: If you modify this table you _MUST_ update the function state_text
@@ -512,8 +523,10 @@ item *item_alloc(char *key, size_t nkey, int flags, rel_time_t exptime, int nbyt
 #define DO_UPDATE true
 #define DONT_UPDATE false
 item *item_get(const char *key, const size_t nkey, uint32_t exptime, const bool do_update);
+item *item_get_locked(const char *key, const size_t nkey, const bool do_update, uint32_t *hv);
 item *item_touch(const char *key, const size_t nkey, uint32_t exptime);
-int   item_set(const char *key, const size_t nkey, const char* data, const size_t datan, uint32_t exptime, const bool do_update);
+memcached_return_t
+item_set(const char *key, const size_t nkey, const char* data, const size_t datan, uint32_t exptime, const bool do_update);
 int   item_link(item *it);
 void  item_remove(item *it);
 int   item_replace(item *it, item *new_it, const uint32_t hv);

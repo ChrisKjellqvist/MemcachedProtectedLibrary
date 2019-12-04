@@ -125,7 +125,7 @@ item *item_get(const char *key, const size_t nkey, uint32_t exptime, const bool 
 // lock will still be held even if return is NULL, allowing caller to replace
 // an item atomically if desired.
 item *item_get_locked(const char *key, const size_t nkey, const bool do_update, uint32_t *hv) {
-    *hv = hash(key, nkey);
+    *hv = tcd_hash(key, nkey);
     item_lock(*hv);
     return  do_item_get(key, nkey, *hv, do_update);
 }
