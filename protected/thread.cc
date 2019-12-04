@@ -121,19 +121,29 @@ item *item_get(const char *key, const size_t nkey, uint32_t exptime, const bool 
   return it;
 }
 
-int item_set(const char *key, const size_t nkey, const char* data, const size_t datan, uint32_t exptime, const bool do_update) {
+// returns an item with the item lock held.
+// lock will still be held even if return is NULL, allowing caller to replace
+// an item atomically if desired.
+item *item_get_locked(const char *key, const size_t nkey, const bool do_update, uint32_t *hv) {
+    *hv = hash(key, nkey);
+    item_lock(*hv);
+    return  do_item_get(key, nkey, *hv, do_update);
+}
+
+memcached_return_t
+item_set(const char *key, const size_t nkey, const char* data, const size_t datan, uint32_t exptime, const bool do_update) {
   item *it;
-  int success;
+  memcached_return_t success;
   uint32_t hv;
   hv = tcd_hash(key, nkey);
   item_lock(hv);
   it = do_item_get(key, nkey, hv, do_update);
   if (it == nullptr) {
-    success = 2;
+    success = MEMCACHED_NOTFOUND;
   } else if ((size_t)it->nbytes < datan + 2){
-    success = 1;
+    success = MEMCACHED_E2BIG;
   } else {
-    success = 0;
+    success = MEMCACHED_SUCCESS;
     memset(ITEM_data(it), 0, (size_t)it->nbytes);
     memcpy(ITEM_data(it), data, datan);
   }

@@ -293,12 +293,6 @@ struct st_st *do_store_item(item *it, int comm, const uint32_t hv) {
       /*
        * Validate CAS
        */
-      if (ITEM_get_cas(it) != 0) {
-	// CAS much be equal
-	if (ITEM_get_cas(it) != ITEM_get_cas(old_it)) {
-	  stored = EXISTS;
-	}
-      }
       if (stored == NOT_STORED) {
 	/* we have it and old_it here - alloc memory to hold both */
 	/* flags was already lost - so recover them from ITEM_suffix(it) */
@@ -642,26 +636,22 @@ enum delta_result_type do_add_delta(const char *key,
     return OK;
 }
 
-int pku_memcached_get(char* key, size_t nkey, uint32_t exptime, char* buffer,
+memcached_return_t
+pku_memcached_get(char* key, size_t nkey, uint32_t exptime, char* buffer,
     size_t buffLen){
   inc_lookers();
   item* it = item_get(key, nkey, exptime, 1);
   if (it == NULL)
-    return 2;
+    return MEMCACHED_NOTFOUND;
   if (buffLen < (size_t)it->nbytes)
-    return 1;
+    return MEMCACHED_E2BIG;
   memcpy(buffer, ITEM_data(it), it->nbytes);
   dec_lookers();
-  return 0;
+  return MEMCACHED_SUCCESS;
 }
 
-void pku_memcached_touch(char* key, size_t nkey, uint32_t exptime){
-  inc_lookers();
-  item_get(key, nkey, exptime, 0);
-  dec_lookers();
-}
-
-void pku_memcached_insert(char* key, size_t nkey, char* data, size_t datan,
+memcached_return_t
+pku_memcached_insert(char* key, size_t nkey, char* data, size_t datan,
     uint32_t exptime){
   // do what we're here for
   inc_lookers();
@@ -672,17 +662,19 @@ void pku_memcached_insert(char* key, size_t nkey, char* data, size_t datan,
     memcpy(ITEM_data(it) + datan, "\r\n", 2);
     uint32_t hv = tcd_hash(key, nkey);
     if (!(do_store_item(it, NREAD_ADD, hv))->sit) {
-      perror("Couldn't store item!!!\n");
+      return MEMCACHED_FAILURE;
     }
     item_remove(it);         /* release our reference */
   } else {
     perror("SERVER_ERROR Out of memory allocating new item");
-    exit(1);
+    return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
   }
   dec_lookers();
+  return MEMCACHED_SUCCESS;
 }
 
-int pku_memcached_set(char *key, size_t nkey, char *data, size_t datan,
+memcached_return_t
+pku_memcached_set(char *key, size_t nkey, char *data, size_t datan,
     uint32_t exptime){
   inc_lookers();
   int ret = item_set(key, nkey, data, datan, exptime, 1); 
@@ -690,10 +682,10 @@ int pku_memcached_set(char *key, size_t nkey, char *data, size_t datan,
   return ret;
 }
 
-void pku_memcached_flush(uint32_t exptime){
+memcached_return_t
+pku_memcached_flush(uint32_t exptime){
   pause_accesses();
   time_t exptime = 0;
-  protocol_binary_request_flush* req = binary_get_request(c);
   rel_time_t new_oldest = 0;
   if (exptime > 0) {
     new_oldest = realtime(exptime);
@@ -702,4 +694,106 @@ void pku_memcached_flush(uint32_t exptime){
   }
   settings.oldest_live = new_oldest;
   unpause_accesses();
+  return MEMCACHED_SUCCESS; 
+}
+
+memcached_return_t
+pku_memcached_delete(char *key, size_t nkey, uint32_t exptime){
+  item *it;
+  uint32_t hv;
+  memcached_return_t ret;
+
+  it = item_get_locked(key, nkey, c, DONT_UPDATE, &hv);
+  if (it) {
+    do_item_unlink(it, hv);
+    do_item_remove(it);      /* release our reference */
+    ret = MEMCACHED_SUCCESS;
+  } else ret = MEMCACHED_FAILURE;
+  item_unlock(hv);
+  return ret;
+}
+
+memcached_return_t
+pku_memcached_append(char *key, size_t nkey, char *data, size_t datan,
+    uint32_t exptime, uint32_t flags) {
+  inc_lookers();
+  item *it = item_alloc(key, nkey, 0, 0, datan+2);
+
+  if (it == 0) {
+    if (! item_size_ok(nkey, 0, datan + 2)) {
+      dec_lookers();
+      return MEMCACHED_E2BIG;
+    } else {
+      dec_lookers();
+      return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
+    }
+    return;
+  }
+  memcpy(ITEM_data(it), data, datan);
+  memcpy(ITEM_data(it) + datan, "\r\n", 2);
+  uint32_t hv = tcd_hash(key, nkey);
+  if (!do_store_item(it, NREAD_APPEND, hv)->sit){
+    dec_lookers();
+    return MEMCACHED_FAILURE;
+  }
+  item_remove(it);
+  dec_lookers();
+  return MEMCACHED_SUCCESS;  
+}
+
+memcached_return_t
+pku_memcached_prepend(char *key, size_t nkey, char *data, size_t datan,
+    uint32_t exptime, uint32_t flags) {
+  inc_lookers();
+  item *it = item_alloc(key, nkey, 0, 0, datan+2);
+
+  if (it == 0) {
+    if (! item_size_ok(nkey, 0, datan + 2)) {
+      dec_lookers();
+      return MEMCACHED_E2BIG;
+    } else {
+      dec_lookers();
+      return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
+    }
+    return;
+  }
+  memcpy(ITEM_data(it), data, datan);
+  memcpy(ITEM_data(it) + datan, "\r\n", 2);
+  uint32_t hv = tcd_hash(key, nkey);
+  if (!do_store_item(it, NREAD_PREPEND, hv)->sit){
+    dec_lookers();
+    return MEMCACHED_FAILURE;
+  }
+  item_remove(it);
+  dec_lookers();
+  return MEMCACHED_SUCCESS;  
+}
+
+memcached_return_t
+pku_memcached_replace(char *key, size_t nkey, char *data, size_t datan,
+    uint32_t exptime, uint32_t flags){
+  inc_lookers();
+  item *it = item_alloc(key, nkey, 0, 0, datan+2);
+
+  if (it == 0) {
+    if (! item_size_ok(nkey, 0, datan + 2)) {
+      dec_lookers();
+      return MEMCACHED_E2BIG;
+    } else {
+      dec_lookers();
+      return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
+    }
+    return;
+  }
+  memcpy(ITEM_data(it), data, datan);
+  memcpy(ITEM_data(it) + datan, "\r\n", 2);
+  uint32_t hv = tcd_hash(key, nkey);
+  if (!do_store_item(it, NREAD_REPLACE, hv)->sit){
+    dec_lookers();
+    return MEMCACHED_FAILURE;
+  }
+  item_remove(it);
+  dec_lookers();
+  return MEMCACHED_SUCCESS;  
+  
 }

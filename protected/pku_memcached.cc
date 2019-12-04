@@ -24,19 +24,58 @@ HODOR_FUNC_ATTR
 memcached_return_t
 memcached_add(char* key, size_t nkey, uint32_t exptime, char* data, 
     size_t datan, uint32_t flags){ 
-  pku_memcached_insert(key, nkey, data, datan, exptime);
+  return pku_memcached_insert(key, nkey, data, datan, exptime);
 } HODOR_FUNC_EXPORT(memcached_insert, 6);
+
+HODOR_FUNC_ATTR
+memcached_return_t
+memcached_replace 
+  (char* key, size_t nkey, char *data, size_t datan, uint32_t exptime
+   uint32_t flags){
+  return pku_memcached_replace(key, nkey, data, datan, exptime, flags);
+} HODOR_FUNC_EXPORT(memcached_replace, 6);
+
+HODOR_FUNC_ATTR
+memcached_return_t
+memcached_append(char *key, size_t nkey, char *data, size_t datan,
+    uint32_t exptime, uint32_t flags){
+  return pku_memcached_append(key, nkey, data, datan, exptime, flags);
+} HODOR_FUNC_EXPORT(memcached_append, 6);
+
+HODOR_FUNC_ATTR
+memcached_return_t
+memcached_prepend(char *key, size_t nkey, char *data, size_t datan,
+    uint32_t exptime, uint32_t flags){
+  return pku_memcached_prepend(key, nkey, data, datan, exptime, flags);
+} HODOR_FUNC_EXPORT(memcached_prepend, 6);
+
+HODOR_FUNC_ATTR
+memcached_return_t
+memcached_delete 
+  (char* key, size_t nkey, uint32_t exptime){
+  return pku_memcached_delete(key, nkey, exptime);
+} HODOR_FUNC_EXPORT(memcached_delete, 3);
 
 HODOR_FUNC_ATTR 
 memcached_return_t 
 memcached_increment(char* key, size_t nkey, uint64_t delta, uint64_t *value){
-  return add_delta(key, nkey, true, delta, value);
+  switch(add_delta(key, nkey, true, delta, value)){
+    case OK:
+      return MEMCACHED_SUCCESS;
+    default:
+      return MEMCACHED_FAILURE;
+  }
 } HODOR_FUNC_EXPORT(memcached_increment, 4);
 
 HODOR_FUNC_ATTR 
 memcached_return_t
 memcached_decrement(char* key, size_t nkey, uint64_t delta, uint64_t *value){
-  return (add_delta(key, nkey, false, delta, value) == OK);
+  switch (add_delta(key, nkey, false, delta, value) == OK){
+    case OK:
+      return MEMCACHED_SUCCESS;
+    default:
+      return MEMCACHED_FAILURE;
+  }
 } HODOR_FUNC_EXPORT(memcached_decrement, 4);
 
 HODOR_FUNC_ATTR

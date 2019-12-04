@@ -168,6 +168,7 @@ struct pthread_args {
 };
 
 #include "pku_memcached.h"
+#include "constants.h"
 
 void pause_accesses(void);
 void unpause_accesses(void);
@@ -179,6 +180,9 @@ void pku_memcached_insert(char* key, size_t nkey, char* data, size_t datan,
 int pku_memcached_set(char *key, size_t nkey, char *data, size_t datan,
     uint32_t exptime);
 void pku_memcached_flush();
+
+memcached_return_t
+pku_memcached_delete(char *key, size_t nkey, uint32_t exptime);
 
 
 /*
@@ -204,11 +208,6 @@ enum pause_thread_types {
 enum store_item_type {
   NOT_STORED=0, STORED, EXISTS, NOT_FOUND, TOO_LARGE, NO_MEMORY
 };
-
-enum delta_result_type {
-  OK, NON_NUMERIC, EOM, DELTA_ITEM_NOT_FOUND, DELTA_ITEM_CAS_MISMATCH
-};
-
 
 /** Time relative to server start. Smaller than time_t on 64-bit systems. */
 // TODO: Move to sub-header. needed in logger.h
