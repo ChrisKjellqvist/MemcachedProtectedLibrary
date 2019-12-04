@@ -568,9 +568,11 @@ void unpause_accesses(void){
   pause_sig = 0;
 }
 
+char buf[32];
+
 enum delta_result_type do_add_delta(const char *key,
     const size_t nkey, const bool incr,
-    const uint64_t delta, char* buf, const uint32_t hv) {
+    const uint64_t delta, uint64_t *value_ptr, const uint32_t hv) {
     char *ptr;
     uint64_t value;
     int res;
@@ -602,6 +604,7 @@ enum delta_result_type do_add_delta(const char *key,
             value -= delta;
         }
     }
+    *value_ptr = value;
 
     itoa_u64(value, buf);
     res = strlen(buf);
@@ -685,4 +688,18 @@ int pku_memcached_set(char *key, size_t nkey, char *data, size_t datan,
   int ret = item_set(key, nkey, data, datan, exptime, 1); 
   dec_lookers();
   return ret;
+}
+
+void pku_memcached_flush(uint32_t exptime){
+  pause_accesses();
+  time_t exptime = 0;
+  protocol_binary_request_flush* req = binary_get_request(c);
+  rel_time_t new_oldest = 0;
+  if (exptime > 0) {
+    new_oldest = realtime(exptime);
+  } else {
+    new_oldest = current_time;
+  }
+  settings.oldest_live = new_oldest;
+  unpause_accesses();
 }

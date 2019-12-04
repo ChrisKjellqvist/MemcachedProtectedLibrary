@@ -11,36 +11,77 @@ extern std::atomic<int> *end_signal;
 
 extern "C" {
 
-HODOR_FUNC_ATTR void memcached_touch(char* key, size_t nkey, uint32_t exptime){
-  pku_memcached_touch(key, nkey, exptime);
-} HODOR_FUNC_EXPORT(memcached_touch, 3);
+  // Implement replace, prepend, append, delete API
 
-HODOR_FUNC_ATTR void memcached_insert(char* key, size_t nkey, uint32_t exptime,
-    char* data, size_t datan){ 
-  pku_memcached_insert(key, nkey, data, datan, exptime);
-} HODOR_FUNC_EXPORT(memcached_insert, 5);
-
-HODOR_FUNC_ATTR int memcached_get(char* key, size_t nkey, uint32_t exptime,
-    char* buffer, size_t buffLen){
-  return pku_memcached_get(key, nkey, exptime, buffer, buffLen);
-} HODOR_FUNC_EXPORT(memcached_get, 5);
-
-HODOR_FUNC_ATTR int memcached_set(char* key, size_t nkey, char *data,
-    size_t datan, uint32_t exptime){
+HODOR_FUNC_ATTR 
+memcached_return_t 
+memcached_set(char* key, size_t nkey, char *data, size_t datan, 
+    uint32_t exptime, uint32_t flags){
   return pku_memcached_set(key, nkey, data, datan, exptime);
-} HODOR_FUNC_EXPORT(memcached_set, 5);
+} HODOR_FUNC_EXPORT(memcached_set, 6);
 
-HODOR_FUNC_ATTR bool memcached_incr(char* key, size_t nkey,
-    uint64_t delta, char *buf){
-  return add_delta(key, nkey, true, delta, buf);
-} HODOR_FUNC_EXPORT(memcached_incr, 4);
+HODOR_FUNC_ATTR 
+memcached_return_t
+memcached_add(char* key, size_t nkey, uint32_t exptime, char* data, 
+    size_t datan, uint32_t flags){ 
+  pku_memcached_insert(key, nkey, data, datan, exptime);
+} HODOR_FUNC_EXPORT(memcached_insert, 6);
 
-HODOR_FUNC_ATTR bool memcached_decr(char* key, size_t nkey,
-    uint64_t delta, char *buf){
-  return add_delta(key, nkey, false, delta, buf);
-} HODOR_FUNC_EXPORT(memcached_decr, 4);
+HODOR_FUNC_ATTR 
+memcached_return_t 
+memcached_increment(char* key, size_t nkey, uint64_t delta, uint64_t *value){
+  return add_delta(key, nkey, true, delta, value);
+} HODOR_FUNC_EXPORT(memcached_increment, 4);
 
-HODOR_FUNC_ATTR void memcached_end(){
+HODOR_FUNC_ATTR 
+memcached_return_t
+memcached_decrement(char* key, size_t nkey, uint64_t delta, uint64_t *value){
+  return (add_delta(key, nkey, false, delta, value) == OK);
+} HODOR_FUNC_EXPORT(memcached_decrement, 4);
+
+HODOR_FUNC_ATTR
+memcached_return_t
+memcached_increment_with_initial (char *key, size_t nkey, uint64_t delta,
+    uint64_t initial, uint32_t exptime, uint64_t *value) {
+  switch(add_delta(key, nkey, true, delta, value) == OK){
+    case OK:
+      return MEMCACHED_SUCCESS;
+    case ITEM_NOT_FOUND:
+      char buff[32];
+      char *NT = itoa_u64(initial, buff);
+      *value = initial;
+      return memcached_insert(key, nkey, exptime, buff, NT-(&*buff));
+    default:
+      return MEMCACHED_FAILURE;
+  }
+} HODOR_FUNC_EXPORT(memcached_increment_with_initial, 6);
+
+HODOR_FUNC_ATTR
+memcached_return_t
+memcached_decrement_with_initial (char *key, size_t nkey, uint64_t delta,
+    uint64_t initial, uint32_t exptime, uint64_t *value) {
+  switch(add_delta(key, nkey, false, delta, value) == OK){
+    case OK:
+      return MEMCACHED_SUCCESS;
+    case ITEM_NOT_FOUND:
+      char buff[32];
+      char *NT = itoa_u64(initial, buff);
+      *value = initial;
+      return memcached_insert(key, nkey, exptime, buff, NT-(&*buff));
+    default:
+      return MEMCACHED_FAILURE;
+  }
+} HODOR_FUNC_EXPORT(memcached_decrement_with_initial, 6);
+
+HODOR_FUNC_ATTR 
+memcached_return_t 
+memcached_flush(uint32_t exptime){
+  pku_memcached_flush(exptime);
+} HODOR_FUNC_EXPORT(memcached_flush, 1);
+
+HODOR_FUNC_ATTR 
+memcached_return_t
+memcached_end(){
   end_signal->store(1);
 } HODOR_FUNC_EXPORT(memcached_end, 0);
 

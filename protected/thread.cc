@@ -203,13 +203,13 @@ void item_unlink(item *item) {
  */
 enum delta_result_type add_delta(const char *key,
                                  const size_t nkey, bool incr,
-                                 const int64_t delta, char *buf) {
+                                 const uint64_t delta, uint64_t *value) {
     enum delta_result_type ret;
     uint32_t hv;
 
     hv = tcd_hash(key, nkey);
     item_lock(hv);
-    ret = do_add_delta(key, nkey, incr, delta, buf, hv);
+    ret = do_add_delta(key, nkey, incr, delta, value, hv);
     item_unlock(hv);
     return ret;
 }

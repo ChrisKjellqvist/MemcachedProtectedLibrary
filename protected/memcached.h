@@ -178,6 +178,7 @@ void pku_memcached_insert(char* key, size_t nkey, char* data, size_t datan,
     uint32_t exptime);
 int pku_memcached_set(char *key, size_t nkey, char *data, size_t datan,
     uint32_t exptime);
+void pku_memcached_flush();
 
 
 /*
@@ -481,7 +482,7 @@ struct st_st *mk_st (enum store_item_type my_sit, size_t my_cas);
 
 enum delta_result_type do_add_delta(const char *key,
     const size_t nkey, const bool incr,
-    const uint64_t delta, char* buf, const uint32_t hv);
+    const uint64_t delta, uint64_t *value, const uint32_t hv);
 
 struct st_st *do_store_item(item *item, int comm, const uint32_t hv);
 extern int daemonize(int nochdir, int noclose);
@@ -506,7 +507,7 @@ void agnostic_init();
 /* Lock wrappers for cache functions that are called from main loop. */
 enum delta_result_type add_delta(const char *key,
     const size_t nkey, bool incr,
-    const uint64_t delta, char *buf);
+    const uint64_t delta, uint64_t *value);
 
 item *item_alloc(char *key, size_t nkey, int flags, rel_time_t exptime, int nbytes);
 #define DO_UPDATE true
