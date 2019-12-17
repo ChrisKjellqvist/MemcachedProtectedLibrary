@@ -5,24 +5,16 @@
 #include <stdbool.h>
 #endif
 #include "constants.h"
+#include "memcached.h"
 
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#ifndef USE_INTERNAL
-
 #define DEFINE_API(ret_ty, sym, ...) \
   ret_ty sym (memcached_st *ptr, __VA_ARGS__);\
-  ret_ty sym ## _internal (__VA_ARGS__);
-
-#else
-
-#define DEFINE_API(ret_ty, sym, ...) \
-  ret_ty sym (__VA_ARGS__);\
-
-#endif
+  ret_ty sym##_internal (__VA_ARGS__);
 
 #ifdef FAIL_ASSERT
 #define FAIL(str) assert(0 && #str);
