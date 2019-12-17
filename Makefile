@@ -6,10 +6,11 @@ PROT_OBJ = obj/memcached.o\
 	   obj/itoa_ljust.o 
 
 #OPT_LEVEL = -O0 -g
+ERROR     = -DFAIL_ASSERT
 OPT_LEVEL =-Ofast
 OPTS_LENIENT = -Iprotected/ -Iunprotected/ -I../rpmalloc/src \
 	       -I../hodor/include -DHAVE_CONFIG_H -MD -MP -Wall -std=c++17 \
-	       -fPIC -I../hodor/libhodor -D__cplus_plus $(OPT_LEVEL)
+	       -fPIC -I../hodor/libhodor -D__cplus_plus $(OPT_LEVEL) $(ERROR)
 OPTS = $(OPTS_LENIENT) -Werror
 # Default arguments that clang++ passes to the linker. This turns out to be
 # important for C++ programs

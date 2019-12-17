@@ -8,49 +8,45 @@
 #include <rpmalloc.hpp>
 
 extern std::atomic<int> *end_signal;
-
-#define INTERNAL(sym)\
-#ifndef USE_INTERNAL\
-sym ## _internal\
-#else\
-sym\
+#ifndef USE_INTERNAL
+#define INTERNAL(sym) sym##internal
+#else
+#define INTERNAL(sym) sym
 #endif
 
+#define HODOR_FUNC_EXPORT_MCD(sym, num) \
+  HODOR_FUNC_EXPORT( \
+      INTERNAL(sym) \
+      ,num)
 
 extern "C" {
 
-#define HODOR_FUNC_EXPORT_MCD(sym, num)\
-  HODOR_FUNC_EXPORT(\
-      INTERNAL(sym)\
-      ,num)
-
 #ifndef USE_INTERNAL
-{
 memcached_result_st*
 memcached_fetch_result
   (memcached_st *ptr, memcached_result_st *result, memcached_return_t *error){
-  return memcached_fetch_result_internal(result, error);
+  return INTERNAL(memcached_fetch_result)(result, error);
 }
 
 char*
 memcached_get
   (memcached_st *ptr, const char *key, size_t key_length, size_t *value_length,
    uint32_t *flags, memcached_return_t *error){
-  return memcached_get_internal(key, key_length, value_length, flags, error);
+  return INTERNAL(memcached_get)(key, key_length, value_length, flags, error);
 }
 
 memcached_return_t
 memcached_mget,
   (memcached_st *ptr, const char * const *keys, const size_t *key_length, 
    size_t number_of_keys){
-  return memcached_mget_internal(keys, key_length, number_of_keys);
+  return INTERNAL(memcached_mget)(keys, key_length, number_of_keys);
 }
 
 char *
 memcached_fetch
   (memcached_st *ptr, char *key, size_t *key_length, size_t *value_length,
    uint32_t *flags, memcached_return_t *error){
-  return memcached_fetch_internal(key, key_length, value_length, flags,
+  return INTERNAL(memcached_fetch)(key, key_length, value_length, flags,
       error);
 }
 
@@ -58,60 +54,60 @@ memcached_return_t
 memcached_set
   (memcached_st *ptr, char* key, size_t nkey, char *data, size_t datan, 
    uint32_t exptime, uint32_t flags){
-  return memcached_set_internal(key, nkey, data, datan, exptime, flags);
+  return INTERNAL(memcached_set)(key, nkey, data, datan, exptime, flags);
 }
 
 memcached_return_t
 memcached_add
   (memcached_st *ptr, char* key, size_t nkey, uint32_t exptime, char* data,
    size_t datan, uint32_t flags){
-  return memcached_add_internal(key, nkey, data, datan, exptime);
+  return INTERNAL(memcached_add)(key, nkey, data, datan, exptime);
 }
 
 memcached_return_t
 memcached_replace
   (char* key, size_t nkey, char *data, size_t datan, uint32_t exptime
    uint32_t flags){
-  return memcached_replace_internal(key, nkey, data, datan, exptime, flags);
+  return INTERNAL(memcached_replace)(key, nkey, data, datan, exptime, flags);
 }
 
 memcached_return_t
 memcached_append
   (memcached_st *ptr, char *key, size_t nkey, char *data, size_t datan,
    uint32_t exptime, uint32_t flags){
-  return memcached_append_internal(key, nkey, data, datan, exptime, flags);
+  return INTERNAL(memcached_append)(key, nkey, data, datan, exptime, flags);
 }
 
 memcached_return_t
 memcached_prepend
   (memcached_st *ptr, char *key, size_t nkey, char *data, size_t datan,
    uint32_t exptime, uint32_t flags){
-  return memcached_prepend_internal(key, nkey, data, datan, exptime, flags);
+  return INTERNAL(memcached_prepend)(key, nkey, data, datan, exptime, flags);
 }
 
 memcached_return_t
 memcached_delete 
   (memcached_str *ptr, char* key, size_t nkey, uint32_t exptime){
-  return memcached_delete_internal(key, nkey, exptime);
+  return INTERNAL(memcached_delete)(key, nkey, exptime);
 }
 
 memcached_return_t
 memcached_increment
   (memcached_st *ptr, char* key, size_t nkey, uint64_t delta, uint64_t *value){
-  return memcached_increment_internal(key, nkey, delta, value);
+  return INTERNAL(memcached_increment)(key, nkey, delta, value);
 }
 
 memcached_return_t
 memcached_decrement
   (memcached_st *ptr, char* key, size_t nkey, uint64_t delta, uint64_t *value){
-  return memcached_decrement_internal(key, nkey, delta, value); 
+  return INTERNAL(memcached_decrement)(key, nkey, delta, value); 
 }
 
 memcached_return_t
 memcached_increment_with_initial
   (memcached_st *ptr, char *key, size_t nkey, uint64_t delta, 
    uint64_t initial, uint32_t exptime, uint64_t *value) {
-  return memcached_increment_with_initial_internal(key, nkey, delta, initial,
+  return INTERNAL(memcached_increment_with_initial)(key, nkey, delta, initial,
       exptime, value);
 }
 
@@ -119,23 +115,23 @@ memcached_return_t
 memcached_decrement_with_initial
   (memcached_st *ptr, char *key, size_t nkey, uint64_t delta, 
    uint64_t initial, uint32_t exptime, uint64_t *value) {
-  return memcached_decrement_with_initial(key, nkey, delta, initial, exptime,
-      value);
+  return INTERNAL(memcached_decrement_with_initial)(key, nkey, delta, initial, 
+      exptime, value);
 }
 
 memcached_return_t
 memcached_flush(uint32_t exptime){
-  return memcached_flush_internal(exptime);
+  return INTERNAL(memcached_flush)(exptime);
 }
 }
-#endif
+#endif // USE_INTERNAL
 
 HODOR_FUNC_ATTR
 memcached_result_st*
 INTERNAL(memcached_fetch_result)
   (memcached_result_st *result, memcached_return_t *error){
   // TODO  
-} HODOR_FUNC_EXPORT_MCD(memcached
+} HODOR_FUNC_EXPORT_MCD(memcached_fetch_result, 2);
 
 
 HODOR_FUNC_ATTR
@@ -144,16 +140,14 @@ INTERNAL(memcached_get)
   (const char *key, size_t key_length, size_t *value_length, uint32_t *flags,
    memcached_return_t *error){
   // TODO
-}
+} HODOR_FUNC_EXPORT_MCD(memcached_get, 5);
 
 HODOR_FUNC_ATTR
 memcached_return_t
 INTERNAL(memcached_mget)
   (const char * const *keys, const size_t *key_length, size_t number_of_keys){
   // TODO
-}
-
-HODOR_FUNC_ATTR
+} HODOR_FUNC_EXPORT_MCD(memcached_mget, 3);
 
 HODOR_FUNC_ATTR
 memcached_return_t
