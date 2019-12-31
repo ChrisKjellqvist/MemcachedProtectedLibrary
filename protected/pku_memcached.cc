@@ -112,6 +112,10 @@ memcached_fetch_result_internal
 
 // --------------------- INTERNAL CALLS ------------------------------
 
+item **fetch_ptrs;
+static unsigned nptrs;
+static unsigned ptrcnt = 0;
+
 HODOR_FUNC_ATTR
 char *
 memcached_get_internal
@@ -128,7 +132,16 @@ HODOR_FUNC_ATTR
 memcached_return_t
 memcached_mget_internal
   (const char * const *keys, const size_t *key_length, size_t number_of_keys){
-  return MEMCACHED_FAILURE; // TODO
+  if (number_of_keys > 128)
+    return MEMCACHED_FAILURE;
+  memcached_return_t q = pku_memcached_mget(keys, key_length, fetch_ptrs);
+  if (q == MEMCACHED_FAILURE){
+    nptrs = ptrcnt = 0;
+    return q;
+  }
+  ptrcnt = 0;
+  nptrs = number_of_keys;
+  return MEMCACHED_SUCCESS;
 } HODOR_FUNC_EXPORT(memcached_mget_internal, 3);
 
 HODOR_FUNC_ATTR
@@ -259,6 +272,7 @@ void memcached_init(int server){
   is_server = server;
   int i = 0;
   void *start, *end;
+  fetch_ptrs = RP_malloc(sizeof(item*)*128);
   while (!RP_region_range(i++, &start, &end)){
     ptrdiff_t rp_region_len = (char*)start - (char*)end;
     pkey_mprotect(start, rp_region_len, PROT_READ | PROT_WRITE | PROT_EXEC, 1);

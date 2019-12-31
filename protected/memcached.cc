@@ -645,8 +645,6 @@ pku_memcached_get(char* key, size_t nkey, char* &buffer, size_t* buffLen,
   item* it = item_get(key, nkey, exptime, 1);
   if (it == NULL)
     return MEMCACHED_NOTFOUND;
-  if (buffLen < (size_t)it->nbytes)
-    return MEMCACHED_E2BIG;
   buffer = malloc(it->nbytes);
   memcpy(buffer, ITEM_data(it), it->nbytes);
   *flags = it->it_flags;
@@ -654,6 +652,18 @@ pku_memcached_get(char* key, size_t nkey, char* &buffer, size_t* buffLen,
   dec_lookers();
   return MEMCACHED_SUCCESS;
 }
+
+memcached_return_t
+pku_memcached_mget(const char * const *keys, const size_t *key_length,
+   size_t number_of_keys, item **list){
+  item *t;
+  for(unsigned i = 0; i < number_of_keys; ++i){
+    t = list[i] = item_get(keys[i], key_length[i], 0, 1);
+    if (t == NULL)
+      return MEMCACHED_FAILURE;
+  }
+  return MEMCACHED_SUCCESS;
+} 
 
 memcached_return_t
 pku_memcached_insert(char* key, size_t nkey, char* data, size_t datan,
