@@ -30,14 +30,6 @@ memcached_mget
   return memcached_mget_internal(keys, key_length, number_of_keys);
 }
 
-char *
-memcached_fetch
-  (memcached_st *ptr, char *key, size_t *key_length, size_t *value_length,
-   uint32_t *flags, memcached_return_t *error){
-  return memcached_fetch_internal(key, key_length, value_length, flags,
-      error);
-}
-
 memcached_return_t
 memcached_set
   (memcached_st *ptr, char* key, size_t nkey, char *data, size_t datan, 
@@ -112,20 +104,24 @@ memcached_flush(memcached_st *ptr, uint32_t exptime){
   return memcached_flush_internal(exptime);
 }
 
-HODOR_FUNC_ATTR
 memcached_result_st*
 memcached_fetch_result_internal
   (memcached_result_st *result, memcached_return_t *error){
-  return nullptr; // TODO
-} HODOR_FUNC_EXPORT(memcached_fetch_result_internal, 2);
+    
+}
 
+// --------------------- INTERNAL CALLS ------------------------------
 
 HODOR_FUNC_ATTR
 char *
 memcached_get_internal
   (const char *key, size_t key_length, size_t *value_length, uint32_t *flags,
    memcached_return_t *error){
-  return nullptr; // TODO
+  *error = MEMCACHED_FAILURE;
+  char *buff;
+  *error = pku_memcached_get(key, nkey, buff, value_length,
+      flags);
+  return buff;
 } HODOR_FUNC_EXPORT(memcached_get_internal, 5);
 
 HODOR_FUNC_ATTR
@@ -208,14 +204,15 @@ memcached_return_t
 memcached_increment_with_initial_internal
   (char *key, size_t nkey, uint64_t delta, uint64_t initial, uint32_t exptime, 
    uint64_t *value) {
+  char *NT;
   switch(add_delta(key, nkey, true, delta, value)){
     case OK:
       return MEMCACHED_SUCCESS;
     case DELTA_ITEM_NOT_FOUND:
       char buff[32];
-      char *NT = itoa_u64(initial, buff);
+      NT = itoa_u64(initial, buff);
       *value = initial;
-      return memcached_insert(key, nkey, exptime, buff, NT-(&*buff));
+      return pku_memcached_insert(key, nkey, buff, NT-(&*buff), exptime);
     default:
       return MEMCACHED_FAILURE;
   }
@@ -226,14 +223,15 @@ memcached_return_t
 memcached_decrement_with_initial_internal
   (char *key, size_t nkey, uint64_t delta, uint64_t initial, uint32_t exptime, 
    uint64_t *value) {
+  char *NT;
   switch(add_delta(key, nkey, false, delta, value)){
     case OK:
       return MEMCACHED_SUCCESS;
     case DELTA_ITEM_NOT_FOUND:
       char buff[32];
-      char *NT = itoa_u64(initial, buff);
+      NT = itoa_u64(initial, buff);
       *value = initial;
-      return memcached_insert(key, nkey, exptime, buff, NT-(&*buff));
+      return pku_memcached_insert(key, nkey, buff, NT-(&*buff), exptime);
     default:
       return MEMCACHED_FAILURE;
   }
@@ -249,6 +247,7 @@ HODOR_FUNC_ATTR
 memcached_return_t
 memcached_end(){
   end_signal->store(1);
+  return MEMCACHED_SUCCESS;
 } HODOR_FUNC_EXPORT(memcached_end, 0);
 
 // Start memcached maintainence processes

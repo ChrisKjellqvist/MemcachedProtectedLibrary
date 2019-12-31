@@ -200,7 +200,7 @@ pku_memcached_set(char *key, size_t nkey, char *data, size_t datan,
 memcached_return_t
 pku_memcached_delete(char *key, size_t nkey, uint32_t exptime);
 memcached_return_t
-pku_memcached_flush();
+pku_memcached_flush(uint32_t exptime);
 memcached_return_t
 pku_memcached_replace(char *key, size_t nkey, char *data, size_t datan,
     uint32_t exptime, uint32_t flags);

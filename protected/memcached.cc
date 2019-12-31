@@ -637,15 +637,20 @@ enum delta_result_type do_add_delta(const char *key,
 }
 
 memcached_return_t
-pku_memcached_get(char* key, size_t nkey, char* buffer, size_t buffLen,
-    uint32_t exptime){
+pku_memcached_get(char* key, size_t nkey, char* &buffer, size_t* buffLen,
+    uint32_t *flags){
+  *flags = 0; // make sure these don't segfault when it really matters
+  *buffLen = 0;
   inc_lookers();
   item* it = item_get(key, nkey, exptime, 1);
   if (it == NULL)
     return MEMCACHED_NOTFOUND;
   if (buffLen < (size_t)it->nbytes)
     return MEMCACHED_E2BIG;
+  buffer = malloc(it->nbytes);
   memcpy(buffer, ITEM_data(it), it->nbytes);
+  *flags = it->it_flags;
+  *buffLen = it->nbytes;
   dec_lookers();
   return MEMCACHED_SUCCESS;
 }
