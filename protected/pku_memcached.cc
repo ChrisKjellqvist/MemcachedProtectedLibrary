@@ -107,13 +107,30 @@ memcached_flush(memcached_st *ptr, uint32_t exptime){
 memcached_result_st*
 memcached_fetch_result_internal
   (memcached_result_st *result, memcached_return_t *error){
-    
+  if (nptrs == ptrcnt) {
+    *error = MEMCACHED_FAILURE;
+    return nullptr; 
+  }
+  if (result == nullptr){
+    result = malloc(sizeof(memcached_result_st));
+  }
+  result->keyn = ptrcnt;
+  item *it = item[ptrcnt++];
+  result->key = malloc(it->nkey);
+  memcpy(result->key, ITEM_key(it), it->nkey);
+  result->key_length = it->nkey;
+  result->data = malloc(it->nbytes);
+  memcpy(result->data, ITEM_data(it), it->nbytes);
+  result->item_cas = it->data; // TODO is this right? maybe just default value it
+  result->item_flags = it->it_flags;
+  result->item_expiration = (time_t)it->exptime;
+  return result;
 }
 
 // --------------------- INTERNAL CALLS ------------------------------
 
 item **fetch_ptrs;
-static unsigned nptrs;
+static unsigned nptrs = 0;
 static unsigned ptrcnt = 0;
 
 HODOR_FUNC_ATTR
