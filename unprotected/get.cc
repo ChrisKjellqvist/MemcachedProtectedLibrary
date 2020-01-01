@@ -59,10 +59,17 @@ int main(){
   std::string name = "chris";
 
   char nbuff[BUFF_LEN];
-  char gbuff[BUFF_LEN];
-  strcpy(nbuff, name.c_str());
-  printf("%d\n", memcached_get(nbuff, strlen(nbuff), 0, gbuff, BUFF_LEN));
+  size_t len;
+  uint32_t flags;
+  memcached_return_t err;
 
-  printf("%s%s\n",nbuff, gbuff);
+  strcpy(nbuff, name.c_str());
+  char *str = memcached_get_internal(nbuff, strlen(nbuff), &len, &flags, &err);
+  assert(err == MEMCACHED_SUCCESS);
+  printf("chris");
+  for(unsigned i = 0; i < len; ++i)
+    printf("%c", *(str++));
+  printf("\n");
+
   return 0;
 }

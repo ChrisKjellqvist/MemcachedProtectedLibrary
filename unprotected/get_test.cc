@@ -80,17 +80,22 @@ int main(){
   unsigned long long begin, end, count = 0;
   const int n = 100000;
   size_t nkB = 0;
-  char buff[0x100];
+  size_t len;
+  uint32_t flags;
+  memcached_return_t err;
   for(unsigned i = 0; i < 1000; ++i){
     auto p = create_random_packet();
-    memcached_get((char*)p->key, p->key_len, 0, buff, 0x100);
+    memcached_get_internal((char*)p->key, p->key_len, &len, &flags,
+        &err);
   }
   int fail = 0;
   for(unsigned i = 0; i < n; ++i){
     auto p = create_random_packet();
     nkB += (p->key_len + p->dat_len);
     begin = get_ticks_start();
-    fail +=  memcached_get((char*)p->key, p->key_len, 0, buff, 0x100);
+    memcached_get_internal((char*)p->key, p->key_len, &len, &flags,
+        &err);
+    fail += err == MEMCACHED_FAILURE;
     end = get_ticks_end();
     count += end - begin;
   }

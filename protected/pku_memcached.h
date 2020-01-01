@@ -38,44 +38,44 @@ DEFINE_API(memcached_return_t, memcached_mget,
    const char * const *keys, const size_t *key_length, size_t number_of_keys); 
 
 DEFINE_API(char *, memcached_fetch,
-    char *key, size_t *key_length, size_t *value_length, uint32_t *flags,
+    const char * key, size_t *key_length, size_t *value_length, uint32_t *flags,
     memcached_return_t *error);
 
 DEFINE_API(memcached_return_t, memcached_set,
-    char *key, size_t nkey, char *data, size_t datan, uint32_t exptime,
+    const char * key, size_t nkey, char *data, size_t datan, uint32_t exptime,
     uint32_t flags);
 
 DEFINE_API(memcached_return_t, memcached_add,
-    char *key, size_t nkey, char *data, size_t datan, uint32_t exptime,
+    const char * key, size_t nkey, char *data, size_t datan, uint32_t exptime,
     uint32_t flags);
 
 DEFINE_API(memcached_return_t, memcached_replace,
-    char *key, size_t nkey, char *data, size_t datan, uint32_t exptime,
+    const char * key, size_t nkey, char *data, size_t datan, uint32_t exptime,
     uint32_t flags);
 
 DEFINE_API(memcached_return_t, memcached_prepend,
-    char *key, size_t nkey, char *data, size_t datan, uint32_t exptime,
+    const char * key, size_t nkey, char *data, size_t datan, uint32_t exptime,
     uint32_t flags);
 
 DEFINE_API(memcached_return_t, memcached_append,
-    char *key, size_t nkey, char *data, size_t datan, uint32_t exptime,
+    const char * key, size_t nkey, char *data, size_t datan, uint32_t exptime,
     uint32_t flags);
 
 DEFINE_API(memcached_return_t, memcached_delete,
-    char *key, size_t nkey, uint32_t exptime);
+    const char * key, size_t nkey, uint32_t exptime);
 
 DEFINE_API(memcached_return_t, memcached_increment,
-    char *key, size_t nkey, uint64_t delta, uint64_t *value);
+    const char * key, size_t nkey, uint64_t delta, uint64_t *value);
 
 DEFINE_API(memcached_return_t, memcached_decrement,
-    char *key, size_t nkey, uint64_t delta, uint64_t *value);
+    const char * key, size_t nkey, uint64_t delta, uint64_t *value);
 
 DEFINE_API(memcached_return_t, memcached_increment_with_initial,
-    char *key, size_t nkey, uint64_t delta, uint64_t initial, uint32_t exptime,
+    const char * key, size_t nkey, uint64_t delta, uint64_t initial, uint32_t exptime,
     uint64_t *value);
 
 DEFINE_API(memcached_return_t, memcached_decrement_with_initial,
-    char *key, size_t nkey, uint64_t delta, uint64_t initial, uint32_t exptime,
+    const char * key, size_t nkey, uint64_t delta, uint64_t initial, uint32_t exptime,
     uint64_t *value);
 
 DEFINE_API(memcached_return_t, memcached_flush, uint32_t exptime);

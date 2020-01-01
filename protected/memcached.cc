@@ -637,15 +637,15 @@ enum delta_result_type do_add_delta(const char *key,
 }
 
 memcached_return_t
-pku_memcached_get(char* key, size_t nkey, char* &buffer, size_t* buffLen,
+pku_memcached_get(const char* key, size_t nkey, char* &buffer, size_t* buffLen,
     uint32_t *flags){
   *flags = 0; // make sure these don't segfault when it really matters
   *buffLen = 0;
   inc_lookers();
-  item* it = item_get(key, nkey, exptime, 1);
+  item* it = item_get(key, nkey, 0, 1);
   if (it == NULL)
     return MEMCACHED_NOTFOUND;
-  buffer = malloc(it->nbytes);
+  buffer = (char*)malloc(it->nbytes);
   memcpy(buffer, ITEM_data(it), it->nbytes);
   *flags = it->it_flags;
   *buffLen = it->nbytes;
@@ -656,17 +656,13 @@ pku_memcached_get(char* key, size_t nkey, char* &buffer, size_t* buffLen,
 memcached_return_t
 pku_memcached_mget(const char * const *keys, const size_t *key_length,
    size_t number_of_keys, item **list){
-  item *t;
-  for(unsigned i = 0; i < number_of_keys; ++i){
-    t = list[i] = item_get(keys[i], key_length[i], 0, 1);
-    if (t == NULL)
-      return MEMCACHED_FAILURE;
-  }
+  for(unsigned i = 0; i < number_of_keys; ++i)
+    list[i] = item_get(keys[i], key_length[i], 0, 1);
   return MEMCACHED_SUCCESS;
 } 
 
 memcached_return_t
-pku_memcached_insert(char* key, size_t nkey, char* data, size_t datan,
+pku_memcached_insert(const char* key, size_t nkey, char* data, size_t datan,
     uint32_t exptime){
   // do what we're here for
   inc_lookers();
@@ -689,7 +685,7 @@ pku_memcached_insert(char* key, size_t nkey, char* data, size_t datan,
 }
 
 memcached_return_t
-pku_memcached_set(char *key, size_t nkey, char *data, size_t datan,
+pku_memcached_set(const char * key, size_t nkey, char *data, size_t datan,
     uint32_t exptime){
   inc_lookers();
   memcached_return_t ret = item_set(key, nkey, data, datan, exptime, 1); 
@@ -712,7 +708,7 @@ pku_memcached_flush(uint32_t exptime){
 }
 
 memcached_return_t
-pku_memcached_delete(char *key, size_t nkey, uint32_t exptime){
+pku_memcached_delete(const char * key, size_t nkey, uint32_t exptime){
   item *it;
   uint32_t hv;
   memcached_return_t ret;
@@ -728,7 +724,7 @@ pku_memcached_delete(char *key, size_t nkey, uint32_t exptime){
 }
 
 memcached_return_t
-pku_memcached_append(char *key, size_t nkey, char *data, size_t datan,
+pku_memcached_append(const char * key, size_t nkey, char *data, size_t datan,
     uint32_t exptime, uint32_t flags) {
   inc_lookers();
   item *it = item_alloc(key, nkey, 0, 0, datan+2);
@@ -755,7 +751,7 @@ pku_memcached_append(char *key, size_t nkey, char *data, size_t datan,
 }
 
 memcached_return_t
-pku_memcached_prepend(char *key, size_t nkey, char *data, size_t datan,
+pku_memcached_prepend(const char * key, size_t nkey, char *data, size_t datan,
     uint32_t exptime, uint32_t flags) {
   inc_lookers();
   item *it = item_alloc(key, nkey, 0, 0, datan+2);
@@ -782,7 +778,7 @@ pku_memcached_prepend(char *key, size_t nkey, char *data, size_t datan,
 }
 
 memcached_return_t
-pku_memcached_replace(char *key, size_t nkey, char *data, size_t datan,
+pku_memcached_replace(const char * key, size_t nkey, char *data, size_t datan,
     uint32_t exptime, uint32_t flags){
   inc_lookers();
   item *it = item_alloc(key, nkey, 0, 0, datan+2);

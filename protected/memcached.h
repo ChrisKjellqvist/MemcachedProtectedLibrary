@@ -188,27 +188,32 @@ struct pthread_args {
 void pause_accesses(void);
 void unpause_accesses(void);
 
+struct item;
+
 memcached_return_t
-pku_memcached_get(char* key, size_t nkey, char* buffer, size_t buffLen,
+pku_memcached_get(const char* key, size_t nkey, char* &buffer, size_t *buffLen,
+    uint32_t *flags);
+memcached_return_t
+pku_memcached_mget(const char * const *keys, const size_t *key_length,
+   size_t number_of_keys, item **list);
+memcached_return_t
+pku_memcached_insert(const char* key, size_t nkey, char* data, size_t datan,
     uint32_t exptime);
 memcached_return_t
-pku_memcached_insert(char* key, size_t nkey, char* data, size_t datan,
+pku_memcached_set(const char *key, size_t nkey, char *data, size_t datan,
     uint32_t exptime);
 memcached_return_t
-pku_memcached_set(char *key, size_t nkey, char *data, size_t datan,
-    uint32_t exptime);
-memcached_return_t
-pku_memcached_delete(char *key, size_t nkey, uint32_t exptime);
+pku_memcached_delete(const char *key, size_t nkey, uint32_t exptime);
 memcached_return_t
 pku_memcached_flush(uint32_t exptime);
 memcached_return_t
-pku_memcached_replace(char *key, size_t nkey, char *data, size_t datan,
+pku_memcached_replace(const char *key, size_t nkey, char *data, size_t datan,
     uint32_t exptime, uint32_t flags);
 memcached_return_t
-pku_memcached_prepend(char *key, size_t nkey, char *data, size_t datan,
+pku_memcached_prepend(const char *key, size_t nkey, char *data, size_t datan,
     uint32_t exptime, uint32_t flags);
 memcached_return_t
-pku_memcached_append(char *key, size_t nkey, char *data, size_t datan,
+pku_memcached_append(const char *key, size_t nkey, char *data, size_t datan,
     uint32_t exptime, uint32_t flags);
 
 /*
@@ -534,7 +539,7 @@ enum delta_result_type add_delta(const char *key,
     const size_t nkey, bool incr,
     const uint64_t delta, uint64_t *value);
 
-item *item_alloc(char *key, size_t nkey, int flags, rel_time_t exptime, int nbytes);
+item *item_alloc(const char * key, size_t nkey, int flags, rel_time_t exptime, int nbytes);
 #define DO_UPDATE true
 #define DONT_UPDATE false
 item *item_get(const char *key, const size_t nkey, uint32_t exptime, const bool do_update);

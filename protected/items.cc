@@ -245,7 +245,7 @@ item_chunk *do_item_alloc_chunk(item_chunk *ch, const size_t bytes_remain) {
   slabs_munlock();
   return nch;
 }
-item *do_item_alloc(char *key, const size_t nkey, const unsigned int flags,
+item *do_item_alloc(const char * key, const size_t nkey, const unsigned int flags,
     const rel_time_t exptime, const int nbytes) {
   uint8_t nsuffix;
   item *it = NULL;
