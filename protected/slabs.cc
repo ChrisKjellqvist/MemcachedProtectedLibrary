@@ -664,7 +664,7 @@ static int slab_rebalance_move(void) {
            * to swap out ntotal for the head-chunk-total. */
           ntotal = s_cls->size;
         }
-        if ((it->exptime != 0 && it->exptime < current_time)
+        if ((it->exptime != 0 && it->exptime < *current_time)
             || item_is_flushed(it)) {
           /* Expired, don't save. */
           save_item = 0;

@@ -42,23 +42,23 @@ DEFINE_API(char *, memcached_fetch,
     memcached_return_t *error);
 
 DEFINE_API(memcached_return_t, memcached_set,
-    const char * key, size_t nkey, char *data, size_t datan, uint32_t exptime,
+    const char * key, size_t nkey, const char * data, size_t datan, uint32_t exptime,
     uint32_t flags);
 
 DEFINE_API(memcached_return_t, memcached_add,
-    const char * key, size_t nkey, char *data, size_t datan, uint32_t exptime,
+    const char * key, size_t nkey, const char * data, size_t datan, uint32_t exptime,
     uint32_t flags);
 
 DEFINE_API(memcached_return_t, memcached_replace,
-    const char * key, size_t nkey, char *data, size_t datan, uint32_t exptime,
+    const char * key, size_t nkey, const char * data, size_t datan, uint32_t exptime,
     uint32_t flags);
 
 DEFINE_API(memcached_return_t, memcached_prepend,
-    const char * key, size_t nkey, char *data, size_t datan, uint32_t exptime,
+    const char * key, size_t nkey, const char * data, size_t datan, uint32_t exptime,
     uint32_t flags);
 
 DEFINE_API(memcached_return_t, memcached_append,
-    const char * key, size_t nkey, char *data, size_t datan, uint32_t exptime,
+    const char * key, size_t nkey, const char * data, size_t datan, uint32_t exptime,
     uint32_t flags);
 
 DEFINE_API(memcached_return_t, memcached_delete,

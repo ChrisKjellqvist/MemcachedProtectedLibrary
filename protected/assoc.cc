@@ -185,7 +185,6 @@ int assoc_insert(item *it, const uint32_t hv) {
 }
 
 void assoc_delete(const char *key, const size_t nkey, const uint32_t hv) {
-  printf("deleted\n");
   pptr<item> *before = _hashitem_before(key, nkey, hv);
 
   if (*before != nullptr) {

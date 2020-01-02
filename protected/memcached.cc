@@ -80,6 +80,7 @@ struct settings settings;
 time_t process_started;     /* when the process was started */
 struct slab_rebalance slab_rebal;
 volatile int slab_rebalance_signal;
+static struct event_base *main_base;
 
 struct st_st *mk_st (enum store_item_type my_sit, size_t my_cas){
   struct st_st *temp = (struct st_st*)malloc(sizeof(struct st_st));
@@ -119,7 +120,7 @@ static rel_time_t realtime(const time_t exptime) {
       return (rel_time_t)1;
     return (rel_time_t)(exptime - process_started);
   } else {
-    return (rel_time_t)(exptime + current_time);
+    return (rel_time_t)(exptime + *current_time);
   }
 }
 
@@ -367,7 +368,7 @@ struct token_t {
  * rather than absolute UNIX timestamps, a space savings on systems where
  * sizeof(time_t) > sizeof(unsigned int).
  */
-volatile rel_time_t current_time;
+volatile rel_time_t *current_time;
 static struct event clockevent;
 
 /* libevent uses a monotonic clock when available for event scheduling. Aside
@@ -375,6 +376,8 @@ static struct event clockevent;
  * Note that users who are setting explicit dates for expiration times *must*
  * ensure their clocks are correct before starting memcached. */
 static void clock_handler(const int fd, const short which, void *arg) {
+  printf("clock handler began\n");
+  struct timeval t = {.tv_sec = 1, .tv_usec = 0};
   static bool initialized = false;
 #if defined(HAVE_CLOCK_GETTIME) && defined(CLOCK_MONOTONIC)
   static bool monotonic = false;
@@ -400,20 +403,24 @@ static void clock_handler(const int fd, const short which, void *arg) {
   // While we're here, check for hash table expansion.
   // This function should be quick to avoid delaying the timer.
   assoc_start_expand(stats_state.curr_items);
+    
+  evtimer_set(&clockevent, clock_handler, 0);
+  event_base_set(main_base, &clockevent);
+  evtimer_add(&clockevent, &t);
 
 #if defined(HAVE_CLOCK_GETTIME) && defined(CLOCK_MONOTONIC)
   if (monotonic) {
     struct timespec ts;
     if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1)
       return;
-    current_time = (rel_time_t) (ts.tv_sec - monotonic_start);
+    *current_time = (rel_time_t) (ts.tv_sec - monotonic_start);
     return;
   }
 #endif
   {
     struct timeval tv;
     gettimeofday(&tv, NULL);
-    current_time = (rel_time_t) (tv.tv_sec - process_started);
+    *current_time = (rel_time_t) (tv.tv_sec - process_started);
   }
 }
 
@@ -441,15 +448,25 @@ static int sigignore(int sig) {
 void agnostic_init(){
   if (!is_restart && is_server){
     end_signal = (std::atomic<int>*)RP_malloc(sizeof(std::atomic<int>));
+    current_time = (rel_time_t*)RP_malloc(sizeof(rel_time_t));
     assert(end_signal != nullptr);
+    assert(current_time != nullptr);
     RP_set_root(end_signal, RPMRoot::EndSignal);
-    printf("set endsignal\nset root %d\n", RPMRoot::EndSignal);
+
+    RP_set_root((void*)current_time, RPMRoot::CTime);
   } else {
     end_signal = RP_get_root<std::atomic<int> >(RPMRoot::EndSignal);
+    current_time = RP_get_root<rel_time_t>(RPMRoot::CTime);
   }
 
   if (is_server){
     *end_signal = 0;
+    
+    struct event_config *ev_config;
+    ev_config = event_config_new();
+    event_config_set_flag(ev_config, EVENT_BASE_FLAG_NOLOCK);
+    main_base = event_base_new_with_config(ev_config);
+    event_config_free(ev_config);
   }
   enum {
     MAXCONNS_FAST = 0,
@@ -527,7 +544,8 @@ void* server_thread (void *pargs) {
   int q = 0;
   while(end_signal->load() == 0){
     sleep(1);
-    printf("slept %d times\n", ++q);
+    event_base_loop(main_base, EVLOOP_ONCE);
+    printf("slept %d times, ctime %d\n", ++q, *current_time);
 
   }
   printf("exited!\n");
@@ -662,7 +680,7 @@ pku_memcached_mget(const char * const *keys, const size_t *key_length,
 } 
 
 memcached_return_t
-pku_memcached_insert(const char* key, size_t nkey, char* data, size_t datan,
+pku_memcached_insert(const char* key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime){
   // do what we're here for
   inc_lookers();
@@ -685,7 +703,7 @@ pku_memcached_insert(const char* key, size_t nkey, char* data, size_t datan,
 }
 
 memcached_return_t
-pku_memcached_set(const char * key, size_t nkey, char *data, size_t datan,
+pku_memcached_set(const char * key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime){
   inc_lookers();
   memcached_return_t ret = item_set(key, nkey, data, datan, exptime, 1); 
@@ -700,7 +718,7 @@ pku_memcached_flush(uint32_t exptime){
   if (exptime > 0) {
     new_oldest = realtime(exptime);
   } else {
-    new_oldest = current_time;
+    new_oldest = *current_time;
   }
   settings.oldest_live = new_oldest;
   unpause_accesses();
@@ -724,7 +742,7 @@ pku_memcached_delete(const char * key, size_t nkey, uint32_t exptime){
 }
 
 memcached_return_t
-pku_memcached_append(const char * key, size_t nkey, char *data, size_t datan,
+pku_memcached_append(const char * key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime, uint32_t flags) {
   inc_lookers();
   item *it = item_alloc(key, nkey, 0, 0, datan+2);
@@ -751,7 +769,7 @@ pku_memcached_append(const char * key, size_t nkey, char *data, size_t datan,
 }
 
 memcached_return_t
-pku_memcached_prepend(const char * key, size_t nkey, char *data, size_t datan,
+pku_memcached_prepend(const char * key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime, uint32_t flags) {
   inc_lookers();
   item *it = item_alloc(key, nkey, 0, 0, datan+2);
@@ -778,7 +796,7 @@ pku_memcached_prepend(const char * key, size_t nkey, char *data, size_t datan,
 }
 
 memcached_return_t
-pku_memcached_replace(const char * key, size_t nkey, char *data, size_t datan,
+pku_memcached_replace(const char * key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime, uint32_t flags){
   inc_lookers();
   item *it = item_alloc(key, nkey, 0, 0, datan+2);

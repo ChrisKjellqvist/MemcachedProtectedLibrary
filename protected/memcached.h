@@ -50,7 +50,8 @@ enum RPMRoot {
   SizesBytes = 9,
   SlabclassAr = 10,
   MemLimit = 11,
-  EndSignal = 12
+  EndSignal = 12,
+  CTime = 13
 };
 extern int is_server;
 extern int is_restart;
@@ -197,23 +198,23 @@ memcached_return_t
 pku_memcached_mget(const char * const *keys, const size_t *key_length,
    size_t number_of_keys, item **list);
 memcached_return_t
-pku_memcached_insert(const char* key, size_t nkey, char* data, size_t datan,
+pku_memcached_insert(const char* key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime);
 memcached_return_t
-pku_memcached_set(const char *key, size_t nkey, char *data, size_t datan,
+pku_memcached_set(const char *key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime);
 memcached_return_t
 pku_memcached_delete(const char *key, size_t nkey, uint32_t exptime);
 memcached_return_t
 pku_memcached_flush(uint32_t exptime);
 memcached_return_t
-pku_memcached_replace(const char *key, size_t nkey, char *data, size_t datan,
+pku_memcached_replace(const char *key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime, uint32_t flags);
 memcached_return_t
-pku_memcached_prepend(const char *key, size_t nkey, char *data, size_t datan,
+pku_memcached_prepend(const char *key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime, uint32_t flags);
 memcached_return_t
-pku_memcached_append(const char *key, size_t nkey, char *data, size_t datan,
+pku_memcached_append(const char *key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime, uint32_t flags);
 
 /*
@@ -478,7 +479,7 @@ struct item_chunk {
     + (((item)->it_flags & ITEM_CAS) ? sizeof(uint64_t) : 0))
 
 /* current time of day (updated periodically) */
-extern volatile rel_time_t current_time;
+extern volatile rel_time_t *current_time;
 
 /* TODO: Move to slabs.h? */
 extern volatile int slab_rebalance_signal;

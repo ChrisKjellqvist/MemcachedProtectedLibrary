@@ -136,7 +136,7 @@ int item_is_flushed(item *it) {
   rel_time_t oldest_live = settings.oldest_live;
   uint64_t cas = ITEM_get_cas(it);
   uint64_t oldest_cas = settings.oldest_cas;
-  if (oldest_live == 0 || oldest_live > current_time)
+  if (oldest_live == 0 || oldest_live > *current_time)
     return 0;
   if ((it->time <= oldest_live)
       || (oldest_cas != 0 && cas != 0 && cas < oldest_cas)) {
@@ -418,7 +418,7 @@ static void item_unlink_q(item *it) {
 int do_item_link(item *it, const uint32_t hv) {
   assert((it->it_flags & (ITEM_LINKED|ITEM_SLABBED)) == 0);
   it->it_flags |= ITEM_LINKED;
-  it->time = current_time;
+  it->time = *current_time;
 
   STATS_LOCK();
   stats_state.curr_bytes += ITEM_ntotal(it);
@@ -477,12 +477,12 @@ void do_item_remove(item *it) {
 /* Copy/paste to avoid adding two extra branches for all common calls, since
  * _nolock is only used in an uncommon case where we want to relink. */
 void do_item_update_nolock(item *it) {
-  if (it->time < current_time - ITEM_UPDATE_INTERVAL) {
+  if (it->time < *current_time - ITEM_UPDATE_INTERVAL) {
     assert((it->it_flags & ITEM_SLABBED) == 0);
 
     if ((it->it_flags & ITEM_LINKED) != 0) {
       do_item_unlink_q(it);
-      it->time = current_time;
+      it->time = *current_time;
       do_item_link_q(it);
     }
   }
@@ -491,11 +491,11 @@ void do_item_update_nolock(item *it) {
 /* Bump the last accessed time, or relink if we're in compat mode */
 void do_item_update(item *it) {
 
-  if (it->time < current_time - ITEM_UPDATE_INTERVAL) {
+  if (it->time < *current_time - ITEM_UPDATE_INTERVAL) {
     assert((it->it_flags & ITEM_SLABBED) == 0);
 
     if ((it->it_flags & ITEM_LINKED) != 0) {
-      it->time = current_time;
+      it->time = *current_time;
       item_unlink_q(it);
       item_link_q(it);
     }
@@ -585,7 +585,7 @@ void fill_item_stats_automove(item_stats_automove *am) {
     pthread_mutex_lock(&lru_locks[i]);
     cur->evicted = itemstats[i].evicted;
     if (tails[i] != nullptr) {
-      cur->age = current_time - tails[i]->time;
+      cur->age = *current_time - tails[i]->time;
     } else {
       cur->age = 0;
     }
@@ -610,7 +610,7 @@ item *do_item_get(const char *key, const size_t nkey, const uint32_t hv, const b
   if (it != NULL) {
     if (item_is_flushed(it)) {
       do_item_unlink(it, hv);
-    } else if (it->exptime != 0 && it->exptime <= current_time) {
+    } else if (it->exptime != 0 && it->exptime <= *current_time) {
       do_item_unlink(it, hv);
       do_item_remove(it);
       it = NULL;
@@ -698,7 +698,7 @@ int lru_pull_tail(const int orig_id, const int cur_lru,
       /* In case of refcount leaks, enable for quick workaround. */
       /* WARNING: This can cause terrible corruption */
       if (settings.tail_repair_time &&
-          search->time + settings.tail_repair_time < current_time) {
+          search->time + settings.tail_repair_time < *current_time) {
         itemstats[id].tailrepairs++;
         search->refcount = 1;
         /* This will call item_remove -> item_free since refcnt is 1 */
@@ -709,7 +709,7 @@ int lru_pull_tail(const int orig_id, const int cur_lru,
     }
 
     /* Expired or flushed */
-    if ((search->exptime != -1 && search->exptime < current_time)
+    if ((search->exptime != -1 && search->exptime < *current_time)
         || item_is_flushed(search)) {
       itemstats[id].reclaimed++;
       if ((search->it_flags & ITEM_FETCHED) == 0) {
@@ -758,7 +758,7 @@ int lru_pull_tail(const int orig_id, const int cur_lru,
           }
         } else if (sizes_bytes[id] > limit ||
           // If it's starting to get old, move to cold
-          current_time - search->time > max_age) {
+          *current_time - search->time > max_age) {
           itemstats[id].moves_to_cold++;
           move_to_lru = COLD_LRU;
           do_item_unlink_q(search);
@@ -778,7 +778,7 @@ int lru_pull_tail(const int orig_id, const int cur_lru,
             break;
           }
           itemstats[id].evicted++;
-          itemstats[id].evicted_time = current_time - search->time;
+          itemstats[id].evicted_time = *current_time - search->time;
           if (search->exptime != 0)
             itemstats[id].evicted_nonzero++;
           if ((search->it_flags & ITEM_FETCHED) == 0) {
@@ -952,12 +952,12 @@ static void lru_maintainer_crawler_check(crawler_expired_data *cdata) {
         next_crawl_wait[i] = MAX_MAINTCRAWL_WAIT;
       }
 
-      next_crawls[i] = current_time + next_crawl_wait[i] + 5;
+      next_crawls[i] = *current_time + next_crawl_wait[i] + 5;
       // Got our calculation, avoid running until next actual run.
       s->run_complete = false;
       pthread_mutex_unlock(&cdata->lock);
     }
-    if (current_time > next_crawls[i]) {
+    if (*current_time > next_crawls[i]) {
       pthread_mutex_lock(&lru_locks[i]);
       if (sizes[i] > tocrawl_limit) {
         tocrawl_limit = sizes[i];
@@ -965,7 +965,7 @@ static void lru_maintainer_crawler_check(crawler_expired_data *cdata) {
       pthread_mutex_unlock(&lru_locks[i]);
       todo[i] = 1;
       do_run = true;
-      next_crawls[i] = current_time + 5; // minimum retry wait.
+      next_crawls[i] = *current_time + 5; // minimum retry wait.
     }
   }
   if (do_run) {
@@ -1054,12 +1054,12 @@ static void *lru_maintainer_thread(void *arg) {
     }
 
     /* Once per second at most */
-    if (settings.lru_crawler && last_crawler_check != current_time) {
+    if (settings.lru_crawler && last_crawler_check != *current_time) {
       lru_maintainer_crawler_check(cdata);
-      last_crawler_check = current_time;
+      last_crawler_check = *current_time;
     }
 
-    if (last_automove_check != current_time) {
+    if (last_automove_check != *current_time) {
       if (last_ratio != settings.slab_automove_ratio) {
         sam->free(am);
         am = sam->init(&settings);
@@ -1072,7 +1072,7 @@ static void *lru_maintainer_thread(void *arg) {
       }
       // dst == 0 means reclaim to global pool, be more aggressive
       if (dst != 0) {
-        last_automove_check = current_time;
+        last_automove_check = *current_time;
       } else if (dst == 0) {
         // also ensure we minimize the thread sleep
         to_sleep = 1000;

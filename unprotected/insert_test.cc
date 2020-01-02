@@ -89,9 +89,10 @@ int main(){
     auto p = create_random_packet();
     nkB += (p->key_len + p->dat_len);
     begin = get_ticks_start();
-    memcached_add_internal((const char*)p->key, p->key_len, (char*)p->dat, p->dat_len,
+    auto q = memcached_add_internal((const char*)p->key, p->key_len, (char*)p->dat, p->dat_len,
         0, 0); // maybe change flags
     end = get_ticks_end();
+    assert(q == MEMCACHED_SUCCESS);
     count += end - begin;
   }
   printf("%lukB\n", nkB/1024);

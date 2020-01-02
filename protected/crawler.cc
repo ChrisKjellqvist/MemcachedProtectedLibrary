@@ -136,14 +136,14 @@ static int crawler_expired_init(crawler_module_t *cm, void *data) {
     // init lock.
     pthread_mutex_init(&d->lock, NULL);
     d->is_external = false;
-    d->start_time = current_time;
+    d->start_time = *current_time;
 
     cm->data = pptr<crawler_expired_data>(d);
   }
   pthread_mutex_lock(&d->lock);
   memset(&d->crawlerstats, 0, sizeof(crawlerstats_t) * POWER_LARGEST);
   for (int x = 0; x < POWER_LARGEST; x++) {
-    d->crawlerstats[x].start_time = current_time;
+    d->crawlerstats[x].start_time = *current_time;
     d->crawlerstats[x].run_complete = false;
   }
   pthread_mutex_unlock(&d->lock);
@@ -153,7 +153,7 @@ static int crawler_expired_init(crawler_module_t *cm, void *data) {
 static void crawler_expired_doneclass(crawler_module_t *cm, int slab_cls) {
   struct crawler_expired_data *d = (struct crawler_expired_data *) cm->data;
   pthread_mutex_lock(&d->lock);
-  d->crawlerstats[slab_cls].end_time = current_time;
+  d->crawlerstats[slab_cls].end_time = *current_time;
   d->crawlerstats[slab_cls].run_complete = true;
   pthread_mutex_unlock(&d->lock);
 }
@@ -161,7 +161,7 @@ static void crawler_expired_doneclass(crawler_module_t *cm, int slab_cls) {
 static void crawler_expired_finalize(crawler_module_t *cm) {
   struct crawler_expired_data *d = (struct crawler_expired_data *) cm->data;
   pthread_mutex_lock(&d->lock);
-  d->end_time = current_time;
+  d->end_time = *current_time;
   d->crawl_complete = true;
   pthread_mutex_unlock(&d->lock);
 
@@ -178,7 +178,7 @@ static void crawler_expired_eval(crawler_module_t *cm, item *search, uint32_t hv
   pthread_mutex_lock(&d->lock);
   crawlerstats_t *s = &d->crawlerstats[i];
   int is_flushed = item_is_flushed(search);
-  if ((search->exptime != 0 && search->exptime < current_time) || is_flushed) {
+  if ((search->exptime != 0 && search->exptime < *current_time) || is_flushed) {
     crawlers[i].reclaimed++;
     s->reclaimed++;
     // LRU crawler found an expired item
@@ -192,10 +192,10 @@ static void crawler_expired_eval(crawler_module_t *cm, item *search, uint32_t hv
     refcount_decr(search);
     if (search->exptime == 0) {
       s->noexp++;
-    } else if (search->exptime - current_time > 3599) {
+    } else if (search->exptime - *current_time > 3599) {
       s->ttl_hourplus++;
     } else {
-      rel_time_t ttl_remain = search->exptime - current_time;
+      rel_time_t ttl_remain = search->exptime - *current_time;
       int bucket = ttl_remain / 60;
       if (bucket <= 60) {
         s->histo[bucket]++;
@@ -210,7 +210,7 @@ static void crawler_metadump_eval(crawler_module_t *cm, item *it, uint32_t hv, i
   char keybuf[KEY_MAX_LENGTH * 3 + 1];
   int is_flushed = item_is_flushed(it);
   /* Ignore expired content. */
-  if ((it->exptime != 0 && it->exptime < current_time)
+  if ((it->exptime != 0 && it->exptime < *current_time)
       || is_flushed) {
     refcount_decr(it);
     return;
@@ -532,11 +532,11 @@ int lru_crawler_start(uint8_t *ids, uint32_t remaining,
   if (is_running &&
       !(type == CRAWLER_AUTOEXPIRE && active_crawler_type == CRAWLER_AUTOEXPIRE)) {
     pthread_mutex_unlock(&lru_crawler_lock);
-    block_ae_until = current_time + 60;
+    block_ae_until = *current_time + 60;
     return -1;
   }
 
-  if (type == CRAWLER_AUTOEXPIRE && block_ae_until > current_time) {
+  if (type == CRAWLER_AUTOEXPIRE && block_ae_until > *current_time) {
     pthread_mutex_unlock(&lru_crawler_lock);
     return -1;
   }

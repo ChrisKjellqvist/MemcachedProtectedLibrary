@@ -95,7 +95,7 @@ int main(){
     begin = get_ticks_start();
     memcached_get_internal((char*)p->key, p->key_len, &len, &flags,
         &err);
-    fail += err == MEMCACHED_FAILURE;
+    fail += err != MEMCACHED_SUCCESS;
     end = get_ticks_end();
     count += end - begin;
   }

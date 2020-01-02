@@ -33,35 +33,35 @@ memcached_mget
 
 memcached_return_t
 memcached_set
-  (memcached_st *ptr, const char * key, size_t nkey, char *data, size_t datan, 
+  (memcached_st *ptr, const char * key, size_t nkey, const char * data, size_t datan, 
    uint32_t exptime, uint32_t flags){
   return memcached_set_internal(key, nkey, data, datan, exptime, flags);
 }
 
 memcached_return_t
 memcached_add
-  (memcached_st *ptr, const char * key, size_t nkey, char* data, size_t datan, 
+  (memcached_st *ptr, const char * key, size_t nkey, const char * data, size_t datan, 
    uint32_t exptime, uint32_t flags){
   return memcached_add_internal(key, nkey, data, datan, exptime, flags);
 }
 
 memcached_return_t
 memcached_replace
-  (memcached_st *ptr, const char * key, size_t nkey, char *data, size_t datan, 
+  (memcached_st *ptr, const char * key, size_t nkey, const char * data, size_t datan, 
    uint32_t exptime, uint32_t flags){
   return memcached_replace_internal(key, nkey, data, datan, exptime, flags);
 }
 
 memcached_return_t
 memcached_append
-  (memcached_st *ptr, const char * key, size_t nkey, char *data, size_t datan,
+  (memcached_st *ptr, const char * key, size_t nkey, const char * data, size_t datan,
    uint32_t exptime, uint32_t flags){
   return memcached_append_internal(key, nkey, data, datan, exptime, flags);
 }
 
 memcached_return_t
 memcached_prepend
-  (memcached_st *ptr, const char * key, size_t nkey, char *data, size_t datan,
+  (memcached_st *ptr, const char * key, size_t nkey, const char * data, size_t datan,
    uint32_t exptime, uint32_t flags){
   return memcached_prepend_internal(key, nkey, data, datan, exptime, flags);
 }
@@ -166,7 +166,7 @@ memcached_mget_internal
 HODOR_FUNC_ATTR
 memcached_return_t
 memcached_set_internal
-  (const char* key, size_t nkey, char *data, size_t datan, uint32_t exptime, 
+  (const char* key, size_t nkey, const char * data, size_t datan, uint32_t exptime, 
    uint32_t flags){
   return pku_memcached_set(key, nkey, data, datan, exptime);
 } HODOR_FUNC_EXPORT(memcached_set_internal, 6);
@@ -174,7 +174,7 @@ memcached_set_internal
 HODOR_FUNC_ATTR
 memcached_return_t
 memcached_add_internal
-  (const char* key, size_t nkey, char* data, size_t datan, uint32_t exptime,
+  (const char* key, size_t nkey, const char * data, size_t datan, uint32_t exptime,
    uint32_t flags){
   return pku_memcached_insert(key, nkey, data, datan, exptime);
 } HODOR_FUNC_EXPORT(memcached_insert_internal, 6);
@@ -182,21 +182,21 @@ memcached_add_internal
 HODOR_FUNC_ATTR
 memcached_return_t
 memcached_replace_internal
-  (const char* key, size_t nkey, char *data, size_t datan, uint32_t exptime,
+  (const char* key, size_t nkey, const char * data, size_t datan, uint32_t exptime,
    uint32_t flags){
   return pku_memcached_replace(key, nkey, data, datan, exptime, flags);
 } HODOR_FUNC_EXPORT(memcached_replace_internal, 6);
 
 HODOR_FUNC_ATTR
 memcached_return_t
-memcached_append_internal(const char * key, size_t nkey, char *data, size_t datan,
+memcached_append_internal(const char * key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime, uint32_t flags){
   return pku_memcached_append(key, nkey, data, datan, exptime, flags);
 } HODOR_FUNC_EXPORT(memcached_append_internal, 6);
 
 HODOR_FUNC_ATTR
 memcached_return_t
-memcached_prepend_internal(const char * key, size_t nkey, char *data, size_t datan,
+memcached_prepend_internal(const char * key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime, uint32_t flags){
   return pku_memcached_prepend(key, nkey, data, datan, exptime, flags);
 } HODOR_FUNC_EXPORT(memcached_prepend_internal, 6);

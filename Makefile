@@ -5,9 +5,9 @@ PROT_OBJ = obj/memcached.o\
 	   obj/slab_automove.o obj/pku_memcached.o obj/util.o\
 	   obj/itoa_ljust.o 
 
-#OPT_LEVEL = -O0 -g
+OPT_LEVEL = -O0 -g
 ERROR     = -DFAIL_ASSERT
-OPT_LEVEL =-Ofast
+#OPT_LEVEL = -Ofast
 OPTS_LENIENT = -Iprotected/ -Iunprotected/ -I../rpmalloc/src \
 	       -I../hodor/include -DHAVE_CONFIG_H -MD -MP -Wall -std=c++17 \
 	       -fPIC -I../hodor/libhodor -D__cplus_plus $(OPT_LEVEL) $(ERROR)
@@ -30,7 +30,7 @@ DEFLINK  = --hash-style=gnu --no-add-needed --build-id --eh-frame-hdr -m \
 LIBS = lib/libhodor.a lib/libthreadcached.so lib/librpmalloc.a
 LINKOPTS = $(DEFLINK) -lpthread -levent -ldl -T scripts/ldscript.lds
 EXE = server.exe end.exe
-TEST_RUN = get.exe insert.exe
+TEST_RUN = get.exe insert.exe timed_get.exe
 PERF_RUN = insert_test.exe get_test.exe
 RPMA_RUN = basic_setup.exe basic_test.exe
 
