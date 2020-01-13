@@ -706,9 +706,39 @@ memcached_return_t
 pku_memcached_set(const char * key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime){
   inc_lookers();
-  memcached_return_t ret = item_set(key, nkey, data, datan, exptime, 1); 
+  item *it = item_alloc(key, nkey, 0, realtime(exptime), datan + 2);
+
+  if (it == 0) {
+    enum store_item_type status;
+    if (! item_size_ok(nkey, flags, datan)) {
+      fprintf(stderr, "SERVER_ERROR too big for the cache\n");
+      return MEMCACHED_FAILURE; // Maybe make this more informative
+    } else {
+      fprintf(stderr, "SERVER_ERROR out of memory storing object");
+      status = NO_MEMORY;
+    }
+    it = item_get(key, nkey, c, DONT_UPDATE);
+    if (it) {
+      item_unlink(it);
+      STORAGE_delete(c->thread->storage, it);
+      item_remove(it);
+    }
+  }
+
+  if (it != NULL) {
+    memcpy(ITEM_data(it), data, datan);
+    memcpy(ITEM_data(it) + datan, "\r\n", 2);
+    uint32_t hv = tcd_hash(key, nkey);
+    if (!(do_store_item(it, NREAD_ADD, hv))->sit) {
+      return MEMCACHED_FAILURE;
+    }
+    item_remove(it);         /* release our reference */
+  } else {
+    perror("SERVER_ERROR Out of memory allocating new item");
+    return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
+  }
   dec_lookers();
-  return ret;
+  return MEMCACHED_SUCCESS;
 }
 
 memcached_return_t
@@ -820,5 +850,5 @@ pku_memcached_replace(const char * key, size_t nkey, const char * data, size_t d
   item_remove(it);
   dec_lookers();
   return MEMCACHED_SUCCESS;  
-  
+
 }

@@ -5,12 +5,12 @@ PROT_OBJ = obj/memcached.o\
 	   obj/slab_automove.o obj/pku_memcached.o obj/util.o\
 	   obj/itoa_ljust.o 
 
-OPT_LEVEL = -O0 -g
+#OPT_LEVEL = -O0 -g
 ERROR     = -DFAIL_ASSERT
-#OPT_LEVEL = -Ofast
+OPT_LEVEL = -Ofast
 OPTS_LENIENT = -Iprotected/ -Iunprotected/ -I../rpmalloc/src \
 	       -I../hodor/include -DHAVE_CONFIG_H -MD -MP -Wall -std=c++17 \
-	       -fPIC -I../hodor/libhodor -D__cplus_plus $(OPT_LEVEL) $(ERROR)
+	       -fPIC -I../hodor/libhodor $(OPT_LEVEL) $(ERROR)
 OPTS = $(OPTS_LENIENT) -Werror
 # Default arguments that clang++ passes to the linker. This turns out to be
 # important for C++ programs
@@ -34,10 +34,16 @@ TEST_RUN = get.exe insert.exe timed_get.exe
 PERF_RUN = insert_test.exe get_test.exe
 RPMA_RUN = basic_setup.exe basic_test.exe
 
-.PHONY : perf
+.PHONY : perf all lib bin dlib install
 perf: $(EXE) $(PERF_RUN)
-.PHONY : all
 all: $(EXE) $(TEST_RUN)
+lib: lib/libthreadcached.so
+lib/libmemcached.so: lib/libthreadcached.so
+	mv $^ lib/libmemcached.so
+dlib: lib/libmemcached.so
+bin: server.exe
+	mv $^ bin/memcached
+
 %.exe: $(LIBS) obj/%.o
 	ld $(LINKOPTS) $^ -o $@
 lib/libhodor.a:

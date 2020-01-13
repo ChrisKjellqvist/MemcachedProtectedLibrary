@@ -1,5 +1,6 @@
 #include <pku_memcached.h>
 #include <constants.h>
+#include <memcached.h>
 
 #include <stdlib.h>
 #include <hodor-plib.h>

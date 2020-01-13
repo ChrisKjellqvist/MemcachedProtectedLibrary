@@ -79,4 +79,25 @@ enum delta_result_type {
   DELTA_ITEM_NOT_FOUND, 
   DELTA_ITEM_CAS_MISMATCH
 };
+
+// we never use memcached_st
+#ifdef __cplusplus
+extern "C" {
+#endif
+  typedef struct {
+  } memcached_st;
+
+  typedef struct {
+    uint32_t item_flags;
+    time_t item_expiration;
+    size_t key_length;
+    uint64_t item_cas;
+    char *data;
+    uint32_t datan;
+    char* key;
+    uint32_t keyn;
+  } memcached_result_st;
+#ifdef __cplusplus
+}
+#endif
 #endif /* __LIBMEMCACHED_CONSTANTS_H__ */

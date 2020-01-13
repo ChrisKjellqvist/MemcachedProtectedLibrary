@@ -58,22 +58,6 @@ extern int is_restart;
 // 4GB
 const size_t MEMORY_MAX = 4*1024*1024*1024ULL;
 
-// we never use memcached_st
-extern "C" {
-  typedef struct {
-  } memcached_st;
-  typedef struct {
-    uint32_t item_flags;
-    time_t item_expiration;
-    size_t key_length;
-    uint64_t item_cas;
-    char *data;
-    uint32_t datan;
-    char* key;
-    uint32_t keyn;
-  } memcached_result_st;
-}
-
 /** Maximum length of a key. */
 #define KEY_MAX_LENGTH 250
 
