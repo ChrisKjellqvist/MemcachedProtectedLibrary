@@ -111,7 +111,7 @@ item *item_alloc(const char * key, size_t nkey, int flags, rel_time_t exptime, i
  * Returns an item if it hasn't been marked as expired,
  * lazy-expiring as needed.
  */
-item *item_get(const char *key, const size_t nkey, uint32_t exptime, const bool do_update) {
+item *item_get(const char *key, const size_t nkey, const bool do_update) {
   item *it;
   uint32_t hv;
   hv = tcd_hash(key, nkey);

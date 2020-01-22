@@ -660,7 +660,7 @@ pku_memcached_get(const char* key, size_t nkey, char* &buffer, size_t* buffLen,
   *flags = 0; // make sure these don't segfault when it really matters
   *buffLen = 0;
   inc_lookers();
-  item* it = item_get(key, nkey, 0, 1);
+  item* it = item_get(key, nkey, 1);
   if (it == NULL)
     return MEMCACHED_NOTFOUND;
   buffer = (char*)malloc(it->nbytes);
@@ -675,7 +675,7 @@ memcached_return_t
 pku_memcached_mget(const char * const *keys, const size_t *key_length,
    size_t number_of_keys, item **list){
   for(unsigned i = 0; i < number_of_keys; ++i)
-    list[i] = item_get(keys[i], key_length[i], 0, 1);
+    list[i] = item_get(keys[i], key_length[i], 1);
   return MEMCACHED_SUCCESS;
 } 
 
@@ -709,18 +709,16 @@ pku_memcached_set(const char * key, size_t nkey, const char * data, size_t datan
   item *it = item_alloc(key, nkey, 0, realtime(exptime), datan + 2);
 
   if (it == 0) {
-    enum store_item_type status;
-    if (! item_size_ok(nkey, flags, datan)) {
+    if (! item_size_ok(nkey, 0, datan)) {
       fprintf(stderr, "SERVER_ERROR too big for the cache\n");
       return MEMCACHED_FAILURE; // Maybe make this more informative
     } else {
       fprintf(stderr, "SERVER_ERROR out of memory storing object");
-      status = NO_MEMORY;
+      return MEMCACHED_FAILURE;
     }
-    it = item_get(key, nkey, c, DONT_UPDATE);
+    it = item_get(key, nkey, DONT_UPDATE);
     if (it) {
       item_unlink(it);
-      STORAGE_delete(c->thread->storage, it);
       item_remove(it);
     }
   }

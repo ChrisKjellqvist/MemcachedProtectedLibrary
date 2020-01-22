@@ -28,12 +28,6 @@
 #define LARGEST_ID POWER_LARGEST
 
 struct crawler_module_reg_t;
-struct crawler_client_t {
-  void *c; /* I don't think this is used... */
-  int sfd; /* client fd. */
-  bipbuf_t *buf; /* output buffer */
-  char *cbuf; /* current buffer */
-};
 struct crawler_module_t;
 
 typedef void (*crawler_eval_func)(crawler_module_t *cm, item *it, uint32_t hv, int slab_cls);
@@ -48,13 +42,11 @@ struct crawler_module_reg_t {
   crawler_doneclass_func doneclass; /* runs once per sub-crawler completion. */
   crawler_finalize_func finalize; /* runs once when all sub-crawlers are done. */
   bool needs_lock; /* whether or not we need the LRU lock held when eval is called */
-  bool needs_client; /* whether or not to grab onto the remote client */
 };
 
 struct crawler_module_t {
-  pptr<crawler_expired_data> data; /* opaque data pointer */
-  crawler_client_t c;
-  pptr<crawler_module_reg_t> mod;
+  pptr<crawler_expired_data> data = 0; /* opaque data pointer */
+  pptr<crawler_module_reg_t> mod = 0;
 };
 
 static int crawler_expired_init(crawler_module_t *cm, void *data);
@@ -68,19 +60,15 @@ crawler_module_reg_t crawler_expired_mod = {
   .doneclass = crawler_expired_doneclass,
   .finalize = crawler_expired_finalize,
   .needs_lock = true,
-  .needs_client = false
 };
 
 static void crawler_metadump_eval(crawler_module_t *cm, item *search, uint32_t hv, int i);
-static void crawler_metadump_finalize(crawler_module_t *cm);
 
 crawler_module_reg_t crawler_metadump_mod = {
   .init = NULL,
   .eval = crawler_metadump_eval,
   .doneclass = NULL,
-  .finalize = crawler_metadump_finalize,
   .needs_lock = false,
-  .needs_client = true
 };
 
 crawler_module_reg_t *crawler_mod_regs[3] = {
@@ -89,7 +77,6 @@ crawler_module_reg_t *crawler_mod_regs[3] = {
   &crawler_metadump_mod
 };
 
-static int lru_crawler_client_getbuf(crawler_client_t *c);
 crawler_module_t active_crawler_mod;
 enum crawler_run_type active_crawler_type;
 
@@ -102,24 +89,12 @@ static pthread_mutex_t lru_crawler_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t  lru_crawler_cond = PTHREAD_COND_INITIALIZER;
 
 /* Will crawl all slab classes a minimum of once per hour */
-#define MAX_MAINTCRAWL_WAIT 60 * 60
+
+static const int MAX_MAINTCRAWL_WAIT = 60 * 60;
 
 /*** LRU CRAWLER THREAD ***/
 
-#define LRU_CRAWLER_WRITEBUF 8192
-
-static void lru_crawler_close_client(crawler_client_t *c) {
-  //fprintf(stderr, "CRAWLER: Closing client\n");
-  c->cbuf = NULL;
-  bipbuf_free(c->buf);
-  c->buf = NULL;
-}
-
-static void lru_crawler_release_client(crawler_client_t *c) {
-  //fprintf(stderr, "CRAWLER: Closing client\n");
-  bipbuf_free(c->buf);
-  c->buf = NULL;
-}
+static const int LRU_CRAWLER_WRITEBUF = 8192;
 
 static int crawler_expired_init(crawler_module_t *cm, void *data) {
   crawler_expired_data *d;
@@ -206,97 +181,10 @@ static void crawler_expired_eval(crawler_module_t *cm, item *search, uint32_t hv
 }
 
 static void crawler_metadump_eval(crawler_module_t *cm, item *it, uint32_t hv, int i) {
-  //int slab_id = CLEAR_LRU(i);
-  char keybuf[KEY_MAX_LENGTH * 3 + 1];
-  int is_flushed = item_is_flushed(it);
-  /* Ignore expired content. */
-  if ((it->exptime != 0 && it->exptime < *current_time)
-      || is_flushed) {
-    refcount_decr(it);
-    return;
-  }
-  // TODO: uriencode directly into the buffer.
-  uriencode(ITEM_key(it), keybuf, it->nkey, KEY_MAX_LENGTH * 3 + 1);
-  int total = snprintf(cm->c.cbuf, 4096,
-      "key=%s exp=%ld la=%llu cas=%llu fetch=%s cls=%u size=%lu\n",
-      keybuf,
-      (it->exptime == 0) ? -1 : (long)(it->exptime + process_started),
-      (unsigned long long)(it->time + process_started),
-      (unsigned long long)ITEM_get_cas(it),
-      (it->it_flags & ITEM_FETCHED) ? "yes" : "no",
-      ITEM_clsid(it),
-      (unsigned long) ITEM_ntotal(it));
   refcount_decr(it);
-  // TODO: some way of tracking the errors. these are very unlikely though.
-  if (total >= LRU_CRAWLER_WRITEBUF - 1 || total <= 0) {
-    /* Failed to write, don't push it. */
-    return;
-  }
-  bipbuf_push(cm->c.buf, total);
 }
 
-static void crawler_metadump_finalize(crawler_module_t *cm) {
-  if (cm->c.c != NULL) {
-    // Ensure space for final message.
-    lru_crawler_client_getbuf(&cm->c);
-    memcpy(cm->c.cbuf, "END\r\n", 5);
-    bipbuf_push(cm->c.buf, 5);
-  }
-}
-
-static int lru_crawler_poll(crawler_client_t *c) {
-  unsigned char *data;
-  unsigned int data_size = 0;
-  struct pollfd to_poll[1];
-  to_poll[0].fd = c->sfd;
-  to_poll[0].events = POLLOUT;
-
-  int ret = poll(to_poll, 1, 1000);
-
-  if (ret < 0) {
-    // fatal.
-    return -1;
-  }
-
-  if (ret == 0) return 0;
-
-  if (to_poll[0].revents & POLLIN) {
-    char buf[1];
-    int res = read(c->sfd, buf, 1);
-    if (res == 0 || (res == -1 && (errno != EAGAIN && errno != EWOULDBLOCK))) {
-      lru_crawler_close_client(c);
-      return -1;
-    }
-  }
-  if ((data = bipbuf_peek_all(c->buf, &data_size)) != NULL) {
-    if (to_poll[0].revents & (POLLHUP|POLLERR)) {
-      lru_crawler_close_client(c);
-      return -1;
-    } else if (to_poll[0].revents & POLLOUT) {
-      int total = write(c->sfd, data, data_size);
-      if (total == -1) {
-        if (errno != EAGAIN && errno != EWOULDBLOCK) {
-          lru_crawler_close_client(c);
-          return -1;
-        }
-      } else if (total == 0) {
-        lru_crawler_close_client(c);
-        return -1;
-      } else {
-        bipbuf_poll(c->buf, total);
-      }
-    }
-  }
-  return 0;
-}
-
-/* Grab some space to work with, if none exists, run the poll() loop and wait
- * for it to clear up or close.
- * Return NULL if closed.
- */
-static int lru_crawler_client_getbuf(crawler_client_t *c) {
-  return -1;
-}
+static pthread_mutex_t lru_running = PTHREAD_MUTEX_INITIALIZER;
 
 static void lru_crawler_class_done(int i) {
   crawlers[i].it_flags = 0;
@@ -329,17 +217,6 @@ static void *item_crawler_thread(void *arg) {
           continue;
         }
 
-        /* Get memory from bipbuf, if client has no space, flush. */
-        if (active_crawler_mod.c.c != NULL) {
-          int ret = lru_crawler_client_getbuf(&active_crawler_mod.c);
-          if (ret != 0) {
-            lru_crawler_class_done(i);
-            continue;
-          }
-        } else if (active_crawler_mod.mod->needs_client) {
-          lru_crawler_class_done(i);
-          continue;
-        }
         pthread_mutex_lock(&lru_locks[i]);
         search = do_item_crawl_q((item *)&crawlers[i]);
         if (search == NULL ||
@@ -394,18 +271,15 @@ static void *item_crawler_thread(void *arg) {
       }
     }
 
+    pthread_mutex_lock(&lru_running);
     if (active_crawler_mod.mod != NULL) {
       if (active_crawler_mod.mod->finalize != NULL)
         active_crawler_mod.mod->finalize(&active_crawler_mod);
-      while (active_crawler_mod.c.c != NULL && bipbuf_used(active_crawler_mod.c.buf)) {
-        lru_crawler_poll(&active_crawler_mod.c);
-      }
-      // Double checking in case the client closed during the poll
-      if (active_crawler_mod.c.c != NULL) {
-        lru_crawler_release_client(&active_crawler_mod.c);
-      }
-      active_crawler_mod.mod = NULL;
+      // TODO check that it's not running
+      // TODO fix this
+      //active_crawler_mod.mod = NULL;
     }
+    pthread_mutex_unlock(&lru_running);
     // LRU crawler thread sleeping
   }
   pthread_mutex_unlock(&lru_crawler_lock);
@@ -507,18 +381,6 @@ static int do_lru_crawler_start(uint32_t id, uint32_t remaining) {
   return starts;
 }
 
-static int lru_crawler_set_client(crawler_module_t *cm, void *c, const int sfd) {
-  crawler_client_t *crawlc = &cm->c;
-  crawlc->c = c;
-  crawlc->sfd = sfd;
-
-  crawlc->buf = bipbuf_new(1024 * 128);
-  if (crawlc->buf == NULL) {
-    return -2;
-  }
-  return 0;
-}
-
 int lru_crawler_start(uint8_t *ids, uint32_t remaining,
     const enum crawler_run_type type, void *data,
     void *c, const int sfd) {
@@ -526,6 +388,7 @@ int lru_crawler_start(uint8_t *ids, uint32_t remaining,
   bool is_running;
   static rel_time_t block_ae_until = 0;
   pthread_mutex_lock(&lru_crawler_lock);
+  pthread_mutex_lock(&lru_running);
   STATS_LOCK();
   is_running = stats_state.lru_crawler_running;
   STATS_UNLOCK();
@@ -544,20 +407,11 @@ int lru_crawler_start(uint8_t *ids, uint32_t remaining,
   /* Configure the module */
   if (!is_running) {
     assert(crawler_mod_regs[type] != NULL);
-    active_crawler_mod.mod = crawler_mod_regs[type];
+    active_crawler_mod.mod = pptr<crawler_module_reg_t>(crawler_mod_regs[type]);
+    assert(&*(active_crawler_mod.mod) == crawler_mod_regs[type]);
     active_crawler_type = type;
     if (active_crawler_mod.mod->init != NULL) {
       active_crawler_mod.mod->init(&active_crawler_mod, data);
-    }
-    if (active_crawler_mod.mod->needs_client) {
-      if (c == NULL || sfd == 0) {
-        pthread_mutex_unlock(&lru_crawler_lock);
-        return -2;
-      }
-      if (lru_crawler_set_client(&active_crawler_mod, c, sfd) != 0) {
-        pthread_mutex_unlock(&lru_crawler_lock);
-        return -2;
-      }
     }
   }
 
@@ -570,6 +424,7 @@ int lru_crawler_start(uint8_t *ids, uint32_t remaining,
     pthread_cond_signal(&lru_crawler_cond);
   }
   pthread_mutex_unlock(&lru_crawler_lock);
+  pthread_mutex_unlock(&lru_running);
   return starts;
 }
 
@@ -589,7 +444,7 @@ int init_lru_crawler(void *arg) {
       return -1;
     }
     pthread_mutex_init(&lru_crawler_lock, NULL);
-    active_crawler_mod.c.c = NULL;
+    //active_crawler_mod.c.c = NULL;
     active_crawler_mod.mod = NULL;
     active_crawler_mod.data = NULL;
     lru_crawler_initialized = 1;

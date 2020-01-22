@@ -527,7 +527,7 @@ enum delta_result_type add_delta(const char *key,
 item *item_alloc(const char * key, size_t nkey, int flags, rel_time_t exptime, int nbytes);
 #define DO_UPDATE true
 #define DONT_UPDATE false
-item *item_get(const char *key, const size_t nkey, uint32_t exptime, const bool do_update);
+item *item_get(const char *key, const size_t nkey, const bool do_update);
 item *item_get_locked(const char *key, const size_t nkey, const bool do_update, uint32_t *hv);
 item *item_touch(const char *key, const size_t nkey, uint32_t exptime);
 memcached_return_t

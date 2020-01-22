@@ -5,10 +5,10 @@ PROT_OBJ = obj/memcached.o\
 	   obj/slab_automove.o obj/pku_memcached.o obj/util.o\
 	   obj/itoa_ljust.o 
 
-#OPT_LEVEL = -O0 -g
+OPT_LEVEL = -O0 -g
 ERROR     = -DFAIL_ASSERT
-OPT_LEVEL = -Ofast
-OPTS_LENIENT = -Iprotected/ -Iunprotected/ -I../rpmalloc/src \
+#OPT_LEVEL = -Ofast
+OPTS_LENIENT = -Iinclude/ -I../rpmalloc/src \
 	       -I../hodor/include -DHAVE_CONFIG_H -MD -MP -Wall -std=c++17 \
 	       -fPIC -I../hodor/libhodor $(OPT_LEVEL) $(ERROR)
 OPTS = $(OPTS_LENIENT) -Werror
@@ -29,10 +29,10 @@ DEFLINK  = --hash-style=gnu --no-add-needed --build-id --eh-frame-hdr -m \
 
 LIBS = lib/libhodor.a lib/libthreadcached.so lib/librpmalloc.a
 LINKOPTS = $(DEFLINK) -lpthread -levent -ldl -T scripts/ldscript.lds
-EXE = server.exe end.exe
-TEST_RUN = get.exe insert.exe timed_get.exe
-PERF_RUN = insert_test.exe get_test.exe
-RPMA_RUN = basic_setup.exe basic_test.exe
+EXE = bin/server.exe bin/end.exe
+TEST_RUN = bin/get.exe bin/insert.exe bin/timed_get.exe
+PERF_RUN = bin/insert_test.exe bin/get_test.exe
+RPMA_RUN = bin/basic_setup.exe bin/basic_test.exe
 
 .PHONY : perf all lib bin dlib install
 perf: $(EXE) $(PERF_RUN)
@@ -41,10 +41,10 @@ lib: lib/libthreadcached.so
 lib/libmemcached.so: lib/libthreadcached.so
 	mv $^ lib/libmemcached.so
 dlib: lib/libmemcached.so
-bin: server.exe
+bin: bin/server.exe
 	mv $^ bin/memcached
 
-%.exe: $(LIBS) obj/%.o
+bin/%.exe: $(LIBS) obj/%.o
 	ld $(LINKOPTS) $^ -o $@
 lib/libhodor.a:
 	cp ~/hodor/libhodor/libhodor.a lib/
