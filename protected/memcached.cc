@@ -711,10 +711,10 @@ pku_memcached_set(const char * key, size_t nkey, const char * data, size_t datan
   if (it == 0) {
     if (! item_size_ok(nkey, 0, datan)) {
       fprintf(stderr, "SERVER_ERROR too big for the cache\n");
-      return MEMCACHED_FAILURE; // Maybe make this more informative
+      return MEMCACHED_KEY_TOO_BIG; // Maybe make this more informative
     } else {
       fprintf(stderr, "SERVER_ERROR out of memory storing object");
-      return MEMCACHED_FAILURE;
+      return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
     }
     it = item_get(key, nkey, DONT_UPDATE);
     if (it) {
@@ -727,7 +727,7 @@ pku_memcached_set(const char * key, size_t nkey, const char * data, size_t datan
     memcpy(ITEM_data(it), data, datan);
     memcpy(ITEM_data(it) + datan, "\r\n", 2);
     uint32_t hv = tcd_hash(key, nkey);
-    if (!(do_store_item(it, NREAD_ADD, hv))->sit) {
+    if (!(store_item(it, NREAD_ADD, hv))->sit) {
       return MEMCACHED_FAILURE;
     }
     item_remove(it);         /* release our reference */
