@@ -5,9 +5,9 @@ PROT_OBJ = obj/memcached.o\
 	   obj/slab_automove.o obj/pku_memcached.o obj/util.o\
 	   obj/itoa_ljust.o 
 
-OPT_LEVEL = -O0 -g
+#OPT_LEVEL = -O0 -g
+OPT_LEVEL = -O3 -g
 ERROR     = -DFAIL_ASSERT
-#OPT_LEVEL = -Ofast
 OPTS_LENIENT = -Iinclude/ -I../rpmalloc/src \
 	       -I../hodor/include -DHAVE_CONFIG_H -MD -MP -Wall -std=c++17 \
 	       -fPIC -I../hodor/libhodor $(OPT_LEVEL) $(ERROR)

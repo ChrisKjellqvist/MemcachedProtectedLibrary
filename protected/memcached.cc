@@ -66,6 +66,7 @@
 
 /* THREADCACHED */
 #include <rpmalloc.hpp>
+#include <utility>
 int is_server, is_restart;
 
 /* defaults */
@@ -81,13 +82,6 @@ time_t process_started;     /* when the process was started */
 struct slab_rebalance slab_rebal;
 volatile int slab_rebalance_signal;
 static struct event_base *main_base;
-
-struct st_st *mk_st (enum store_item_type my_sit, size_t my_cas){
-  struct st_st *temp = (struct st_st*)malloc(sizeof(struct st_st));
-  temp->sit = my_sit;
-  temp->cas = my_cas;
-  return temp;
-}
 
 enum transmit_result {
   TRANSMIT_COMPLETE,   /** All done writing. */
@@ -254,7 +248,7 @@ static int _store_item_copy_data(int comm, item *old_it, item *new_it, item *add
  * Returns the state of storage.
  */
 
-struct st_st *do_store_item(item *it, int comm, const uint32_t hv) {
+std::pair<store_item_type, size_t> do_store_item(item *it, int comm, const uint32_t hv) {
   char *key = ITEM_key(it);
   item *old_it = do_item_get(key, it->nkey, hv, DONT_UPDATE);
   enum store_item_type stored = NOT_STORED;
@@ -334,7 +328,7 @@ struct st_st *do_store_item(item *it, int comm, const uint32_t hv) {
   if (stored == STORED) {
     cas = ITEM_get_cas(it);
   }
-  return mk_st(stored, cas);
+  return std::pair<store_item_type, size_t>(stored, cas);
 }
 
 struct token_t {
@@ -376,7 +370,6 @@ static struct event clockevent;
  * Note that users who are setting explicit dates for expiration times *must*
  * ensure their clocks are correct before starting memcached. */
 static void clock_handler(const int fd, const short which, void *arg) {
-  printf("clock handler began\n");
   struct timeval t = {.tv_sec = 1, .tv_usec = 0};
   static bool initialized = false;
 #if defined(HAVE_CLOCK_GETTIME) && defined(CLOCK_MONOTONIC)
@@ -517,7 +510,6 @@ void agnostic_init(){
 
 void* server_thread (void *pargs) {
   is_server = 1;
-  printf("server started\n");
   fflush(stdout);
 
   /* handle SIGINT and SIGTERM */
@@ -541,14 +533,11 @@ void* server_thread (void *pargs) {
   /* enter the event loop */
   // TODO chnage to wait on maintenance threads
   pthread_mutex_unlock(&begin_ops_mutex);
-  int q = 0;
   while(end_signal->load() == 0){
     sleep(1);
     event_base_loop(main_base, EVLOOP_ONCE);
-    printf("slept %d times, ctime %d\n", ++q, *current_time);
 
   }
-  printf("exited!\n");
 
   stop_assoc_maintenance_thread();
   return NULL;
@@ -654,6 +643,10 @@ enum delta_result_type do_add_delta(const char *key,
     return OK;
 }
 
+// Race conditions don't happen in get operations. We never do in place writes,
+// only full replacements. Whenever you do a item_get operation, it increments
+// the refcounts and prevents it from being freed. NOTE - YOU MUST refcount_decr
+// after you read the item so that it may be freed if necessary. 
 memcached_return_t
 pku_memcached_get(const char* key, size_t nkey, char* &buffer, size_t* buffLen,
     uint32_t *flags){
@@ -667,10 +660,13 @@ pku_memcached_get(const char* key, size_t nkey, char* &buffer, size_t* buffLen,
   memcpy(buffer, ITEM_data(it), it->nbytes);
   *flags = it->it_flags;
   *buffLen = it->nbytes;
+  item_remove(it); /* release our reference */
   dec_lookers();
   return MEMCACHED_SUCCESS;
 }
 
+// Is this good? If the user doesn't fetch all the entries, some entries might
+// be unfreeable. TODO - change this
 memcached_return_t
 pku_memcached_mget(const char * const *keys, const size_t *key_length,
    size_t number_of_keys, item **list){
@@ -690,8 +686,18 @@ pku_memcached_insert(const char* key, size_t nkey, const char * data, size_t dat
     memcpy(ITEM_data(it), data, datan);
     memcpy(ITEM_data(it) + datan, "\r\n", 2);
     uint32_t hv = tcd_hash(key, nkey);
-    if (!(do_store_item(it, NREAD_ADD, hv))->sit) {
-      return MEMCACHED_FAILURE;
+    auto pr = do_store_item(it, NREAD_ADD, hv);
+    switch(pr.first){
+      case NOT_FOUND:
+        return MEMCACHED_NOTFOUND;
+      case TOO_LARGE: 
+        return MEMCACHED_E2BIG;
+      case NO_MEMORY:
+        return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
+      case NOT_STORED:
+        return MEMCACHED_NOTSTORED;
+      default:
+        break;
     }
     item_remove(it);         /* release our reference */
   } else {
@@ -718,25 +724,38 @@ pku_memcached_set(const char * key, size_t nkey, const char * data, size_t datan
     }
     it = item_get(key, nkey, DONT_UPDATE);
     if (it) {
-      item_unlink(it);
-      item_remove(it);
+      item_unlink(it); // remove item from table
+      item_remove(it); // lazily delete it
     }
+    // If we're storing, don't allow data to overwrite to persist in cache,
+    // we prefer old data to not exist than pollute the cache
+    return MEMCACHED_NOTSTORED;
   }
 
   if (it != NULL) {
     memcpy(ITEM_data(it), data, datan);
     memcpy(ITEM_data(it) + datan, "\r\n", 2);
-    uint32_t hv = tcd_hash(key, nkey);
-    if (!(store_item(it, NREAD_ADD, hv))->sit) {
-      return MEMCACHED_FAILURE;
-    }
+    auto res = store_item(it, NREAD_SET);
     item_remove(it);         /* release our reference */
+    dec_lookers();
+    switch(res) {
+      case EXISTS:
+      case STORED:
+        break;
+      case NOT_FOUND:
+        return MEMCACHED_NOTFOUND;
+      case TOO_LARGE: 
+        return MEMCACHED_E2BIG;
+      case NO_MEMORY:
+        return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
+      case NOT_STORED:
+        return MEMCACHED_NOTSTORED;
+    }
   } else {
     perror("SERVER_ERROR Out of memory allocating new item");
     return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
   }
-  dec_lookers();
-  return MEMCACHED_SUCCESS;
+  return MEMCACHED_STORED;
 }
 
 memcached_return_t
@@ -756,8 +775,8 @@ pku_memcached_flush(uint32_t exptime){
 memcached_return_t
 pku_memcached_delete(const char * key, size_t nkey, uint32_t exptime){
   item *it;
-  uint32_t hv;
   memcached_return_t ret;
+  uint32_t hv;
 
   it = item_get_locked(key, nkey, DONT_UPDATE, &hv);
   if (it) {
@@ -786,14 +805,13 @@ pku_memcached_append(const char * key, size_t nkey, const char * data, size_t da
   }
   memcpy(ITEM_data(it), data, datan);
   memcpy(ITEM_data(it) + datan, "\r\n", 2);
-  uint32_t hv = tcd_hash(key, nkey);
-  if (!do_store_item(it, NREAD_APPEND, hv)->sit){
+  if (store_item(it, NREAD_APPEND) != STORED){
     dec_lookers();
-    return MEMCACHED_FAILURE;
+    return MEMCACHED_NOTSTORED;
   }
   item_remove(it);
   dec_lookers();
-  return MEMCACHED_SUCCESS;  
+  return MEMCACHED_STORED;  
 }
 
 memcached_return_t
@@ -813,14 +831,13 @@ pku_memcached_prepend(const char * key, size_t nkey, const char * data, size_t d
   }
   memcpy(ITEM_data(it), data, datan);
   memcpy(ITEM_data(it) + datan, "\r\n", 2);
-  uint32_t hv = tcd_hash(key, nkey);
-  if (!do_store_item(it, NREAD_PREPEND, hv)->sit){
+  if (store_item(it, NREAD_PREPEND) != STORED){
     dec_lookers();
-    return MEMCACHED_FAILURE;
+    return MEMCACHED_NOTSTORED;
   }
   item_remove(it);
   dec_lookers();
-  return MEMCACHED_SUCCESS;  
+  return MEMCACHED_STORED;
 }
 
 memcached_return_t
@@ -841,12 +858,27 @@ pku_memcached_replace(const char * key, size_t nkey, const char * data, size_t d
   memcpy(ITEM_data(it), data, datan);
   memcpy(ITEM_data(it) + datan, "\r\n", 2);
   uint32_t hv = tcd_hash(key, nkey);
-  if (!do_store_item(it, NREAD_REPLACE, hv)->sit){
-    dec_lookers();
-    return MEMCACHED_FAILURE;
+  auto pr = do_store_item(it, NREAD_REPLACE, hv);
+  switch(pr.first) {
+    case EXISTS:
+    case STORED:
+      break;
+    case NOT_FOUND:
+      dec_lookers();
+      return MEMCACHED_NOTFOUND;
+    case TOO_LARGE: 
+      dec_lookers();
+      return MEMCACHED_E2BIG;
+    case NO_MEMORY:
+      dec_lookers();
+      return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
+    case NOT_STORED:
+      dec_lookers();
+      return MEMCACHED_NOTSTORED;
   }
   item_remove(it);
   dec_lookers();
   return MEMCACHED_SUCCESS;  
 
 }
+

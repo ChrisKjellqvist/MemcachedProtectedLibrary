@@ -112,6 +112,7 @@ item **fetch_ptrs;
 static unsigned nptrs = 0;
 static unsigned ptrcnt = 0;
 
+// This may not work...
 HODOR_FUNC_ATTR
 memcached_result_st*
 memcached_fetch_result_internal

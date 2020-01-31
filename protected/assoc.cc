@@ -178,8 +178,9 @@ int assoc_insert(item *it, const uint32_t hv) {
     it->h_next = old_hashtable[oldbucket];
     old_hashtable[oldbucket] = it;
   } else {
-    it->h_next = primary_hashtable[hv & hashmask(hashpower)];
-    primary_hashtable[hv & hashmask(hashpower)] = it;
+    size_t ind = hv & hashmask(hashpower);
+    it->h_next = primary_hashtable[ind];
+    primary_hashtable[ind] = pptr<item>(it);
   }
   return 1;
 }

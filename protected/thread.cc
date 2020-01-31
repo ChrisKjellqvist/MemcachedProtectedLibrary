@@ -86,11 +86,15 @@ void memcached_thread_init() {
     lru_locks = RP_get_root<pthread_mutex_t>(RPMRoot::LRULocks);
   }
   if (is_server){
+    pthread_mutexattr_t attr;
+    pthread_mutexattr_init(&attr);
+    // the mutex may be shared across processes
+    pthread_mutexattr_setpshared(&attr, 1);
     for (unsigned i = 0; i < POWER_LARGEST; ++i)
-      pthread_mutex_init(&lru_locks[i], NULL);
-    pthread_mutex_init(stats_lock, NULL);
+      pthread_mutex_init(&lru_locks[i], &attr);
+    pthread_mutex_init(stats_lock, &attr);
     for (unsigned i = 0; i < item_lock_count; i++) {
-      pthread_mutex_init(&item_locks[i], NULL);
+      pthread_mutex_init(&item_locks[i], &attr);
     }
   }
 }
@@ -194,7 +198,10 @@ void item_remove(item *item) {
  * it to be thread-safe.
  */
 int item_replace(item *old_it, item *new_it, const uint32_t hv) {
-  return do_item_replace(old_it, new_it, hv);
+  item_lock(hv);
+  int q = do_item_replace(old_it, new_it, hv);
+  item_unlock(hv);
+  return q;
 }
 
 /*
@@ -228,16 +235,13 @@ enum delta_result_type add_delta(const char *key,
  * Stores an item in the cache (high level, obeys set/add/replace semantics)
  */
 enum store_item_type store_item(item *item, int comm) {
-  struct st_st *ret;
   uint32_t hv;
 
   hv = tcd_hash(ITEM_key(item), item->nkey);
   item_lock(hv);
-  ret = do_store_item(item, comm, hv);
+  auto ret = do_store_item(item, comm, hv).first;
   item_unlock(hv);
-  enum store_item_type my_t = ret->sit;
-  free(ret);
-  return my_t;
+  return ret;
 }
 
 /******************************* GLOBAL STATS ******************************/

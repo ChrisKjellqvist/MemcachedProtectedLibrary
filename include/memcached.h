@@ -51,7 +51,8 @@ enum RPMRoot {
   SlabclassAr = 10,
   MemLimit = 11,
   EndSignal = 12,
-  CTime = 13
+  CTime = 13,
+  SlabLock = 14,
 };
 extern int is_server;
 extern int is_restart;
@@ -499,7 +500,7 @@ enum delta_result_type do_add_delta(const char *key,
     const size_t nkey, const bool incr,
     const uint64_t delta, uint64_t *value, const uint32_t hv);
 
-struct st_st *do_store_item(item *item, int comm, const uint32_t hv);
+std::pair<store_item_type, size_t> do_store_item(item *item, int comm, const uint32_t hv);
 extern int daemonize(int nochdir, int noclose);
 
 #define mutex_lock(x) pthread_mutex_lock(x)
