@@ -42,7 +42,8 @@ unsigned int item_lock_hashpower = 11;
  */
 
 void item_lock(uint32_t hv) {
-  mutex_lock(&item_locks[hv & hashmask(item_lock_hashpower)]);
+  volatile unsigned q = hv & hashmask(item_lock_hashpower);
+  mutex_lock(&item_locks[q]);
 }
 
 void *item_trylock(uint32_t hv) {
@@ -198,10 +199,7 @@ void item_remove(item *item) {
  * it to be thread-safe.
  */
 int item_replace(item *old_it, item *new_it, const uint32_t hv) {
-  item_lock(hv);
-  int q = do_item_replace(old_it, new_it, hv);
-  item_unlock(hv);
-  return q;
+  return do_item_replace(old_it, new_it, hv);
 }
 
 /*
