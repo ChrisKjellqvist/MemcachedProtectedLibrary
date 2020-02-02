@@ -65,7 +65,6 @@
  */
 
 /* THREADCACHED */
-#include <rpmalloc.hpp>
 #include <utility>
 int is_server, is_restart;
 

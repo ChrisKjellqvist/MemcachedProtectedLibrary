@@ -6,7 +6,6 @@
 #include <hodor-plib.h>
 #include <hodor.h>
 #include <sys/mman.h>
-#include <rpmalloc.hpp>
 #include <string.h>
 
 extern std::atomic<int> *end_signal;

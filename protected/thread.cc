@@ -10,10 +10,6 @@
 #include <string.h>
 #include <pthread.h>
 
-// Threadcached
-#include <rpmalloc.hpp>
-
-
 #define ITEMS_PER_ALLOC 64
  
 // The following sets of locks ~probably~ don't have to be persistent, but they

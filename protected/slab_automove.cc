@@ -9,7 +9,6 @@
 #include "slab_automove.h"
 #include <stdlib.h>
 #include <string.h>
-#include <rpmalloc.hpp>
 
 #define MIN_PAGES_FOR_SOURCE 2
 #define MIN_PAGES_FOR_RECLAIM 2.5

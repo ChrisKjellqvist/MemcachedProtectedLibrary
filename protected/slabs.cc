@@ -21,9 +21,6 @@
 #include <signal.h>
 #include <assert.h>
 #include <pthread.h>
-// threadcached
-#include <rpmalloc.hpp>
-#include <pptr.hpp>
 
 //#define DEBUG_SLAB_MOVER
 /* powers-of-N allocation structures */

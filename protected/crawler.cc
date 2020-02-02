@@ -22,9 +22,6 @@
 #include <poll.h>
 
 #include "bipbuffer.h"
-// threadcached
-#include <pptr.hpp>
-#include <rpmalloc.hpp>
 #define LARGEST_ID POWER_LARGEST
 
 struct crawler_module_reg_t;
@@ -90,11 +87,11 @@ static pthread_cond_t  lru_crawler_cond = PTHREAD_COND_INITIALIZER;
 
 /* Will crawl all slab classes a minimum of once per hour */
 
-static const int MAX_MAINTCRAWL_WAIT = 60 * 60;
+//static const int MAX_MAINTCRAWL_WAIT = 60 * 60;
 
 /*** LRU CRAWLER THREAD ***/
 
-static const int LRU_CRAWLER_WRITEBUF = 8192;
+//static const int LRU_CRAWLER_WRITEBUF = 8192;
 
 static int crawler_expired_init(crawler_module_t *cm, void *data) {
   crawler_expired_data *d;

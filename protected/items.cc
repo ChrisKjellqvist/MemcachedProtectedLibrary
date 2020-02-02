@@ -17,8 +17,6 @@
 #include <unistd.h>
 #include <poll.h>
 
-#include <rpmalloc.hpp>
-
 /* Forward Declarations */
 static void item_link_q(item *it);
 static void item_unlink_q(item *it);
@@ -656,7 +654,7 @@ int lru_pull_tail(const int orig_id, const int cur_lru,
     return 0;
 
   int tries = 5;
-  item *search;
+  pptr<item> search;
   item *next_it;
   void *hold_lock = NULL;
   unsigned int move_to_lru = 0;
@@ -667,7 +665,7 @@ int lru_pull_tail(const int orig_id, const int cur_lru,
   pthread_mutex_lock(&lru_locks[id]);
   search = tails[id];
   /* We walk up *only* for locked items, and if bottom is expired. */
-  for (; tries > 0 && search != NULL; tries--, search=next_it) {
+  for (; tries > 0 && (!search.is_null()); tries--, search=next_it) {
     /* we might relink search mid-loop, so search->prev isn't reliable */
     next_it = search->prev;
     if (search->nbytes == 0 && search->nkey == 0 && search->it_flags == 1) {

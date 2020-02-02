@@ -85,6 +85,7 @@ enum delta_result_type {
 extern "C" {
 #endif
   typedef struct {
+    bool a;
   } memcached_st;
 
   typedef struct {

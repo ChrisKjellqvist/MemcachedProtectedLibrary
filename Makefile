@@ -5,12 +5,15 @@ PROT_OBJ = obj/memcached.o\
 	   obj/slab_automove.o obj/pku_memcached.o obj/util.o\
 	   obj/itoa_ljust.o 
 
-#OPT_LEVEL = -O0 -g
+libralloc=ralloc/test
+libhodor= hodor/libhodor
+
+#OPT_LEVEL = -O1 -g
 OPT_LEVEL = -O3 -g
 ERROR     = -DFAIL_ASSERT
-OPTS_LENIENT = -Iinclude/ -I../rpmalloc/src \
-	       -I../hodor/include -DHAVE_CONFIG_H -MD -MP -Wall -std=c++17 \
-	       -fPIC -I../hodor/libhodor $(OPT_LEVEL) $(ERROR)
+OPTS_LENIENT = -Iinclude/ -Iralloc/src \
+	       -Ihodor/include -DHAVE_CONFIG_H -MD -MP -Wall -std=c++17 \
+	       -fPIC -I$(libhodor) $(OPT_LEVEL) $(ERROR)
 OPTS = $(OPTS_LENIENT) -Werror
 # Default arguments that clang++ passes to the linker. This turns out to be
 # important for C++ programs
@@ -27,33 +30,28 @@ DEFLINK  = --hash-style=gnu --no-add-needed --build-id --eh-frame-hdr -m \
 	   -lgcc_s -lgcc /usr/bin/../lib/gcc/x86_64-redhat-linux/8/crtend.o \
 	   /usr/bin/../lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crtn.o
 
-LIBS = lib/libhodor.a lib/libthreadcached.so lib/librpmalloc.a
+LIBS = $(libhodor)/libhodor.a obj/libthreadcached.so $(libralloc)/libralloc.a
 LINKOPTS = $(DEFLINK) -lpthread -levent -ldl -T scripts/ldscript.lds
 EXE = bin/server.exe bin/end.exe
 TEST_RUN = bin/get.exe bin/insert.exe bin/timed_get.exe
 PERF_RUN = bin/insert_test.exe bin/get_test.exe
 RPMA_RUN = bin/basic_setup.exe bin/basic_test.exe
 
-.PHONY : perf all lib bin dlib install
+.PHONY : perf all lib bin install
 perf: $(EXE) $(PERF_RUN)
 all: $(EXE) $(TEST_RUN)
-lib: lib/libthreadcached.so
-lib/libmemcached.so: lib/libthreadcached.so
-	mv $^ lib/libmemcached.so
-dlib: lib/libmemcached.so
+lib: obj/libthreadcached.so
 bin: bin/server.exe
 	mv $^ bin/memcached
 
 bin/%.exe: $(LIBS) obj/%.o
 	ld $(LINKOPTS) $^ -o $@
-lib/libhodor.a:
-	cp ~/hodor/libhodor/libhodor.a lib/
-lib/libthreadcached.so: $(PROT_OBJ)
-	$(CC) -shared $(PROT_OBJ) $(OPTS) -o lib/libthreadcached.so
-
-lib/librpmalloc.a:
-	$(MAKE) librpmalloc.a -C ~/rpmalloc/test
-	cp ~/rpmalloc/test/librpmalloc.a $@
+$(libhodor)/libhodor.a:
+	make -C $(libhodor) libhodor.a
+obj/libthreadcached.so: $(PROT_OBJ)
+	$(CC) -shared $(PROT_OBJ) $(OPTS) -o $@ 
+$(libralloc)/libralloc.a:
+	$(MAKE) -C ralloc/test libralloc.a
 
 obj/%.o: protected/%.cc
 	$(CC) -c $^ $(OPTS) -MT $@ -o $@
@@ -65,6 +63,8 @@ obj/%.o: unprotected/%.cc
 .PHONY : clean
 clean: 
 	rm -f obj/* exec *.d /dev/shm/memcached* $(EXE) $(TEST_RUN) $(PERF_RUN) $(RPMA_RUN)
+	make -C $(libhodor) clean
+	make -C $(libralloc) clean
 .PHONY : reset
 reset:
 	rm -f /dev/shm/memcached*

@@ -32,7 +32,7 @@ using rel_time_t = int;
 #include "murmur3_hash.h"
 #include "itoa_ljust.h"
 #include <atomic>
-#include <rpmalloc.hpp>
+#include <ralloc.hpp>
 #include <BaseMeta.hpp>
 #define tcd_hash MurmurHash3_x86_32
 /* RPMalloc Root IDs */
