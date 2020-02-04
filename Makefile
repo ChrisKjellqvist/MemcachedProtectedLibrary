@@ -5,6 +5,11 @@ PROT_OBJ = obj/memcached.o\
 	   obj/slab_automove.o obj/pku_memcached.o obj/util.o\
 	   obj/itoa_ljust.o 
 
+SERV_OBJ = obj/memcached.o\
+	   obj/murmur3_hash.o obj/items.o obj/assoc.o obj/thread.o \
+	   obj/bipbuffer.o obj/crawler.o obj/slabs.o \
+	   obj/slab_automove.o obj/util.o obj/itoa_ljust.o 
+
 libralloc=ralloc/test
 libhodor= hodor/libhodor
 

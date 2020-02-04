@@ -432,33 +432,31 @@ static int sigignore(int sig) {
 }
 #endif
 
-/**
- * Do basic sanity check of the runtime environment
- * @return true if no errors found, false if we can't use this env
- */
+void server_init() {
+  *end_signal = 0;
+  struct event_config *ev_config;
+  ev_config = event_config_new();
+  event_config_set_flag(ev_config, EVENT_BASE_FLAG_NOLOCK);
+  main_base = event_base_new_with_config(ev_config);
+  event_config_free(ev_config);
+
+  if (is_restart) {
+    RP_recover();
+  }
+}
+
 // run this regardless of whether you're a server or a client
 void agnostic_init(){
-  if (!is_restart && is_server){
+  if (!is_restart){
     end_signal = (std::atomic<int>*)RP_malloc(sizeof(std::atomic<int>));
     current_time = (rel_time_t*)RP_malloc(sizeof(rel_time_t));
     assert(end_signal != nullptr);
     assert(current_time != nullptr);
     RP_set_root(end_signal, RPMRoot::EndSignal);
-
     RP_set_root((void*)current_time, RPMRoot::CTime);
   } else {
     end_signal = RP_get_root<std::atomic<int> >(RPMRoot::EndSignal);
     current_time = RP_get_root<rel_time_t>(RPMRoot::CTime);
-  }
-
-  if (is_server){
-    *end_signal = 0;
-    
-    struct event_config *ev_config;
-    ev_config = event_config_new();
-    event_config_set_flag(ev_config, EVENT_BASE_FLAG_NOLOCK);
-    main_base = event_base_new_with_config(ev_config);
-    event_config_free(ev_config);
   }
   enum {
     MAXCONNS_FAST = 0,
