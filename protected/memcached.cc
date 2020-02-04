@@ -66,7 +66,7 @@
 
 /* THREADCACHED */
 #include <utility>
-int is_server, is_restart;
+int is_restart;
 
 /* defaults */
 static void settings_init(void);
@@ -432,7 +432,7 @@ static int sigignore(int sig) {
 }
 #endif
 
-void server_init() {
+void server_start() {
   *end_signal = 0;
   struct event_config *ev_config;
   ev_config = event_config_new();
@@ -500,9 +500,6 @@ void agnostic_init(){
   /* initialize other stuff */
   assoc_init(settings.hashpower_init);
   slabs_init(settings.factor);
-
-  if (is_server && is_restart)
-    RP_recover();
 }
 
 void* server_thread (void *pargs) {
