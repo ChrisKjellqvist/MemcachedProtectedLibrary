@@ -287,13 +287,12 @@ memcached_end(){
 // server is either 0 or 1 to represent whether or not we are initializing
 // for a server process or a client process
 static bool run_once = false;
-void memcached_init(int server){
+void memcached_init(){
   if (!run_once){
     run_once = true;
   } else return;
   is_restart = RP_init("memcached.rpma");
   printf("is restart? %d\n", is_restart);
-  is_server = server;
   int i = 0;
   void *start, *end;
   fetch_ptrs = (item**)RP_malloc(sizeof(item*)*128);

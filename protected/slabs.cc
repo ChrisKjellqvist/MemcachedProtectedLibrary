@@ -113,7 +113,13 @@ void slabs_init(const double factor) {
   unsigned int size = sizeof(item) + settings.chunk_size;
   // CHRIS - we used to have a statically allocated set of slabclasses. Make
   // them dynamically allocated so that we can make them persistent
-  if (is_server && !is_restart){
+  if (is_restart){
+    slabclass = pptr<slabclass_t>(
+        RP_get_root<slabclass_t>(RPMRoot::SlabclassAr));
+    slabs_lock = (pthread_mutex_t*)RP_get_root<pthread_mutex_t>
+      (RPMRoot::SlabLock);
+    power_largest = MAX_NUMBER_OF_SLAB_CLASSES - 1;
+  } else {
     slabclass = pptr<slabclass_t>((slabclass_t*)
         RP_malloc(sizeof(slabclass_t)*MAX_NUMBER_OF_SLAB_CLASSES));
     memset(slabclass, 0,
@@ -140,13 +146,6 @@ void slabs_init(const double factor) {
       settings.slab_page_size / settings.slab_chunk_size_max;
     RP_set_root(&*slabclass, RPMRoot::SlabclassAr);
     RP_set_root(slabs_lock, RPMRoot::SlabLock);
-  } else {
-    // you are not the server or this is a restart
-    slabclass = pptr<slabclass_t>(
-        RP_get_root<slabclass_t>(RPMRoot::SlabclassAr));
-    slabs_lock = (pthread_mutex_t*)RP_get_root<pthread_mutex_t>
-      (RPMRoot::SlabLock);
-    power_largest = MAX_NUMBER_OF_SLAB_CLASSES - 1;
   }
 }
 

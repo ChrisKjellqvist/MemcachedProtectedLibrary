@@ -63,7 +63,7 @@ void assoc_init(const int hashtable_init) {
   if (hashtable_init) {
     hashpower = hashtable_init;
   }
-  if (!is_restart && is_server){
+  if (!is_restart){
     primary_hashtable = (pptr<item>*)
       RP_calloc(hashsize(hashpower), sizeof(pptr<item>));
     assert(primary_hashtable != nullptr);

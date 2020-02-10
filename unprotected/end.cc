@@ -55,7 +55,7 @@ char *keys[N_INSERT];
 char *dats[N_INSERT];
 
 int main(){
-  memcached_init(0);
+  memcached_init();
   memcached_end();
   return 0;
 }

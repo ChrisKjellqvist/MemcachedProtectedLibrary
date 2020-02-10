@@ -72,7 +72,7 @@ DEFINE_API(memcached_return_t, memcached_flush, uint32_t exptime);
 memcached_return_t
 memcached_end    ();
 
-void memcached_init(int server);
+void memcached_init();
 
 #ifdef __cplusplus
 }

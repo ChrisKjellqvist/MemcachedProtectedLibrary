@@ -60,7 +60,7 @@ static pthread_mutex_t lru_maintainer_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t cas_id_lock = PTHREAD_MUTEX_INITIALIZER;
 
 void items_init(){
-  if (!is_server || is_restart){
+  if (is_restart){
     // get roots
     heads = (pptr<item>*)RP_get_root<char>(RPMRoot::Heads);
     tails = (pptr<item>*)RP_get_root<char>(RPMRoot::Tails);

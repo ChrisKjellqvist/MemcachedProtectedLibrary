@@ -433,16 +433,6 @@ static int sigignore(int sig) {
 #endif
 
 void server_start() {
-  *end_signal = 0;
-  struct event_config *ev_config;
-  ev_config = event_config_new();
-  event_config_set_flag(ev_config, EVENT_BASE_FLAG_NOLOCK);
-  main_base = event_base_new_with_config(ev_config);
-  event_config_free(ev_config);
-
-  if (is_restart) {
-    RP_recover();
-  }
 }
 
 // run this regardless of whether you're a server or a client
@@ -503,9 +493,17 @@ void agnostic_init(){
 }
 
 void* server_thread (void *pargs) {
-  is_server = 1;
-  fflush(stdout);
+  
+  *end_signal = 0;
+  struct event_config *ev_config;
+  ev_config = event_config_new();
+  event_config_set_flag(ev_config, EVENT_BASE_FLAG_NOLOCK);
+  main_base = event_base_new_with_config(ev_config);
+  event_config_free(ev_config);
 
+  if (is_restart) {
+    RP_recover();
+  }
   /* handle SIGINT and SIGTERM */
   signal(SIGINT, sig_handler);
   signal(SIGTERM, sig_handler);

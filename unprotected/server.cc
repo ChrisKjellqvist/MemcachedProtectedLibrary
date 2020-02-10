@@ -2,6 +2,6 @@
 #include <memcached.h>
 
 int main(){
-  memcached_init(1);
+  memcached_init();
   server_thread(nullptr);
 }

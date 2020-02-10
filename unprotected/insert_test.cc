@@ -76,7 +76,7 @@ packet* create_random_packet(){
 
 int main(){
   srand(71798);
-  memcached_init(0);
+  memcached_init();
   unsigned long long begin, end, count = 0;
   const int n = 100000;
   size_t nkB = 0;

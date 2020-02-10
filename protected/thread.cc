@@ -64,7 +64,11 @@ void item_unlock(uint32_t hv) {
  */
 void memcached_thread_init() {
   item_lock_count = hashsize(item_lock_hashpower);
-  if (is_server && !is_restart){
+  if (is_restart){
+    item_locks = RP_get_root<pthread_mutex_t>(RPMRoot::ItemLocks);
+    stats_lock = RP_get_root<pthread_mutex_t>(RPMRoot::StatLock);
+    lru_locks = RP_get_root<pthread_mutex_t>(RPMRoot::LRULocks);
+  } else {
     lru_locks = (pthread_mutex_t*)RP_malloc(sizeof(pthread_mutex_t)*POWER_LARGEST);
     item_locks = (pthread_mutex_t*)RP_calloc(item_lock_count, sizeof(pthread_mutex_t));
     stats_lock = (pthread_mutex_t*)RP_malloc(sizeof(pthread_mutex_t));
@@ -76,13 +80,7 @@ void memcached_thread_init() {
     RP_set_root(item_locks, RPMRoot::ItemLocks);
     RP_set_root(stats_lock, RPMRoot::StatLock);
     RP_set_root(lru_locks, RPMRoot::LRULocks);
-  } else {
-
-    item_locks = RP_get_root<pthread_mutex_t>(RPMRoot::ItemLocks);
-    stats_lock = RP_get_root<pthread_mutex_t>(RPMRoot::StatLock);
-    lru_locks = RP_get_root<pthread_mutex_t>(RPMRoot::LRULocks);
-  }
-  if (is_server){
+    
     pthread_mutexattr_t attr;
     pthread_mutexattr_init(&attr);
     // the mutex may be shared across processes
