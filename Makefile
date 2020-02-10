@@ -1,4 +1,4 @@
-CXX = g++
+CXX=g++
 PROT_OBJ = obj/memcached.o\
 	   obj/murmur3_hash.o obj/items.o obj/assoc.o obj/thread.o \
 	   obj/bipbuffer.o obj/crawler.o obj/slabs.o \
@@ -16,8 +16,8 @@ libhodor= hodor/libhodor
 #OPT_LEVEL = -O1 -g
 OPT_LEVEL = -O3 -g
 ERROR     = -DFAIL_ASSERT
-OPTS_LENIENT = -Iinclude/ -Iralloc/src \
-	       -Ihodor/include -DHAVE_CONFIG_H -MD -MP -Wall -Werror \
+OPTS = -Iinclude/ -Iralloc/src -levent\
+	       -Ihodor/include -DHAVE_CONFIG_H -Wall -Werror \
 	       -std=c++17 -fPIC -I$(libhodor) $(OPT_LEVEL) $(ERROR)
 
 LIBS = $(libhodor)/libhodor.a obj/libthreadcached.so $(libralloc)/libralloc.a
@@ -44,10 +44,10 @@ $(libralloc)/libralloc.a:
 	$(MAKE) -C ralloc/test libralloc.a
 
 obj/%.o: protected/%.cc
-	$(CXX) -c $^ $(OPTS) -MT $@ -o $@
+	$(CXX) -c $^ $(OPTS) -o $@
 
 obj/%.o: unprotected/%.cc
-	$(CXX) -c $^ $(OPTS) -MT $@ -o $@
+	$(CXX) -c $^ $(OPTS) -o $@
 
 
 .PHONY : clean
