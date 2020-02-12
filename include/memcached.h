@@ -53,6 +53,11 @@ enum RPMRoot {
   EndSignal = 12,
   CTime = 13,
   SlabLock = 14,
+  ActiveTrans = 15,
+  BookTrans = 16,
+  ListToPersist = 17,
+  ListToFree = 18,
+  Epoch = 19,
 };
 extern int is_server;
 extern int is_restart;
