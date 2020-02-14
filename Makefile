@@ -11,16 +11,15 @@ SERV_OBJ = obj/memcached.o\
 	   obj/slab_automove.o obj/util.o obj/itoa_ljust.o 
 
 libralloc=ralloc/test
-libhodor= hodor/libhodor
 
 #OPT_LEVEL = -O1 -g
 OPT_LEVEL = -O3 -g
 ERROR     = -DFAIL_ASSERT
 OPTS = -Iinclude/ -Iralloc/src -levent\
-	       -Ihodor/include -DHAVE_CONFIG_H -Wall -Werror \
-	       -std=c++17 -fPIC -I$(libhodor) $(OPT_LEVEL) $(ERROR)
+	       -DHAVE_CONFIG_H -Wall -Werror \
+	       -std=c++17 -fPIC $(OPT_LEVEL) $(ERROR)
 
-LIBS = $(libhodor)/libhodor.a obj/libthreadcached.so $(libralloc)/libralloc.a
+LIBS = obj/libthreadcached.so $(libralloc)/libralloc.a
 LINKOPTS = -lpthread -levent -ldl
 EXE = bin/server.exe bin/end.exe
 TEST_RUN = bin/get.exe bin/insert.exe bin/timed_get.exe
@@ -36,8 +35,6 @@ bin: bin/server.exe
 
 bin/%.exe: $(LIBS) obj/%.o
 	$(CXX) $(LINKOPTS) $^ -o $@
-$(libhodor)/libhodor.a:
-	make -C $(libhodor) libhodor.a
 obj/libthreadcached.so: $(PROT_OBJ)
 	$(CXX) -shared $(PROT_OBJ) $(OPTS) -o $@ 
 $(libralloc)/libralloc.a:
@@ -53,12 +50,9 @@ obj/%.o: unprotected/%.cc
 .PHONY : clean
 clean: 
 	rm -f obj/* exec *.d /dev/shm/memcached* $(EXE) $(TEST_RUN) $(PERF_RUN) $(RPMA_RUN)
-	make -C $(libhodor) clean
 	make -C $(libralloc) clean
 .PHONY : reset
 reset:
 	rm -f /dev/shm/memcached*
 
-# hodor/apps/kv/app/Makefile
 # include/hodo-plib.h
-# localdisk/qemu-clean.img -- for vm

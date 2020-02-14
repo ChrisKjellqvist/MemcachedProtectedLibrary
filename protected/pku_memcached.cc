@@ -112,7 +112,6 @@ static unsigned nptrs = 0;
 static unsigned ptrcnt = 0;
 
 // This may not work...
-HODOR_FUNC_ATTR
 memcached_result_st*
 memcached_fetch_result_internal
   (memcached_result_st *result, memcached_return_t *error){
@@ -138,9 +137,8 @@ memcached_fetch_result_internal
   result->item_flags = it->it_flags;
   result->item_expiration = (time_t)it->exptime;
   return result;
-} HODOR_FUNC_EXPORT(memcached_fetch_result_internal, 2);
+} 
 
-HODOR_FUNC_ATTR
 char *
 memcached_get_internal
   (const char * key, size_t key_length, size_t *value_length, uint32_t *flags,
@@ -150,9 +148,8 @@ memcached_get_internal
   *error = pku_memcached_get(key, key_length, buff, value_length,
       flags);
   return buff;
-} HODOR_FUNC_EXPORT(memcached_get_internal, 5);
+} 
 
-HODOR_FUNC_ATTR
 memcached_return_t
 memcached_mget_internal
   (const char * const *keys, const size_t *key_length, size_t number_of_keys){
@@ -162,53 +159,47 @@ memcached_mget_internal
   ptrcnt = 0;
   nptrs = number_of_keys;
   return MEMCACHED_SUCCESS;
-} HODOR_FUNC_EXPORT(memcached_mget_internal, 3);
+} 
 
-HODOR_FUNC_ATTR
 memcached_return_t
 memcached_set_internal
   (const char* key, size_t nkey, const char * data, size_t datan, uint32_t exptime, 
    uint32_t flags){
   return pku_memcached_set(key, nkey, data, datan, exptime);
-} HODOR_FUNC_EXPORT(memcached_set_internal, 6);
+} 
 
-HODOR_FUNC_ATTR
 memcached_return_t
 memcached_add_internal
   (const char* key, size_t nkey, const char * data, size_t datan, uint32_t exptime,
    uint32_t flags){
   return pku_memcached_insert(key, nkey, data, datan, exptime);
-} HODOR_FUNC_EXPORT(memcached_insert_internal, 6);
+} 
 
-HODOR_FUNC_ATTR
 memcached_return_t
 memcached_replace_internal
   (const char* key, size_t nkey, const char * data, size_t datan, uint32_t exptime,
    uint32_t flags){
   return pku_memcached_replace(key, nkey, data, datan, exptime, flags);
-} HODOR_FUNC_EXPORT(memcached_replace_internal, 6);
+} 
 
-HODOR_FUNC_ATTR
 memcached_return_t
 memcached_append_internal(const char * key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime, uint32_t flags){
   return pku_memcached_append(key, nkey, data, datan, exptime, flags);
-} HODOR_FUNC_EXPORT(memcached_append_internal, 6);
+} 
 
-HODOR_FUNC_ATTR
 memcached_return_t
 memcached_prepend_internal(const char * key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime, uint32_t flags){
   return pku_memcached_prepend(key, nkey, data, datan, exptime, flags);
-} HODOR_FUNC_EXPORT(memcached_prepend_internal, 6);
+} 
 
-HODOR_FUNC_ATTR
 memcached_return_t
 memcached_delete_internal(const char* key, size_t nkey, uint32_t exptime){
   return pku_memcached_delete(key, nkey, exptime);
-} HODOR_FUNC_EXPORT(memcached_delete_internal, 3);
+} 
 
-HODOR_FUNC_ATTR
+
 memcached_return_t
 memcached_increment_internal
   (const char* key, size_t nkey, uint64_t delta, uint64_t *value){
@@ -218,9 +209,9 @@ memcached_increment_internal
     default:
       return MEMCACHED_FAILURE;
   }
-} HODOR_FUNC_EXPORT(memcached_increment_internal, 4);
+} 
 
-HODOR_FUNC_ATTR
+
 memcached_return_t
 memcached_decrement_internal
   (const char* key, size_t nkey, uint64_t delta, uint64_t *value){
@@ -230,9 +221,9 @@ memcached_decrement_internal
     default:
       return MEMCACHED_FAILURE;
   }
-} HODOR_FUNC_EXPORT(memcached_decrement_internal, 4);
+} 
 
-HODOR_FUNC_ATTR
+
 memcached_return_t
 memcached_increment_with_initial_internal
   (const char * key, size_t nkey, uint64_t delta, uint64_t initial, uint32_t exptime, 
@@ -249,9 +240,9 @@ memcached_increment_with_initial_internal
     default:
       return MEMCACHED_FAILURE;
   }
-} HODOR_FUNC_EXPORT(memcached_increment_with_initial_internal, 6);
+} 
 
-HODOR_FUNC_ATTR
+
 memcached_return_t
 memcached_decrement_with_initial_internal
   (const char * key, size_t nkey, uint64_t delta, uint64_t initial, uint32_t exptime, 
@@ -268,20 +259,19 @@ memcached_decrement_with_initial_internal
     default:
       return MEMCACHED_FAILURE;
   }
-} HODOR_FUNC_EXPORT(memcached_decrement_with_initial_internal, 6);
+} 
 
-HODOR_FUNC_ATTR
+
 memcached_return_t
 memcached_flush_internal(uint32_t exptime){
   return pku_memcached_flush(exptime);
-} HODOR_FUNC_EXPORT(memcached_flush_internal, 1);
+} 
 
-HODOR_FUNC_ATTR
 memcached_return_t
 memcached_end(){
   end_signal->store(1);
   return MEMCACHED_SUCCESS;
-} HODOR_FUNC_EXPORT(memcached_end, 0);
+} 
 
 // Start memcached maintainence processes
 // server is either 0 or 1 to represent whether or not we are initializing
@@ -303,6 +293,6 @@ void memcached_init(){
 
   agnostic_init();
 
-} HODOR_INIT_FUNC(memcached_init);
+}
 }
 
