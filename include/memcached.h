@@ -34,6 +34,7 @@ using rel_time_t = int;
 #include <atomic>
 #include <ralloc.hpp>
 #include <BaseMeta.hpp>
+
 #define tcd_hash MurmurHash3_x86_32
 /* RPMalloc Root IDs */
 #define MEMCACHED_BITFIELD :1
@@ -59,7 +60,6 @@ enum RPMRoot {
   ListToFree = 18,
   Epoch = 19,
 };
-extern int is_server;
 extern int is_restart;
 // 4GB
 const size_t MEMORY_MAX = 4*1024*1024*1024ULL;
@@ -397,10 +397,11 @@ extern struct settings settings;
 #define ITEM_CHUNKED 32
 #define ITEM_CHUNK 64
 
+#include "persistence.h"
 /**
  * Structure for storing items within memcached.
  */
-struct item{
+struct item : public RERO::obj {
   /* Protected by LRU locks */
   pptr<item>      next;
   pptr<item>      prev;
@@ -414,6 +415,8 @@ struct item{
   uint8_t         it_flags;   /* ITEM_* above */
   uint8_t         slabs_clsid;/* which slab class we're in */
   uint8_t         nkey;       /* key length, w/terminating null and padding */
+  std::atomic<unsigned>
+                  epoch = 0;
   /* this odd type prevents type-punning issues when we do
    * the little shuffle to save space when not using CAS. */
   union {
@@ -424,6 +427,10 @@ struct item{
   /* then null-terminated key */
   /* then " flags length\r\n" (no terminating null) */
   /* then data with terminating \r\n (no terminating null; it's binary!) */
+  void commit_memory(RERO::CL_Box &box) {
+    box.add(this, sizeof(item));
+    box.add(ITEM_data(this), nbytes);
+  }
 };
 
 // TODO: If we eventually want user loaded modules, we can't use an enum :(

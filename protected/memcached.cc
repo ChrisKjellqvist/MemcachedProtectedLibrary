@@ -14,51 +14,22 @@
  *      Brad Fitzpatrick <brad@danga.com>
  */
 #include "memcached.h"
-#include <sys/stat.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <signal.h>
 #include <sys/param.h>
-#include <sys/resource.h>
-#include <sys/uio.h>
 #include <ctype.h>
-#include <stdarg.h>
 
 /* some POSIX systems need the following definition
  * to get mlockall flags out of sys/mman.h.  */
 #ifndef _P1003_1B_VISIBLE
 #define _P1003_1B_VISIBLE
 #endif
-/* need this to get IOV_MAX on some platforms. */
-#ifndef __need_IOV_MAX
-#define __need_IOV_MAX
-#endif
-#include <pwd.h>
-#include <sys/mman.h>
-#include <fcntl.h>
-#include <netinet/tcp.h>
-#include <arpa/inet.h>
-#include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
 #include <assert.h>
-#include <limits.h>
 #include <sysexits.h>
-#include <stddef.h>
 
-/* FreeBSD 4.x doesn't have IOV_MAX exposed. */
-#ifndef IOV_MAX
-#if defined(__FreeBSD__) || defined(__APPLE__) || defined(__GNU__)
-# define IOV_MAX 1024
-/* GNU/Hurd don't set MAXPATHLEN
- * http://www.gnu.org/software/hurd/hurd/porting/guidelines.html#PATH_MAX_tt_MAX_PATH_tt_MAXPATHL */
-#ifndef MAXPATHLEN
-#define MAXPATHLEN 4096
-#endif
-#endif
-#endif
+#include "persistence.h"
 
 /*
  * forward declarations
@@ -301,7 +272,15 @@ std::pair<store_item_type, size_t> do_store_item(item *it, int comm, const uint3
 	  if (new_it != NULL)
 	    item_remove(new_it);
 	} else {
+          // README - in the case of append or prepend, the actual item
+          // never becomes visible upwards in our stack. For the purposes
+          // of persistence, commit the memory here (it's pretty much
+          // in the structure anyway)
 	  it = new_it;
+          unsigned e = RERO::begin_tx();
+          it->epoch = e;
+          RERO::add_to_persist(it);
+          RERO::end_tx(e);
 	}
       }
     }
@@ -674,30 +653,42 @@ pku_memcached_insert(const char* key, size_t nkey, const char * data, size_t dat
   inc_lookers();
   item *it = item_alloc(key, nkey, 0, realtime(exptime), datan + 2);
 
+  memcached_return_t t;
   if (it != NULL) {
     memcpy(ITEM_data(it), data, datan);
     memcpy(ITEM_data(it) + datan, "\r\n", 2);
     uint32_t hv = tcd_hash(key, nkey);
+    unsigned e = RERO::begin_tx();
     auto pr = do_store_item(it, NREAD_ADD, hv);
     switch(pr.first){
       case NOT_FOUND:
-        return MEMCACHED_NOTFOUND;
+        t = MEMCACHED_NOTFOUND;
+        break;
       case TOO_LARGE: 
-        return MEMCACHED_E2BIG;
+        t = MEMCACHED_E2BIG;
+        break;
       case NO_MEMORY:
-        return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
+        t = MEMCACHED_MEMORY_ALLOCATION_FAILURE;
+        break;
       case NOT_STORED:
-        return MEMCACHED_NOTSTORED;
+        t = MEMCACHED_NOTSTORED;
+        break;
       default:
+        t = MEMCACHED_SUCCESS;
         break;
     }
     item_remove(it);         /* release our reference */
+    if (t == MEMCACHED_SUCCESS){
+      it->epoch = e;
+      RERO::add_to_persist(it);
+    }
+    RERO::end_tx(e);
   } else {
     perror("SERVER_ERROR Out of memory allocating new item");
     return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
   }
   dec_lookers();
-  return MEMCACHED_SUCCESS;
+  return t;
 }
 
 memcached_return_t
@@ -723,26 +714,40 @@ pku_memcached_set(const char * key, size_t nkey, const char * data, size_t datan
     // we prefer old data to not exist than pollute the cache
     return MEMCACHED_NOTSTORED;
   }
-
   if (it != NULL) {
+    unsigned e = RERO::begin_tx();
     memcpy(ITEM_data(it), data, datan);
     memcpy(ITEM_data(it) + datan, "\r\n", 2);
     auto res = store_item(it, NREAD_SET);
     item_remove(it);         /* release our reference */
+    memcached_return_t t;
     dec_lookers();
     switch(res) {
       case EXISTS:
       case STORED:
+        t = MEMCACHED_SUCCESS;
         break;
       case NOT_FOUND:
-        return MEMCACHED_NOTFOUND;
+        t = MEMCACHED_NOTFOUND;
+        break;
       case TOO_LARGE: 
-        return MEMCACHED_E2BIG;
+        t = MEMCACHED_E2BIG;
+        break;
       case NO_MEMORY:
-        return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
+        t = MEMCACHED_MEMORY_ALLOCATION_FAILURE;
+        break;
       case NOT_STORED:
-        return MEMCACHED_NOTSTORED;
+        t = MEMCACHED_NOTSTORED;
+        break;
+      default:
+        t = MEMCACHED_FAILURE;
     }
+    if (t == MEMCACHED_SUCCESS) {
+      it->epoch = e;
+      RERO::add_to_persist(it);
+    }
+    RERO::end_tx(e);
+    return t;
   } else {
     perror("SERVER_ERROR Out of memory allocating new item");
     return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
@@ -766,6 +771,8 @@ pku_memcached_flush(uint32_t exptime){
 
 memcached_return_t
 pku_memcached_delete(const char * key, size_t nkey, uint32_t exptime){
+  // how to free an item?
+  // For now we think these are very infrequent...
   item *it;
   memcached_return_t ret;
   uint32_t hv;
@@ -773,13 +780,17 @@ pku_memcached_delete(const char * key, size_t nkey, uint32_t exptime){
   it = item_get_locked(key, nkey, DONT_UPDATE, &hv);
   if (it) {
     do_item_unlink(it, hv);
+    it->epoch = 0;
     do_item_remove(it);      /* release our reference */
+    FLUSH(it);
+    FLUSHFENCE;
     ret = MEMCACHED_SUCCESS;
   } else ret = MEMCACHED_FAILURE;
   item_unlock(hv);
   return ret;
 }
 
+// Persistence handled in do_store_item
 memcached_return_t
 pku_memcached_append(const char * key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime, uint32_t flags) {
@@ -801,11 +812,13 @@ pku_memcached_append(const char * key, size_t nkey, const char * data, size_t da
     dec_lookers();
     return MEMCACHED_NOTSTORED;
   }
+  // TODO add to list of some kind
   item_remove(it);
   dec_lookers();
   return MEMCACHED_STORED;  
 }
 
+// Persistence handled in do_store_item
 memcached_return_t
 pku_memcached_prepend(const char * key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime, uint32_t flags) {
@@ -850,27 +863,38 @@ pku_memcached_replace(const char * key, size_t nkey, const char * data, size_t d
   memcpy(ITEM_data(it), data, datan);
   memcpy(ITEM_data(it) + datan, "\r\n", 2);
   uint32_t hv = tcd_hash(key, nkey);
+  unsigned e = RERO::begin_tx();
   auto pr = do_store_item(it, NREAD_REPLACE, hv);
+  memcached_return_t t;
   switch(pr.first) {
     case EXISTS:
     case STORED:
+      t = MEMCACHED_SUCCESS;
       break;
     case NOT_FOUND:
-      dec_lookers();
-      return MEMCACHED_NOTFOUND;
+      t = MEMCACHED_NOTFOUND;
+      break;
     case TOO_LARGE: 
-      dec_lookers();
-      return MEMCACHED_E2BIG;
+      t = MEMCACHED_E2BIG;
+      break;
     case NO_MEMORY:
-      dec_lookers();
-      return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
+      t = MEMCACHED_MEMORY_ALLOCATION_FAILURE;
+      break;
     case NOT_STORED:
-      dec_lookers();
-      return MEMCACHED_NOTSTORED;
+      t = MEMCACHED_NOTSTORED;
+      break;
+    default:
+      t = MEMCACHED_FAILURE;
+      break;
   }
+  if (t == MEMCACHED_SUCCESS){
+    it->epoch = e;
+    RERO::add_to_persist(it);
+  }
+  RERO::end_tx(e);
   item_remove(it);
   dec_lookers();
-  return MEMCACHED_SUCCESS;  
+  return t;
 
 }
 
