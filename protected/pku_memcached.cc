@@ -3,9 +3,6 @@
 #include <memcached.h>
 
 #include <stdlib.h>
-#include <hodor-plib.h>
-#include <hodor.h>
-#include <sys/mman.h>
 #include <string.h>
 
 extern std::atomic<int> *end_signal;
@@ -283,14 +280,7 @@ void memcached_init(){
   } else return;
   is_restart = RP_init("memcached.rpma");
   printf("is restart? %d\n", is_restart);
-  int i = 0;
-  void *start, *end;
   fetch_ptrs = (item**)RP_malloc(sizeof(item*)*128);
-  while (!RP_region_range(i++, &start, &end)){
-    ptrdiff_t rp_region_len = (char*)start - (char*)end;
-    pkey_mprotect(start, rp_region_len, PROT_READ | PROT_WRITE | PROT_EXEC, 1);
-  }
-
   agnostic_init();
 
 }
