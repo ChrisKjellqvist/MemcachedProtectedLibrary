@@ -3,11 +3,6 @@
 #include "bipbuffer.h"
 #include "slab_automove.h"
 #include <sys/stat.h>
-#include <sys/socket.h>
-#include <sys/resource.h>
-#include <fcntl.h>
-#include <netinet/in.h>
-#include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <signal.h>
@@ -22,7 +17,7 @@ static void item_link_q(item *it);
 static void item_unlink_q(item *it);
 
 #define LARGEST_ID POWER_LARGEST
-struct itemstats_t {
+typedef struct {
   uint64_t evicted;
   uint64_t evicted_nonzero;
   uint64_t reclaimed;
@@ -42,8 +37,9 @@ struct itemstats_t {
   uint64_t hits_to_warm;
   uint64_t hits_to_cold;
   uint64_t hits_to_temp;
+  uint64_t mem_requested;
   rel_time_t evicted_time;
-};
+} itemstats_t;
 
 static pptr<item> *heads; // LARGEST_ID
 static pptr<item> *tails; // LARGEST_ID
@@ -53,28 +49,24 @@ static uint64_t *sizes_bytes; // LARGEST_ID
 
 static volatile int do_run_lru_maintainer_thread = 0;
 static int lru_maintainer_initialized = 0;
-
-// These (AFAIK) should only be used by the server, and so we don't need
-// to make heads for them in the mmapped region 
 static pthread_mutex_t lru_maintainer_lock = PTHREAD_MUTEX_INITIALIZER;
-static pthread_mutex_t cas_id_lock = PTHREAD_MUTEX_INITIALIZER;
 
 void items_init(){
   if (is_restart){
     // get roots
-    heads = (pptr<item>*)RP_get_root<char>(RPMRoot::Heads);
-    tails = (pptr<item>*)RP_get_root<char>(RPMRoot::Tails);
+    heads = (pptr<item>*)RP_get_root<item*>(RPMRoot::Heads);
+    tails = (pptr<item>*)RP_get_root<item*>(RPMRoot::Tails);
     itemstats = RP_get_root<itemstats_t>(RPMRoot::ItemStats);
     sizes = RP_get_root<unsigned int>(RPMRoot::Sizes);
     sizes_bytes = RP_get_root<uint64_t>(RPMRoot::SizesBytes);
   } else {
-    heads = (pptr<item>*)RP_calloc(sizeof(pptr<item>), LARGEST_ID);
-    tails = (pptr<item>*)RP_calloc(sizeof(pptr<item>), LARGEST_ID);
+    heads = (pptr<item>*)RP_calloc(sizeof(item*), LARGEST_ID);
+    tails = (pptr<item>*)RP_calloc(sizeof(item*), LARGEST_ID);
     itemstats = (itemstats_t*)RP_calloc(sizeof(itemstats_t), LARGEST_ID);
     sizes = (unsigned int*)RP_calloc(sizeof(unsigned int), LARGEST_ID);
     sizes_bytes = (uint64_t*)RP_calloc(sizeof(uint64_t), LARGEST_ID);
     for(unsigned i = 0; i < LARGEST_ID; ++i)
-      heads[i] = tails[i] = pptr<item>(nullptr);
+      heads[i] = tails[i] = NULL;
 
     RP_set_root(heads, RPMRoot::Heads);
     RP_set_root(tails, RPMRoot::Tails);
@@ -101,30 +93,24 @@ void do_item_stats_add_crawl(const int i, const uint64_t reclaimed,
   itemstats[i].crawler_items_checked += checked;
 }
 
-struct  lru_bump_buf {
-  lru_bump_buf *prev;
-  lru_bump_buf *next;
+typedef struct _lru_bump_buf {
+  struct _lru_bump_buf *prev;
+  struct _lru_bump_buf *next;
   pthread_mutex_t mutex;
   bipbuf_t *buf;
   uint64_t dropped;
-};
+} lru_bump_buf;
 
-struct lru_bump_entry{
+typedef struct {
   item *it;
   uint32_t hv;
-};
+} lru_bump_entry;
+
+static lru_bump_buf *bump_buf_head = NULL;
+static lru_bump_buf *bump_buf_tail = NULL;
+static pthread_mutex_t bump_buf_lock = PTHREAD_MUTEX_INITIALIZER;
 /* TODO: tunable? Need bench results */
 #define LRU_BUMP_BUF_SIZE 8192
-
-/* Get the next CAS id for a new item. */
-/* TODO: refactor some atomics for this. */
-uint64_t get_cas_id(void) {
-  static uint64_t cas_id = 0;
-  pthread_mutex_lock(&cas_id_lock);
-  uint64_t next_id = ++cas_id;
-  pthread_mutex_unlock(&cas_id_lock);
-  return next_id;
-}
 
 int item_is_flushed(item *it) {
   rel_time_t oldest_live = settings.oldest_live;
@@ -158,7 +144,6 @@ unsigned int do_get_lru_size(uint32_t id) {
 /**
  * Generates the variable-sized part of the header for an object.
  *
- * key     - The key
  * nkey    - The length of the key
  * flags   - key flags
  * nbytes  - Number of bytes to hold value and addition CRLF terminator
@@ -176,6 +161,7 @@ static size_t item_make_header(const uint8_t nkey, const unsigned int flags, con
   }
   return sizeof(item) + nkey + *nsuffix + nbytes;
 }
+
 item *do_item_alloc_pull(const size_t ntotal, const unsigned int id) {
   item *it = NULL;
   int i;
@@ -191,13 +177,16 @@ item *do_item_alloc_pull(const size_t ntotal, const unsigned int id) {
     lru_pull_tail(id, COLD_LRU, 0, 0, 0, NULL);
     it = (item*)slabs_alloc(ntotal, id, &total_bytes, 0);
 
-     if (it == NULL) {
-       if (lru_pull_tail(id, COLD_LRU, total_bytes, LRU_PULL_EVICT, 0, NULL) <= 0) {
-         break;
-       }
-     } else {
-       break;
-     }
+    if (it == NULL) {
+      // We send '0' in for "total_bytes" as this routine is always
+      // pulling to evict, or forcing HOT -> COLD migration.
+      // As of this writing, total_bytes isn't at all used with COLD_LRU.
+      if (lru_pull_tail(id, COLD_LRU, total_bytes, LRU_PULL_EVICT, 0, NULL) <= 0) {
+        break;
+      }
+    } else {
+      break;
+    }
   }
 
   if (i > 0) {
@@ -217,8 +206,8 @@ item *do_item_alloc_pull(const size_t ntotal, const unsigned int id) {
 item_chunk *do_item_alloc_chunk(item_chunk *ch, const size_t bytes_remain) {
   // TODO: Should be a cleaner way of finding real size with slabber calls
   size_t size = bytes_remain + sizeof(item_chunk);
-  if (size > (size_t)settings.slab_chunk_size_max)
-    size = (size_t)settings.slab_chunk_size_max;
+  if (size > (long unsigned int)settings.slab_chunk_size_max)
+    size = settings.slab_chunk_size_max;
   unsigned int id = slabs_clsid(size);
 
   item_chunk *nch = (item_chunk *) do_item_alloc_pull(size, id);
@@ -239,7 +228,8 @@ item_chunk *do_item_alloc_chunk(item_chunk *ch, const size_t bytes_remain) {
   slabs_munlock();
   return nch;
 }
-item *do_item_alloc(const char * key, const size_t nkey, const unsigned int flags,
+
+item *do_item_alloc(const char *key, const size_t nkey, const unsigned int flags,
     const rel_time_t exptime, const int nbytes) {
   uint8_t nsuffix;
   item *it = NULL;
@@ -249,7 +239,6 @@ item *do_item_alloc(const char * key, const size_t nkey, const unsigned int flag
     return 0;
 
   size_t ntotal = item_make_header(nkey + 1, flags, nbytes, suffix, &nsuffix);
-  ntotal += sizeof(uint64_t);
 
   unsigned int id = slabs_clsid(ntotal);
   unsigned int hdr_id = 0;
@@ -259,17 +248,19 @@ item *do_item_alloc(const char * key, const size_t nkey, const unsigned int flag
   /* This is a large item. Allocate a header object now, lazily allocate
    *  chunks while reading the upload.
    */
-  if (ntotal > (size_t)settings.slab_chunk_size_max) {
+  if (ntotal > (long unsigned int)settings.slab_chunk_size_max) {
     /* We still link this item into the LRU for the larger slab class, but
      * we're pulling a header from an entirely different slab class. The
      * free routines handle large items specifically.
      */
-    // CHRIS - We sneak in an item chunk object right behind the header. Refer
-    // to memcached.h:433. You put the key, null term, etc... and then chunk
-    // behind it. You can access the chunk as a chunk object (even though the
-    // item doesn't have a chunk field by using the ITEM_schunk macro.) 
-    int htotal = nkey + 1 + nsuffix + sizeof(item) + sizeof(item_chunk) 
-      + sizeof(uint64_t);
+    int htotal = nkey + 1 + nsuffix + sizeof(item) + sizeof(item_chunk);
+#ifdef NEED_ALIGN
+    // header chunk needs to be padded on some systems
+    int remain = htotal % 8;
+    if (remain != 0) {
+      htotal += 8 - remain;
+    }
+#endif
     hdr_id = slabs_clsid(htotal);
     it = do_item_alloc_pull(htotal, hdr_id);
     /* setting ITEM_CHUNKED is fine here because we aren't LINKED yet. */
@@ -286,7 +277,8 @@ item *do_item_alloc(const char * key, const size_t nkey, const unsigned int flag
     return NULL;
   }
 
-  assert(it->slabs_clsid == 0);
+  assert(it->it_flags == 0 || it->it_flags == ITEM_CHUNKED);
+  //assert(it != heads[id]);
 
   /* Refcount is seeded to 1 by slabs_alloc() */
   it->next = it->prev = 0;
@@ -294,11 +286,16 @@ item *do_item_alloc(const char * key, const size_t nkey, const unsigned int flag
   /* Items are initially loaded into the HOT_LRU. This is '0' but I want at
    * least a note here. Compiler (hopefully?) optimizes this out.
    */
-  id |= COLD_LRU;
+  if (settings.temp_lru &&
+      exptime - *current_time <= (int)settings.temporary_ttl) {
+    id |= TEMP_LRU;
+  } else {
+    /* There is only COLD in compat-mode */
+    id |= COLD_LRU;
+  }
   it->slabs_clsid = id;
 
   DEBUG_REFCNT(it, '*');
-  it->it_flags |= ITEM_CAS;
   it->nkey = nkey;
   it->nbytes = nbytes;
   memcpy(ITEM_key(it), key, nkey);
@@ -306,7 +303,6 @@ item *do_item_alloc(const char * key, const size_t nkey, const unsigned int flag
   if (nsuffix > 0) {
     memcpy(ITEM_suffix(it), &flags, sizeof(flags));
   }
-  it->nsuffix = nsuffix;
 
   /* Initialize internal chunk. */
   if (it->it_flags & ITEM_CHUNKED) {
@@ -350,8 +346,31 @@ bool item_size_ok(const size_t nkey, const int flags, const int nbytes) {
 
   size_t ntotal = item_make_header(nkey + 1, flags, nbytes,
       prefix, &nsuffix);
-    ntotal += sizeof(uint64_t);
+
   return slabs_clsid(ntotal) != 0;
+}
+
+/* fixing stats/references during warm start */
+void do_item_link_fixup(item *it) {
+  pptr<item> *head, *tail;
+  int ntotal = ITEM_ntotal(it);
+  uint32_t hv = tcd_hash(ITEM_key(it), it->nkey);
+  assoc_insert(it, hv);
+
+  head = &heads[it->slabs_clsid];
+  tail = &tails[it->slabs_clsid];
+  if (it->prev == 0 && *head == 0) *head = it;
+  if (it->next == 0 && *tail == 0) *tail = it;
+  sizes[it->slabs_clsid]++;
+  sizes_bytes[it->slabs_clsid] += ntotal;
+
+  STATS_LOCK();
+  stats_state.curr_bytes += ntotal;
+  stats_state.curr_items += 1;
+  stats.total_items += 1;
+  STATS_UNLOCK();
+
+  return;
 }
 
 static void do_item_link_q(item *it) { /* item is the new head */
@@ -361,11 +380,10 @@ static void do_item_link_q(item *it) { /* item is the new head */
   head = &heads[it->slabs_clsid];
   tail = &tails[it->slabs_clsid];
   assert(it != *head);
-  // && operator on a pointer?
-  assert(((item*)(*head) && (item*)(*tail)) || (*head == 0 && *tail == 0));
+  assert((*head != NULL && *tail != NULL) || (*head == 0 && *tail == 0));
   it->prev = 0;
   it->next = *head;
-  if (it->next != nullptr) it->next->prev = it;
+  if (it->next != NULL) it->next->prev = it;
   *head = it;
   if (*tail == 0) *tail = it;
   sizes[it->slabs_clsid]++;
@@ -396,10 +414,11 @@ static void do_item_unlink_q(item *it) {
   assert(it->next != it);
   assert(it->prev != it);
 
-  if (it->next != nullptr) it->next->prev = it->prev;
-  if (it->prev != nullptr) it->prev->next = it->next;
+  if (it->next != NULL) it->next->prev = it->prev;
+  if (it->prev != NULL) it->prev->next = it->next;
   sizes[it->slabs_clsid]--;
   sizes_bytes[it->slabs_clsid] -= ITEM_ntotal(it);
+
   return;
 }
 
@@ -421,23 +440,19 @@ int do_item_link(item *it, const uint32_t hv) {
   STATS_UNLOCK();
 
   /* Allocate a new CAS ID on link. */
-  ITEM_set_cas(it, get_cas_id());
   assoc_insert(it, hv);
   item_link_q(it);
   refcount_incr(it);
-  item_stats_sizes_add(it);
-
   return 1;
 }
 
 void do_item_unlink(item *it, const uint32_t hv) {
-  if ((it->it_flags & ITEM_LINKED) != 0) {
+    if ((it->it_flags & ITEM_LINKED) != 0) {
     it->it_flags &= ~ITEM_LINKED;
     STATS_LOCK();
     stats_state.curr_bytes -= ITEM_ntotal(it);
     stats_state.curr_items -= 1;
     STATS_UNLOCK();
-    item_stats_sizes_remove(it);
     assoc_delete(ITEM_key(it), it->nkey, hv);
     item_unlink_q(it);
     do_item_remove(it);
@@ -446,13 +461,12 @@ void do_item_unlink(item *it, const uint32_t hv) {
 
 /* FIXME: Is it necessary to keep this copy/pasted code? */
 void do_item_unlink_nolock(item *it, const uint32_t hv) {
-  if ((it->it_flags & ITEM_LINKED) != 0) {
+    if ((it->it_flags & ITEM_LINKED) != 0) {
     it->it_flags &= ~ITEM_LINKED;
     STATS_LOCK();
     stats_state.curr_bytes -= ITEM_ntotal(it);
     stats_state.curr_items -= 1;
     STATS_UNLOCK();
-    item_stats_sizes_remove(it);
     assoc_delete(ITEM_key(it), it->nkey, hv);
     do_item_unlink_q(it);
     do_item_remove(it);
@@ -460,7 +474,7 @@ void do_item_unlink_nolock(item *it, const uint32_t hv) {
 }
 
 void do_item_remove(item *it) {
-  assert((it->it_flags & ITEM_SLABBED) == 0);
+    assert((it->it_flags & ITEM_SLABBED) == 0);
   assert(it->refcount > 0);
 
   if (refcount_decr(it) == 0) {
@@ -468,23 +482,9 @@ void do_item_remove(item *it) {
   }
 }
 
-/* Copy/paste to avoid adding two extra branches for all common calls, since
- * _nolock is only used in an uncommon case where we want to relink. */
-void do_item_update_nolock(item *it) {
-  if (it->time < *current_time - ITEM_UPDATE_INTERVAL) {
-    assert((it->it_flags & ITEM_SLABBED) == 0);
-
-    if ((it->it_flags & ITEM_LINKED) != 0) {
-      do_item_unlink_q(it);
-      it->time = *current_time;
-      do_item_link_q(it);
-    }
-  }
-}
-
 /* Bump the last accessed time, or relink if we're in compat mode */
 void do_item_update(item *it) {
-
+  /* Hits to COLD_LRU immediately move to WARM. */
   if (it->time < *current_time - ITEM_UPDATE_INTERVAL) {
     assert((it->it_flags & ITEM_SLABBED) == 0);
 
@@ -525,7 +525,7 @@ char *item_cachedump(const unsigned int slabs_clsid, const unsigned int limit, u
   pthread_mutex_lock(&lru_locks[id]);
   it = heads[id];
 
-  buffer = (char*)malloc((size_t)memlimit);
+  buffer = (char*)RP_malloc((size_t)memlimit);
   if (buffer == 0) {
     pthread_mutex_unlock(&lru_locks[id]);
     return NULL;
@@ -579,7 +579,7 @@ void fill_item_stats_automove(item_stats_automove *am) {
     i = n | COLD_LRU;
     pthread_mutex_lock(&lru_locks[i]);
     cur->evicted = itemstats[i].evicted;
-    if (tails[i] != nullptr) {
+    if (tails[i] != NULL) {
       cur->age = *current_time - tails[i]->time;
     } else {
       cur->age = 0;
@@ -588,43 +588,75 @@ void fill_item_stats_automove(item_stats_automove *am) {
   }
 }
 
-void item_stats_sizes_add(item *it) {
-  return;
-}
+/* I think there's no way for this to be accurate without using the CAS value.
+ * Since items getting their time value bumped will pass this validation.
+ */
 
-void item_stats_sizes_remove(item *it) {
-  return;
-}
+/** dumps out a list of objects of each size, with granularity of 32 bytes */
+/*@null@*/
+/* Locks are correct based on a technicality. Holds LRU lock while doing the
+ * work, so items can't go invalid, and it's only looking at header sizes
+ * which don't change.
+ */
 
 /** wrapper around assoc_find which does the lazy expiration logic */
 item *do_item_get(const char *key, const size_t nkey, const uint32_t hv, const bool do_update) {
   item *it = assoc_find(key, nkey, hv);
   if (it != NULL) {
     refcount_incr(it);
+    /* Optimization for slab reassignment. prevents popular items from
+     * jamming in busy wait. Can only do this here to satisfy lock order
+     * of item_lock, slabs_lock. */
+    /* This was made unsafe by removal of the cache_lock:
+     * slab_rebalance_signal and slab_rebal.* are modified in a separate
+     * thread under slabs_lock. If slab_rebalance_signal = 1, slab_start =
+     * NULL (0), but slab_end is still equal to some value, this would end
+     * up unlinking every item fetched.
+     * This is either an acceptable loss, or if slab_rebalance_signal is
+     * true, slab_start/slab_end should be put behind the slabs_lock.
+     * Which would cause a huge potential slowdown.
+     * Could also use a specific lock for slab_rebal.* and
+     * slab_rebalance_signal (shorter lock?)
+     */
+    /*if (slab_rebalance_signal &&
+      ((void *)it >= slab_rebal.slab_start && (void *)it < slab_rebal.slab_end)) {
+      do_item_unlink(it, hv);
+      do_item_remove(it);
+      it = NULL;
+      }*/
   }
   if (it != NULL) {
     if (item_is_flushed(it)) {
       do_item_unlink(it, hv);
+      do_item_remove(it);
+      it = NULL;
     } else if (it->exptime != 0 && it->exptime <= *current_time) {
       do_item_unlink(it, hv);
       do_item_remove(it);
       it = NULL;
     } else {
       if (do_update) {
-        /* We update the hit markers only during fetches.
-         * An item needs to be hit twice overall to be considered
-         * ACTIVE, but only needs a single hit to maintain activity
-         * afterward.
-         * FETCHED tells if an item has ever been active.
-         */
-        it->it_flags |= ITEM_FETCHED;
-        do_item_update(it);
+        do_item_bump(it, hv);
       }
       DEBUG_REFCNT(it, '+');
     }
   }
 
   return it;
+}
+
+// Requires lock held for item.
+// Split out of do_item_get() to allow mget functions to look through header
+// data before losing state modified via the bump function.
+void do_item_bump(item *it, const uint32_t hv) {
+  /* We update the hit markers only during fetches.
+   * An item needs to be hit twice overall to be considered
+   * ACTIVE, but only needs a single hit to maintain activity
+   * afterward.
+   * FETCHED tells if an item has ever been active.
+   */
+  it->it_flags |= ITEM_FETCHED;
+  do_item_update(it);
 }
 
 item *do_item_touch(const char *key, size_t nkey, uint32_t exptime,
@@ -640,32 +672,26 @@ item *do_item_touch(const char *key, size_t nkey, uint32_t exptime,
 
 /* Returns number of items remove, expired, or evicted.
  * Callable from worker threads or the LRU maintainer thread */
-/* orig-id -> slab id
- * cur_lru -> name of lru (COLD/WARM/HOT_LRU)
- * flags -> options to do (LRU_PULL_EVICT...)
- */
 int lru_pull_tail(const int orig_id, const int cur_lru,
     const uint64_t total_bytes, const uint8_t flags, const rel_time_t max_age,
-    lru_pull_tail_return *ret_it) {
+    struct lru_pull_tail_return *ret_it) {
   item *it = NULL;
-  int id = orig_id;
   int removed = 0;
-  if (id == 0)
+  if (orig_id == 0)
     return 0;
 
   int tries = 5;
-  pptr<item> search;
+  item *search;
   item *next_it;
   void *hold_lock = NULL;
   unsigned int move_to_lru = 0;
   uint64_t limit = 0;
 
-  id |= cur_lru;
-  // Each slab class has a HOT/WARM/COLD LRU
+  const int id = orig_id | cur_lru;
   pthread_mutex_lock(&lru_locks[id]);
   search = tails[id];
   /* We walk up *only* for locked items, and if bottom is expired. */
-  for (; tries > 0 && (!search.is_null()); tries--, search=next_it) {
+  for (; tries > 0 && search != NULL; tries--, search=next_it) {
     /* we might relink search mid-loop, so search->prev isn't reliable */
     next_it = search->prev;
     if (search->nbytes == 0 && search->nkey == 0 && search->it_flags == 1) {
@@ -678,14 +704,11 @@ int lru_pull_tail(const int orig_id, const int cur_lru,
       continue;
     }
     uint32_t hv = tcd_hash(ITEM_key(search), search->nkey);
-    /* Attempt to hash item lock the "search" item. If locked, no
+    /* Attempt to tcd_hash item lock the "search" item. If locked, no
      * other callers can incr the refcount. Also skip ourselves. */
     if ((hold_lock = item_trylock(hv)) == NULL)
       continue;
     /* Now see if the item is refcount locked */
-    // CHRIS - 1 link is for linkage, 1 is from us. If this item is
-    // getting old, expire it and unlink. Use nolock because we already hold the
-    // lru lock
     if (refcount_incr(search) != 2) {
       /* Note pathological case with ref'ed items in tail.
        * Can still unlink the item, but it won't be reusable yet */
@@ -731,17 +754,13 @@ int lru_pull_tail(const int orig_id, const int cur_lru,
         if (limit == 0)
           limit = total_bytes * 40 / 100;
         /* Rescue ACTIVE items aggressively */
-        /* CHRIS - If this item has been used it has a 'active' bit. Mark it as
-         * inactive so next time we can sweep through other LRUs. If it's in the
-         * hot_lru, we move it to warm (if it's active). If it's warm, the item
-         * stays in warm, but just gets its bit switched.
-         */
         if ((search->it_flags & ITEM_ACTIVE) != 0) {
           search->it_flags &= ~ITEM_ACTIVE;
           removed++;
           if (cur_lru == WARM_LRU) {
             itemstats[id].moves_within_lru++;
-            do_item_update_nolock(search);
+            do_item_unlink_q(search);
+            do_item_link_q(search);
             do_item_remove(search);
             item_trylock_unlock(hold_lock);
           } else {
@@ -752,8 +771,7 @@ int lru_pull_tail(const int orig_id, const int cur_lru,
             it = search;
           }
         } else if (sizes_bytes[id] > limit ||
-          // If it's starting to get old, move to cold
-          *current_time - search->time > max_age) {
+            *current_time - search->time > max_age) {
           itemstats[id].moves_to_cold++;
           move_to_lru = COLD_LRU;
           do_item_unlink_q(search);
@@ -788,7 +806,7 @@ int lru_pull_tail(const int orig_id, const int cur_lru,
           /* Keep a reference to this item and return it. */
           ret_it->it = it;
           ret_it->hv = hv;
-        }
+        } 
         break;
       case TEMP_LRU:
         it = search; /* Kill the loop. Parent only interested in reclaims */
@@ -815,12 +833,46 @@ int lru_pull_tail(const int orig_id, const int cur_lru,
   return removed;
 }
 
+
+/* TODO: Third place this code needs to be deduped */
+static void lru_bump_buf_link_q(lru_bump_buf *b) {
+  pthread_mutex_lock(&bump_buf_lock);
+  assert(b != bump_buf_head);
+
+  b->prev = 0;
+  b->next = bump_buf_head;
+  if (b->next) b->next->prev = b;
+  bump_buf_head = b;
+  if (bump_buf_tail == 0) bump_buf_tail = b;
+  pthread_mutex_unlock(&bump_buf_lock);
+  return;
+}
+
+void *item_lru_bump_buf_create(void) {
+  lru_bump_buf *b = (lru_bump_buf*)RP_calloc(1, sizeof(lru_bump_buf));
+  if (b == NULL) {
+    return NULL;
+  }
+
+  b->buf = bipbuf_new(sizeof(lru_bump_entry) * LRU_BUMP_BUF_SIZE);
+  if (b->buf == NULL) {
+    free(b);
+    return NULL;
+  }
+
+  pthread_mutex_init(&b->mutex, NULL);
+
+  lru_bump_buf_link_q(b);
+  return b;
+}
+
 /* TODO: Might be worth a micro-optimization of having bump buffers link
  * themselves back into the central queue when queue goes from zero to
  * non-zero, then remove from list if zero more than N times.
  * If very few hits on cold this would avoid extra memory barriers from LRU
  * maintainer thread. If many hits, they'll just stay in the list.
  */
+
 /* Loop up to N times:
  * If too many items are in HOT_LRU, push to COLD_LRU
  * If too many items are in WARM_LRU, push to COLD_LRU
@@ -837,10 +889,20 @@ static int lru_maintainer_juggle(const int slabs_clsid) {
   //unsigned int chunks_free = 0;
   /* TODO: if free_chunks below high watermark, increase aggressiveness */
   slabs_available_chunks(slabs_clsid, NULL, &total_bytes, &chunks_perslab);
+  if (settings.temp_lru) {
+    /* Only looking for reclaims. Run before we size the LRU. */
+    for (i = 0; i < 500; i++) {
+      if (lru_pull_tail(slabs_clsid, TEMP_LRU, 0, 0, 0, NULL) <= 0) {
+        break;
+      } else {
+        did_moves++;
+      }
+    }
+  }
+
   rel_time_t hot_age = 0;
   rel_time_t warm_age = 0;
-  /* If LRU is in flat mode, force items to drain into COLD via max age */
-
+  /* If LRU is in flat mode, force items to drain into COLD via max age of 0 */
   /* Juggle HOT/WARM up to N times */
   for (i = 0; i < 500; i++) {
     int do_more = 0;
@@ -869,7 +931,7 @@ static int lru_maintainer_juggle(const int slabs_clsid) {
  * The latter is to avoid newly started daemons from waiting too long before
  * retrying a crawl.
  */
-static void lru_maintainer_crawler_check(crawler_expired_data *cdata) {
+static void lru_maintainer_crawler_check(struct crawler_expired_data *cdata) {
   int i;
   static rel_time_t next_crawls[POWER_LARGEST];
   static rel_time_t next_crawl_wait[POWER_LARGEST];
@@ -884,7 +946,7 @@ static void lru_maintainer_crawler_check(crawler_expired_data *cdata) {
     /* We've not successfully kicked off a crawl yet. */
     if (s->run_complete) {
       pthread_mutex_lock(&cdata->lock);
-      int32_t x;
+      int x;
       /* Should we crawl again? */
       uint64_t possible_reclaims = s->seen - s->noexp;
       uint64_t available_reclaims = 0;
@@ -956,8 +1018,8 @@ static void *lru_maintainer_thread(void *arg) {
   rel_time_t last_automove_check = 0;
   useconds_t next_juggles[MAX_NUMBER_OF_SLAB_CLASSES] = {0};
   useconds_t backoff_juggles[MAX_NUMBER_OF_SLAB_CLASSES] = {0};
-  crawler_expired_data *cdata =
-    (crawler_expired_data*)calloc(1, sizeof(crawler_expired_data));
+  crawler_expired_data *cdata = (crawler_expired_data*)
+    RP_calloc(1, sizeof(struct crawler_expired_data));
   if (cdata == NULL) {
     fprintf(stderr, "Failed to allocate crawler data for LRU maintainer thread\n");
     abort();
@@ -969,7 +1031,6 @@ static void *lru_maintainer_thread(void *arg) {
   void *am = sam->init(&settings);
 
   pthread_mutex_lock(&lru_maintainer_lock);
-  // LRU maintainer background thread
   while (do_run_lru_maintainer_thread) {
     pthread_mutex_unlock(&lru_maintainer_lock);
     if (to_sleep)
@@ -1042,8 +1103,8 @@ static void *lru_maintainer_thread(void *arg) {
   }
   pthread_mutex_unlock(&lru_maintainer_lock);
   sam->free(am);
+  // LRU crawler *must* be stopped.
   free(cdata);
-  // LRU maintainer thread stopping
   return NULL;
 }
 
@@ -1057,6 +1118,7 @@ int stop_lru_maintainer_thread(void) {
     fprintf(stderr, "Failed to stop LRU maintainer thread: %s\n", strerror(ret));
     return -1;
   }
+  settings.lru_maintainer_thread = false;
   return 0;
 }
 
@@ -1065,6 +1127,7 @@ int start_lru_maintainer_thread(void *arg) {
 
   pthread_mutex_lock(&lru_maintainer_lock);
   do_run_lru_maintainer_thread = 1;
+  settings.lru_maintainer_thread = true;
   if ((ret = pthread_create(&lru_maintainer_tid, NULL,
           lru_maintainer_thread, arg)) != 0) {
     fprintf(stderr, "Can't create LRU maintainer thread: %s\n",
@@ -1087,10 +1150,7 @@ void lru_maintainer_resume(void) {
 }
 
 int init_lru_maintainer(void) {
-  if (lru_maintainer_initialized == 0) {
-    pthread_mutex_init(&lru_maintainer_lock, NULL);
-    lru_maintainer_initialized = 1;
-  }
+  lru_maintainer_initialized = 1;
   return 0;
 }
 
@@ -1104,10 +1164,10 @@ void do_item_linktail_q(item *it) { /* item is the new tail */
   tail = &tails[it->slabs_clsid];
   //assert(*tail != 0);
   assert(it != *tail);
-  assert(((*head != nullptr) && (*tail!=nullptr)) || (*head == 0 && *tail == 0));
+  assert((*head != NULL && *tail != NULL) || (*head == 0 && *tail == 0));
   it->prev = *tail;
   it->next = 0;
-  if (it->prev != nullptr) {
+  if (it->prev != NULL) {
     assert(it->prev->next == 0);
     it->prev->next = it;
   }
@@ -1132,8 +1192,8 @@ void do_item_unlinktail_q(item *it) {
   assert(it->next != it);
   assert(it->prev != it);
 
-  if (it->next != nullptr) it->next->prev = it->prev;
-  if (it->prev != nullptr) it->prev->next = it->next;
+  if (it->next != NULL) it->next->prev = it->prev;
+  if (it->prev != NULL) it->prev->next = it->next;
   return;
 }
 
@@ -1147,9 +1207,9 @@ item *do_item_crawl_q(item *it) {
   tail = &tails[it->slabs_clsid];
 
   /* We've hit the head, pop off */
-  if (it->prev == nullptr) {
+  if (it->prev == 0) {
     assert(*head == it);
-    if (it->next != nullptr) {
+    if (it->next != NULL) {
       *head = it->next;
       assert(it->next->prev == it);
       it->next->prev = 0;
@@ -1160,7 +1220,7 @@ item *do_item_crawl_q(item *it) {
   /* Swing ourselves in front of the next item */
   /* NB: If there is a prev, we can't be the head */
   assert(it->prev != it);
-  if (it->prev != nullptr) {
+  if (it->prev != NULL) {
     if (*head == it->prev) {
       /* Prev was the head, now we're the head */
       *head = it;
@@ -1170,7 +1230,7 @@ item *do_item_crawl_q(item *it) {
       *tail = it->prev;
     }
     assert(it->next != it);
-    if (it->next != nullptr) {
+    if (it->next != NULL) {
       assert(it->prev->next == it);
       it->prev->next = it->next;
       it->next->prev = it->prev;
@@ -1183,7 +1243,7 @@ item *do_item_crawl_q(item *it) {
     it->prev = it->next->prev;
     it->next->prev = it;
     /* New it->prev now, if we're not at the head. */
-    if (it->prev != nullptr) {
+    if (it->prev != NULL) {
       it->prev->next = it;
     }
   }

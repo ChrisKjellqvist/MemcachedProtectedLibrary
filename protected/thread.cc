@@ -85,12 +85,11 @@ void memcached_thread_init() {
     pthread_mutexattr_init(&attr);
     // the mutex may be shared across processes
     pthread_mutexattr_setpshared(&attr, 1);
-    for (unsigned i = 0; i < POWER_LARGEST; ++i)
+    for (unsigned i = 0; i < POWER_LARGEST; ++i){
       pthread_mutex_init(&lru_locks[i], &attr);
-    pthread_mutex_init(stats_lock, &attr);
-    for (unsigned i = 0; i < item_lock_count; i++) {
       pthread_mutex_init(&item_locks[i], &attr);
     }
+    pthread_mutex_init(stats_lock, &attr);
   }
 }
 
