@@ -516,9 +516,9 @@ void* server_thread (void *pargs) {
   // num_threads
   init_lru_crawler(NULL);
 
-  assert(start_assoc_maintenance_thread() != -1);
-  assert(start_item_crawler_thread() == 0);
-  assert(start_lru_maintainer_thread(NULL) == 0);
+  //assert(start_assoc_maintenance_thread() != -1);
+  //assert(start_item_crawler_thread() == 0);
+  //assert(start_lru_maintainer_thread(NULL) == 0);
   /* initialise clock event */
   clock_handler(0, 0, 0);
 
@@ -606,8 +606,6 @@ enum delta_result_type do_add_delta(const char *key,
      * increase. */
     if (res + 2 <= it->nbytes && it->refcount == 2) { 
       /* replace in-place */
-      item_stats_sizes_remove(it);
-      item_stats_sizes_add(it);
       memcpy(ITEM_data(it), buf, res);
       memset(ITEM_data(it) + res, ' ', it->nbytes - res - 2);
       do_item_update(it);

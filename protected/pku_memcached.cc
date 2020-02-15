@@ -300,9 +300,7 @@ void memcached_init(){
     ptrdiff_t rp_region_len = (char*)start - (char*)end;
     pkey_mprotect(start, rp_region_len, PROT_READ | PROT_WRITE | PROT_EXEC, 1);
   }
-
   agnostic_init();
-
 } HODOR_INIT_FUNC(memcached_init);
 }
 
