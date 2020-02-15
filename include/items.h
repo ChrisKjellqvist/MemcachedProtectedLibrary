@@ -30,6 +30,7 @@ unsigned int do_get_lru_size(uint32_t id);
 void do_item_linktail_q(item *it);
 void do_item_unlinktail_q(item *it);
 item *do_item_crawl_q(item *it);
+void do_item_bump(item *it, const uint32_t hv);
 
 void *item_lru_bump_buf_create(void);
 
@@ -50,10 +51,6 @@ int lru_pull_tail(const int orig_id, const int cur_lru,
 char *item_cachedump(const unsigned int slabs_clsid, const unsigned int limit, unsigned int *bytes);
 void do_item_stats_add_crawl(const int i, const uint64_t reclaimed,
         const uint64_t unfetched, const uint64_t checked);
-void item_stats_sizes_init(void);
-void item_stats_sizes_add(item *it);
-void item_stats_sizes_remove(item *it);
-bool item_stats_sizes_status(void);
 void items_init();
 
 /* stats getter for slab automover */

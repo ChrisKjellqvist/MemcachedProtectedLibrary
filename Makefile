@@ -12,8 +12,8 @@ SERV_OBJ = obj/memcached.o\
 
 libralloc=ralloc/test
 
-#OPT_LEVEL = -O1 -g
-OPT_LEVEL = -O3 -g
+OPT_LEVEL = -O1 -g
+#OPT_LEVEL = -O3 -g
 ERROR     = -DFAIL_ASSERT
 OPTS = -Iinclude/ -Iralloc/src -levent\
 	       -DHAVE_CONFIG_H -Wall -Werror \
