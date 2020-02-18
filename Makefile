@@ -23,7 +23,7 @@ OPTS = -Iinclude/ -Iralloc/src -levent\
 LIBS = $(libhodor)/libhodor.a obj/libthreadcached.so $(libralloc)/libralloc.a
 LINKOPTS = -lpthread -levent -ldl
 EXE = bin/server.exe bin/end.exe
-TEST_RUN = bin/get.exe bin/insert.exe bin/timed_get.exe
+TEST_RUN = bin/get.exe bin/insert.exe
 PERF_RUN = bin/insert_test.exe bin/get_test.exe
 RPMA_RUN = bin/basic_setup.exe bin/basic_test.exe
 
