@@ -10,8 +10,8 @@ SERV_OBJ = obj/memcached.o\
 	   obj/bipbuffer.o obj/crawler.o obj/slabs.o \
 	   obj/slab_automove.o obj/util.o obj/itoa_ljust.o 
 
-libralloc=ralloc/test
-libhodor= hodor/libhodor
+libralloc=/home/suser/threadcached/ralloc/test
+libhodor=/home/suser/threadcached/hodor/libhodor/
 
 OPT_LEVEL = -O0 -g
 #OPT_LEVEL = -O3
@@ -20,8 +20,8 @@ OPTS = -Iinclude/ -Iralloc/src -levent\
 	       -Ihodor/include -DHAVE_CONFIG_H -Wall -Werror \
 	       -std=c++17 -fPIC -I$(libhodor) $(OPT_LEVEL) $(ERROR)
 
-LIBS = $(libhodor)/libhodor.a obj/libthreadcached.so $(libralloc)/libralloc.a
-LINKOPTS = -lpthread -levent -ldl
+LIBS = obj/libthreadcached.so $(libralloc)/libralloc.a
+LINKOPTS = $(libralloc)/libralloc.a obj/libthreadcached.so -L$(libhodor) -lhodor -ldl -lpthread
 EXE = bin/server.exe bin/end.exe
 TEST_RUN = bin/get.exe bin/insert.exe
 PERF_RUN = bin/insert_test.exe bin/get_test.exe
@@ -35,9 +35,7 @@ bin: bin/server.exe
 	mv $^ bin/memcached
 
 bin/%.exe: $(LIBS) obj/%.o
-	$(CXX) $(LINKOPTS) $^ -o $@
-$(libhodor)/libhodor.a:
-	make -C $(libhodor) libhodor.a
+	$(CXX) $^ -o $@ $(LINKOPTS)
 obj/libthreadcached.so: $(PROT_OBJ)
 	$(CXX) -shared $(PROT_OBJ) $(OPTS) -o $@ 
 $(libralloc)/libralloc.a:
@@ -53,7 +51,6 @@ obj/%.o: unprotected/%.cc
 .PHONY : clean
 clean: 
 	rm -f obj/* exec *.d /dev/shm/memcached* $(EXE) $(TEST_RUN) $(PERF_RUN) $(RPMA_RUN)
-	make -C $(libhodor) clean
 	make -C $(libralloc) clean
 .PHONY : reset
 reset:

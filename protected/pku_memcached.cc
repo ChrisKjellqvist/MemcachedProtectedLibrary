@@ -178,7 +178,7 @@ memcached_add_internal
   (const char* key, size_t nkey, const char * data, size_t datan, uint32_t exptime,
    uint32_t flags){
   return pku_memcached_insert(key, nkey, data, datan, exptime);
-} HODOR_FUNC_EXPORT(memcached_insert_internal, 6);
+} HODOR_FUNC_EXPORT(memcached_add_internal, 6);
 
 HODOR_FUNC_ATTR
 memcached_return_t
