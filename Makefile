@@ -13,8 +13,8 @@ SERV_OBJ = obj/memcached.o\
 libralloc=ralloc/test
 libhodor= hodor/libhodor
 
-#OPT_LEVEL = -O1 -g
-OPT_LEVEL = -O3
+OPT_LEVEL = -O0 -g
+#OPT_LEVEL = -O3
 ERROR     = -DFAIL_ASSERT
 OPTS = -Iinclude/ -Iralloc/src -levent\
 	       -Ihodor/include -DHAVE_CONFIG_H -Wall -Werror \

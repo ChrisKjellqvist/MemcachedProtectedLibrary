@@ -69,6 +69,8 @@ DEFINE_API(memcached_return_t, memcached_decrement_with_initial,
 
 DEFINE_API(memcached_return_t, memcached_flush, uint32_t exptime);
 
+void memcached_start_server();
+
 memcached_return_t
 memcached_end    ();
 

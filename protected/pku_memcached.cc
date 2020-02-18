@@ -283,6 +283,12 @@ memcached_end(){
   return MEMCACHED_SUCCESS;
 } HODOR_FUNC_EXPORT(memcached_end, 0);
 
+HODOR_FUNC_ATTR
+void
+memcached_start_server() {
+  server_thread(nullptr);
+} HODOR_FUNC_EXPORT(memcached_start_server, 0);
+
 // Start memcached maintainence processes
 // server is either 0 or 1 to represent whether or not we are initializing
 // for a server process or a client process
@@ -293,33 +299,19 @@ void memcached_init(){
 	if (!run_once){
 		run_once = true;
 	} else return;
-	void *p = mmap(0, getpagesize(), PROT_READ | PROT_WRITE, 0, 0, 0);;
-	printf("%p\n%d\n", p, getpagesize()) ;
-	assert(p != NULL);
-	int key = pkey_alloc(0, PKEY_DISABLE_ACCESS);
-	assert(key > 0);
-	if (pkey_mprotect(p, getpagesize(), PROT_READ | PROT_WRITE, key))
-		printf("%s\n", strerror(errno));
-	else {
-		int a = *(int*)p;
-		printf("%d\n", a);
-	}
-	exit(0);
-	is_restart = RP_init("memcached.rpma", MIN_SB_REGION_SIZE);
+	is_restart = RP_init("memcached.rpma", 2*MIN_SB_REGION_SIZE);
 	printf("is restart? %d\n", is_restart);
 	int i = 0;
 	void *start, *end;
 	fetch_ptrs = (item**)RP_malloc(sizeof(item*)*128);
 	agnostic_init();
 	while (!RP_region_range(i++, &start, &end)){
-		ptrdiff_t rp_region_len = (char*)start - (char*)end - 1;
+		ptrdiff_t rp_region_len = (char*)end- (char*)start- 1;
 		if(pkey_mprotect(start, rp_region_len, PROT_READ | PROT_WRITE, 1)) {
 			printf("%s\n", strerror(errno));
 			exit(0);
 		}
 	}
-	//  char *pt = (char*)malloc(sizeof(int));
-	//  pkey_mprotect(start, rp_region_len, PROT_READ | PROT_WRITE, 1);
 
 } HODOR_INIT_FUNC(memcached_init);
 }

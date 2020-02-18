@@ -432,9 +432,6 @@ static int sigignore(int sig) {
 }
 #endif
 
-void server_start() {
-}
-
 // run this regardless of whether you're a server or a client
 void agnostic_init(){
   if (!is_restart){
@@ -493,7 +490,6 @@ void agnostic_init(){
 }
 
 void* server_thread (void *pargs) {
-  
   *end_signal = 0;
   struct event_config *ev_config;
   ev_config = event_config_new();
