@@ -489,13 +489,27 @@ void agnostic_init(){
   slabs_init(settings.factor);
 }
 
+static inline unsigned int rdpkru(void) {
+  unsigned int eax, edx;
+  unsigned int ecx = 0;
+  unsigned int pkru;
+
+  asm volatile(".byte 0x0f,0x01,0xee\n\t" : "=a"(eax), "=d"(edx) : "c"(ecx));
+  pkru = eax;
+  return pkru;
+}
+
 void* server_thread (void *pargs) {
+  unsigned int mynt= rdpkru();
+  printf("enters server_thread() %x\n", mynt);
+  fflush(stdout);
   *end_signal = 0;
   struct event_config *ev_config;
   ev_config = event_config_new();
   event_config_set_flag(ev_config, EVENT_BASE_FLAG_NOLOCK);
   main_base = event_base_new_with_config(ev_config);
   event_config_free(ev_config);
+  
 
   if (is_restart) {
     RP_recover();
@@ -524,7 +538,6 @@ void* server_thread (void *pargs) {
   while(end_signal->load() == 0){
     sleep(1);
     event_base_loop(main_base, EVLOOP_ONCE);
-
   }
 
   stop_assoc_maintenance_thread();
@@ -642,7 +655,7 @@ pku_memcached_get(const char* key, size_t nkey, char* &buffer, size_t* buffLen,
   item* it = item_get(key, nkey, 1);
   if (it == NULL)
     return MEMCACHED_NOTFOUND;
-  buffer = (char*)RP_malloc(it->nbytes);
+  buffer = (char*)malloc(it->nbytes);
   memcpy(buffer, ITEM_data(it), it->nbytes);
   *flags = it->it_flags;
   *buffLen = it->nbytes;

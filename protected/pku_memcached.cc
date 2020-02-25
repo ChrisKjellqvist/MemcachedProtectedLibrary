@@ -296,22 +296,24 @@ memcached_start_server() {
 #include <unistd.h>
 static bool run_once = false;
 void memcached_init(){
-	if (!run_once){
-		run_once = true;
-	} else return;
-	is_restart = RP_init("memcached.rpma", 2*MIN_SB_REGION_SIZE);
-	printf("is restart? %d\n", is_restart);
-	int i = 0;
-	void *start, *end;
-	fetch_ptrs = (item**)RP_malloc(sizeof(item*)*128);
-	agnostic_init();
-	while (!RP_region_range(i++, &start, &end)){
-		ptrdiff_t rp_region_len = (char*)end- (char*)start- 1;
-		if(pkey_mprotect(start, rp_region_len, PROT_READ | PROT_WRITE, 1)) {
-			printf("%s\n", strerror(errno));
-			exit(0);
-		}
-	}
+  if (!run_once){
+    run_once = true;
+  } else return;
+  is_restart = RP_init("memcached.rpma", 2*MIN_SB_REGION_SIZE);
+  printf("is restart? %d\n", is_restart);
+  int i = 0;
+  void *start, *end;
+  fetch_ptrs = (item**)RP_malloc(sizeof(item*)*128);
+  agnostic_init();
+  while (!RP_region_range(i++, &start, &end)){
+    ptrdiff_t rp_region_len = (char*)end- (char*)start- 1;
+    if(pkey_mprotect(start, rp_region_len, PROT_READ | PROT_WRITE | PROT_EXEC, 1)) {
+      printf("error in mprotect: %s\n", strerror(errno));
+      exit(0);
+    }
+  }
+  printf("success\n");
+  fflush(stdout);
 
 } HODOR_INIT_FUNC(memcached_init);
 }

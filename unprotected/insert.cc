@@ -55,7 +55,12 @@ char *keys[N_INSERT];
 char *dats[N_INSERT];
 
 int main(){
-  memcached_init();
+	int res = 0;
+	res = hodor_init();
+	assert(res == 0);
+	res = hodor_enter();
+	assert(res == 0);
+
   std::string name = "chris";
   std::string quality = " tests memcached";
 

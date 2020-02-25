@@ -16,7 +16,7 @@ libhodor=/home/suser/threadcached/hodor/libhodor/
 OPT_LEVEL = -O0 -g
 #OPT_LEVEL = -O3
 ERROR     = -DFAIL_ASSERT
-OPTS = -Iinclude/ -Iralloc/src -levent\
+OPTS = -Iinclude/ -Iralloc/src -levent -m64 \
 	       -Ihodor/include -DHAVE_CONFIG_H -Wall -Werror \
 	       -std=c++17 -fPIC -I$(libhodor) $(OPT_LEVEL) $(ERROR)
 
@@ -54,7 +54,7 @@ clean:
 	make -C $(libralloc) clean
 .PHONY : reset
 reset:
-	rm -f /dev/shm/memcached*
+	sudo rm -f /dev/shm/memcached*
 
 # hodor/apps/kv/app/Makefile
 # include/hodo-plib.h
