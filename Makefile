@@ -10,8 +10,8 @@ SERV_OBJ = obj/memcached.o\
 	   obj/bipbuffer.o obj/crawler.o obj/slabs.o \
 	   obj/slab_automove.o obj/util.o obj/itoa_ljust.o 
 
-libralloc=/home/suser/threadcached/ralloc/test
-libhodor=/home/suser/threadcached/hodor/libhodor/
+libralloc=ralloc/test
+libhodor=hodor/libhodor/
 
 OPT_LEVEL = -O0 -g
 #OPT_LEVEL = -O3

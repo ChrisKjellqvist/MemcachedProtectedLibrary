@@ -295,6 +295,7 @@ memcached_start_server() {
 #include <errno.h>
 #include <unistd.h>
 static bool run_once = false;
+bool server_flag = false;
 void memcached_init(){
 	if (!run_once){
 		run_once = true;
@@ -305,11 +306,10 @@ void memcached_init(){
 	void *start, *end;
 	fetch_ptrs = (item**)RP_malloc(sizeof(item*)*128);
 	agnostic_init();
-	while (!RP_region_range(i++, &start, &end)){
+	while (!RP_region_range(i++, &start, &end) && !server_flag){
 		ptrdiff_t rp_region_len = (char*)end- (char*)start- 1;
 		if(pkey_mprotect(start, rp_region_len, PROT_READ | PROT_WRITE, 1)) {
 			printf("%s\n", strerror(errno));
-			exit(0);
 		}
 	}
 

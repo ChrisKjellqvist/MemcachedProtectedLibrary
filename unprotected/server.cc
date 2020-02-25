@@ -2,11 +2,9 @@
 #include <memcached.h>
 #include <hodor.h>
 
+extern bool server_flag;
 int main(){
-  int ret = hodor_init();
-  assert(ret == 0);
-  ret = hodor_enter();
-  assert(ret == 0);
+  server_flag = true;
   memcached_init();
   memcached_start_server();
 }
