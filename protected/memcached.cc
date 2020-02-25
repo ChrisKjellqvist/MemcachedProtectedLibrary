@@ -541,6 +541,7 @@ void* server_thread (void *pargs) {
   }
 
   stop_assoc_maintenance_thread();
+  RP_close();
   return NULL;
 }
 
@@ -656,7 +657,7 @@ pku_memcached_get(const char* key, size_t nkey, char* &buffer, size_t* buffLen,
   if (it == NULL)
     return MEMCACHED_NOTFOUND;
   buffer = (char*)malloc(it->nbytes);
-  memcpy(buffer, ITEM_data(it), it->nbytes);
+  //memcpy(buffer, ITEM_data(it), it->nbytes);
   *flags = it->it_flags;
   *buffLen = it->nbytes;
   item_remove(it); /* release our reference */

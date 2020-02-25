@@ -76,6 +76,8 @@ memcached_end    ();
 
 void memcached_init();
 
+void memcached_close();
+
 #ifdef __cplusplus
 }
 #endif

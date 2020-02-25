@@ -306,7 +306,7 @@ void memcached_init(){
   void *start, *end;
   fetch_ptrs = (item**)RP_malloc(sizeof(item*)*128);
   agnostic_init();
-  while (!RP_region_range(i++, &start, &end)){
+  while (!RP_region_range(i++, &start, &end) && !server_flag){
     ptrdiff_t rp_region_len = (char*)end- (char*)start- 1;
     if(pkey_mprotect(start, rp_region_len, PROT_READ | PROT_WRITE | PROT_EXEC, 1)) {
       printf("error in mprotect: %s\n", strerror(errno));
@@ -315,7 +315,12 @@ void memcached_init(){
   }
   printf("success\n");
   fflush(stdout);
-
 } HODOR_INIT_FUNC(memcached_init);
+
+HODOR_FUNC_ATTR
+void
+memcached_close() {
+  RP_close();
+} HODOR_FUNC_EXPORT(memcached_close, 0); 
 }
 

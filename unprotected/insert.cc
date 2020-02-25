@@ -69,7 +69,7 @@ int main(){
   strcpy(nbuff, name.c_str());
   strcpy(qbuff, quality.c_str());
 
-  auto t = memcached_add_internal(nbuff, strlen(nbuff), qbuff, strlen(qbuff), 0, 0);
+  auto t = memcached_set_internal(nbuff, strlen(nbuff), qbuff, strlen(qbuff), 0, 0);
   printf("success? %d\n", t == MEMCACHED_SUCCESS);
   return 0;
 }
