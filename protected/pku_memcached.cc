@@ -295,6 +295,7 @@ memcached_start_server() {
 #include <errno.h>
 #include <unistd.h>
 static bool run_once = false;
+bool server_flag = false;
 void memcached_init(){
   if (!run_once){
     run_once = true;
