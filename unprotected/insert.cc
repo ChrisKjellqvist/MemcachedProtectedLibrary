@@ -55,7 +55,12 @@ char *keys[N_INSERT];
 char *dats[N_INSERT];
 
 int main(){
-  memcached_init(0);
+	int res = 0;
+	res = hodor_init();
+	assert(res == 0);
+	res = hodor_enter();
+	assert(res == 0);
+
   std::string name = "chris";
   std::string quality = " tests memcached";
 
@@ -64,7 +69,8 @@ int main(){
   strcpy(nbuff, name.c_str());
   strcpy(qbuff, quality.c_str());
 
-  auto t = memcached_add_internal(nbuff, strlen(nbuff), qbuff, strlen(qbuff), 0, 0);
-  printf("success? %d\n", t == MEMCACHED_SUCCESS);
+  auto t = memcached_set_internal(nbuff, strlen(nbuff), qbuff, strlen(qbuff), 0, 0);
+  printf("success? %d\n", t == MEMCACHED_STORED || t == MEMCACHED_SUCCESS);
+  memcached_close();
   return 0;
 }

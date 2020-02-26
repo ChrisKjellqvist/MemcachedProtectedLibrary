@@ -145,7 +145,7 @@ memcached_get_internal
   *error = pku_memcached_get(key, key_length, buff, value_length,
       flags);
   return buff;
-} 
+}
 
 memcached_return_t
 memcached_mget_internal
@@ -270,19 +270,31 @@ memcached_end(){
   return MEMCACHED_SUCCESS;
 } 
 
+void
+memcached_start_server() {
+  server_thread(nullptr);
+}
+
 // Start memcached maintainence processes
 // server is either 0 or 1 to represent whether or not we are initializing
 // for a server process or a client process
+#include <errno.h>
+#include <unistd.h>
 static bool run_once = false;
+bool server_flag = false;
 void memcached_init(){
   if (!run_once){
     run_once = true;
   } else return;
-  is_restart = RP_init("memcached.rpma");
+  is_restart = RP_init("memcached.rpma", 2*MIN_SB_REGION_SIZE);
   printf("is restart? %d\n", is_restart);
   fetch_ptrs = (item**)RP_malloc(sizeof(item*)*128);
   agnostic_init();
+}
 
+void
+memcached_close() {
+  RP_close();
 }
 
 }

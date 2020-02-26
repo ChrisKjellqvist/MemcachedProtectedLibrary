@@ -12,7 +12,7 @@ SERV_OBJ = obj/memcached.o\
 
 libralloc=ralloc/test
 
-#OPT_LEVEL = -O1 -g
+#OPT_LEVEL = -O0 -g
 OPT_LEVEL = -O3
 ERROR     = -DFAIL_ASSERT
 OPTS = -Iinclude/ -Iralloc/src -levent\
@@ -22,7 +22,7 @@ OPTS = -Iinclude/ -Iralloc/src -levent\
 LIBS = obj/libthreadcached.so $(libralloc)/libralloc.a
 LINKOPTS = -lpthread -levent -ldl
 EXE = bin/server.exe bin/end.exe
-TEST_RUN = bin/get.exe bin/insert.exe bin/timed_get.exe
+TEST_RUN = bin/get.exe bin/insert.exe
 PERF_RUN = bin/insert_test.exe bin/get_test.exe
 RPMA_RUN = bin/basic_setup.exe bin/basic_test.exe
 
@@ -34,7 +34,7 @@ bin: bin/server.exe
 	mv $^ bin/memcached
 
 bin/%.exe: $(LIBS) obj/%.o
-	$(CXX) $(LINKOPTS) $^ -o $@
+	$(CXX) $^ -o $@ $(LINKOPTS)
 obj/libthreadcached.so: $(PROT_OBJ)
 	$(CXX) -shared $(PROT_OBJ) $(OPTS) -o $@ 
 $(libralloc)/libralloc.a:
@@ -53,6 +53,6 @@ clean:
 	make -C $(libralloc) clean
 .PHONY : reset
 reset:
-	rm -f /dev/shm/memcached*
+	sudo rm -f /dev/shm/memcached*
 
 # include/hodo-plib.h
