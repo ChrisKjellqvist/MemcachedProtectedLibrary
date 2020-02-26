@@ -22,11 +22,12 @@ int main(){
 
   strcpy(nbuff, name.c_str());
   char *str = memcached_get_internal(nbuff, strlen(nbuff), &len, &flags, &err);
+  char *cpy = str;
   assert(err == MEMCACHED_SUCCESS);
-  printf("chris");
+  printf("len: %lu\n'", len);
   for(unsigned i = 0; i < len; ++i)
     printf("%c", *(str++));
-  free(str);
-  printf("\n");
-  exit(0);
+  free(cpy);
+  printf("'\n");
+  memcached_close();
 }
