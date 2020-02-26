@@ -8,8 +8,8 @@
 #include <string.h>
 
 int main(){
-	hodor_init();
-	hodor_enter();
+  memcached_init();
   memcached_end();
+  memcached_close();
   return 0;
 }
