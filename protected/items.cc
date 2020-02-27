@@ -525,7 +525,7 @@ char *item_cachedump(const unsigned int slabs_clsid, const unsigned int limit, u
   pthread_mutex_lock(&lru_locks[id]);
   it = heads[id];
 
-  buffer = (char*)RP_malloc((size_t)memlimit);
+  buffer = (char*)pm_malloc((size_t)memlimit);
   if (buffer == 0) {
     pthread_mutex_unlock(&lru_locks[id]);
     return NULL;

@@ -16,7 +16,7 @@
 #include "bipbuffer.h"
 
 // threadcached
-#include <ralloc.hpp>
+#include <AllocatorMacro.hpp>
 
 static size_t bipbuf_sizeof(const unsigned int size)
 {
@@ -51,7 +51,7 @@ void bipbuf_init(bipbuf_t* me, const unsigned int size)
 
 bipbuf_t *bipbuf_new(const unsigned int size)
 {
-    bipbuf_t *me = (bipbuf_t*)RP_malloc(bipbuf_sizeof(size));
+    bipbuf_t *me = (bipbuf_t*)pm_malloc(bipbuf_sizeof(size));
     if (!me)
         return NULL;
     bipbuf_init(me, size);

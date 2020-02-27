@@ -17,7 +17,8 @@ OPT_LEVEL = -O3
 ERROR     = -DFAIL_ASSERT
 OPTS = -Iinclude/ -Iralloc/src -levent\
 	       -DHAVE_CONFIG_H -Wall -Werror \
-	       -std=c++17 -fPIC $(OPT_LEVEL) $(ERROR)
+	       -std=c++17 -fPIC $(OPT_LEVEL) $(ERROR) \
+		   -DRALLOC
 
 LIBS = obj/libthreadcached.so $(libralloc)/libralloc.a
 LINKOPTS = -lpthread -levent -ldl

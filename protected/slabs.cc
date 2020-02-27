@@ -121,10 +121,10 @@ void slabs_init(const double factor) {
     power_largest = MAX_NUMBER_OF_SLAB_CLASSES - 1;
   } else {
     slabclass = pptr<slabclass_t>((slabclass_t*)
-        RP_malloc(sizeof(slabclass_t)*MAX_NUMBER_OF_SLAB_CLASSES));
+        pm_malloc(sizeof(slabclass_t)*MAX_NUMBER_OF_SLAB_CLASSES));
     memset(slabclass, 0,
         sizeof(slabclass_t)*MAX_NUMBER_OF_SLAB_CLASSES);
-    slabs_lock = (pthread_mutex_t*)RP_malloc(sizeof(pthread_mutex_t));
+    slabs_lock = (pthread_mutex_t*)pm_malloc(sizeof(pthread_mutex_t));
     pthread_mutexattr_t attr;
     pthread_mutexattr_init(&attr);
     pthread_mutexattr_setpshared(&attr, 1);
@@ -365,7 +365,7 @@ void fill_slab_stats_automove(slab_stats_automove *am) {
 
 static void *memory_allocate(size_t size) {
   /* We are not using a preallocated large memory chunk */
-  void *ret = RP_malloc(size);
+  void *ret = pm_malloc(size);
   if (ret == nullptr){
     return nullptr;
   }

@@ -69,9 +69,9 @@ void memcached_thread_init() {
     stats_lock = RP_get_root<pthread_mutex_t>(RPMRoot::StatLock);
     lru_locks = RP_get_root<pthread_mutex_t>(RPMRoot::LRULocks);
   } else {
-    lru_locks = (pthread_mutex_t*)RP_malloc(sizeof(pthread_mutex_t)*POWER_LARGEST);
+    lru_locks = (pthread_mutex_t*)pm_malloc(sizeof(pthread_mutex_t)*POWER_LARGEST);
     item_locks = (pthread_mutex_t*)RP_calloc(item_lock_count, sizeof(pthread_mutex_t));
-    stats_lock = (pthread_mutex_t*)RP_malloc(sizeof(pthread_mutex_t));
+    stats_lock = (pthread_mutex_t*)pm_malloc(sizeof(pthread_mutex_t));
 
     assert(item_locks != nullptr);
     assert(stats_lock != nullptr);

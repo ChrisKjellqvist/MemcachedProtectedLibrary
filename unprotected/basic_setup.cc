@@ -4,7 +4,7 @@
 
 int main(){
   RP_init("memcached.rpma");
-  int *al = (int*)RP_malloc(sizeof(int)*1000);
+  int *al = (int*)pm_malloc(sizeof(int)*1000);
   RP_set_root(al, 0);
   for(int i = 0; i < 1000; ++i)
     al[i] = 0xDEADBEEF;

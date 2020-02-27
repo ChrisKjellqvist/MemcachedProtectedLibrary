@@ -435,8 +435,8 @@ static int sigignore(int sig) {
 // run this regardless of whether you're a server or a client
 void agnostic_init(){
   if (!is_restart){
-    end_signal = (std::atomic<int>*)RP_malloc(sizeof(std::atomic<int>));
-    current_time = (rel_time_t*)RP_malloc(sizeof(rel_time_t));
+    end_signal = (std::atomic<int>*)pm_malloc(sizeof(std::atomic<int>));
+    current_time = (rel_time_t*)pm_malloc(sizeof(rel_time_t));
     assert(end_signal != nullptr);
     assert(current_time != nullptr);
     RP_set_root(end_signal, RPMRoot::EndSignal);
@@ -500,9 +500,9 @@ static inline unsigned int rdpkru(void) {
 }
 
 void* server_thread (void *pargs) {
-  unsigned int mynt= rdpkru();
-  printf("enters server_thread() %x\n", mynt);
-  fflush(stdout);
+  // unsigned int mynt= rdpkru();
+  // printf("enters server_thread() %x\n", mynt);
+  // fflush(stdout);
   *end_signal = 0;
   struct event_config *ev_config;
   ev_config = event_config_new();
