@@ -8,6 +8,8 @@
 extern std::atomic<int> *end_signal;
 extern "C" {
 
+static bool run_once = false;
+
 memcached_result_st*
 memcached_fetch_result
   (memcached_st *ptr, memcached_result_st *result, memcached_return_t *error){
@@ -112,6 +114,7 @@ static unsigned ptrcnt = 0;
 memcached_result_st*
 memcached_fetch_result_internal
   (memcached_result_st *result, memcached_return_t *error){
+  assert(run_once && "You must run memcached_init before calling memcached_functions");
   if (nptrs == ptrcnt) {
     *error = MEMCACHED_END;
     return nullptr; 
@@ -140,6 +143,7 @@ char *
 memcached_get_internal
   (const char * key, size_t key_length, size_t *value_length, uint32_t *flags,
    memcached_return_t *error){
+  assert(run_once && "You must run memcached_init before calling memcached_functions");
   *error = MEMCACHED_FAILURE;
   char *buff;
   *error = pku_memcached_get(key, key_length, buff, value_length,
@@ -150,6 +154,7 @@ memcached_get_internal
 memcached_return_t
 memcached_mget_internal
   (const char * const *keys, const size_t *key_length, size_t number_of_keys){
+  assert(run_once && "You must run memcached_init before calling memcached_functions");
   if (number_of_keys > 128)
     return MEMCACHED_FAILURE;
   pku_memcached_mget(keys, key_length, number_of_keys, fetch_ptrs);
@@ -162,6 +167,7 @@ memcached_return_t
 memcached_set_internal
   (const char* key, size_t nkey, const char * data, size_t datan, uint32_t exptime, 
    uint32_t flags){
+  assert(run_once && "You must run memcached_init before calling memcached_functions");
   return pku_memcached_set(key, nkey, data, datan, exptime);
 } 
 
@@ -169,6 +175,7 @@ memcached_return_t
 memcached_add_internal
   (const char* key, size_t nkey, const char * data, size_t datan, uint32_t exptime,
    uint32_t flags){
+  assert(run_once && "You must run memcached_init before calling memcached_functions");
   return pku_memcached_insert(key, nkey, data, datan, exptime);
 } 
 
@@ -176,23 +183,27 @@ memcached_return_t
 memcached_replace_internal
   (const char* key, size_t nkey, const char * data, size_t datan, uint32_t exptime,
    uint32_t flags){
+  assert(run_once && "You must run memcached_init before calling memcached_functions");
   return pku_memcached_replace(key, nkey, data, datan, exptime, flags);
 } 
 
 memcached_return_t
 memcached_append_internal(const char * key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime, uint32_t flags){
+  assert(run_once && "You must run memcached_init before calling memcached_functions");
   return pku_memcached_append(key, nkey, data, datan, exptime, flags);
 } 
 
 memcached_return_t
 memcached_prepend_internal(const char * key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime, uint32_t flags){
+  assert(run_once && "You must run memcached_init before calling memcached_functions");
   return pku_memcached_prepend(key, nkey, data, datan, exptime, flags);
 } 
 
 memcached_return_t
 memcached_delete_internal(const char* key, size_t nkey, uint32_t exptime){
+  assert(run_once && "You must run memcached_init before calling memcached_functions");
   return pku_memcached_delete(key, nkey, exptime);
 } 
 
@@ -200,6 +211,7 @@ memcached_delete_internal(const char* key, size_t nkey, uint32_t exptime){
 memcached_return_t
 memcached_increment_internal
   (const char* key, size_t nkey, uint64_t delta, uint64_t *value){
+  assert(run_once && "You must run memcached_init before calling memcached_functions");
   switch(add_delta(key, nkey, true, delta, value)){
     case OK:
       return MEMCACHED_SUCCESS;
@@ -212,6 +224,7 @@ memcached_increment_internal
 memcached_return_t
 memcached_decrement_internal
   (const char* key, size_t nkey, uint64_t delta, uint64_t *value){
+  assert(run_once && "You must run memcached_init before calling memcached_functions");
   switch (add_delta(key, nkey, false, delta, value)){
     case OK:
       return MEMCACHED_SUCCESS;
@@ -225,6 +238,7 @@ memcached_return_t
 memcached_increment_with_initial_internal
   (const char * key, size_t nkey, uint64_t delta, uint64_t initial, uint32_t exptime, 
    uint64_t *value) {
+  assert(run_once && "You must run memcached_init before calling memcached_functions");
   char *NT;
   switch(add_delta(key, nkey, true, delta, value)){
     case OK:
@@ -244,6 +258,7 @@ memcached_return_t
 memcached_decrement_with_initial_internal
   (const char * key, size_t nkey, uint64_t delta, uint64_t initial, uint32_t exptime, 
    uint64_t *value) {
+  assert(run_once && "You must run memcached_init before calling memcached_functions");
   char *NT;
   switch(add_delta(key, nkey, false, delta, value)){
     case OK:
@@ -261,17 +276,20 @@ memcached_decrement_with_initial_internal
 
 memcached_return_t
 memcached_flush_internal(uint32_t exptime){
+  assert(run_once && "You must run memcached_init before calling memcached_functions");
   return pku_memcached_flush(exptime);
 } 
 
 memcached_return_t
 memcached_end(){
+  assert(run_once && "You must run memcached_init before calling memcached_functions");
   end_signal->store(1);
   return MEMCACHED_SUCCESS;
 } 
 
 void
 memcached_start_server() {
+  assert(run_once && "You must run memcached_init before calling memcached_functions");
   server_thread(nullptr);
 }
 
@@ -280,7 +298,6 @@ memcached_start_server() {
 // for a server process or a client process
 #include <errno.h>
 #include <unistd.h>
-static bool run_once = false;
 bool server_flag = false;
 void memcached_init(){
   if (!run_once){
