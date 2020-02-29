@@ -15,17 +15,45 @@ libralloc=ralloc/test
 #OPT_LEVEL = -O0 -g
 OPT_LEVEL = -O3
 ERROR     = -DFAIL_ASSERT
-OPTS = -Iinclude/ -Iralloc/src -levent\
+OPTS = -Iinclude/  -levent\
 	       -DHAVE_CONFIG_H -Wall -Werror \
 	       -std=c++17 -fPIC $(OPT_LEVEL) $(ERROR) \
-		   -DRALLOC
+		   -I./ralloc/src 
 
-LIBS = obj/libthreadcached.so $(libralloc)/libralloc.a
-LINKOPTS = -lpthread -levent -ldl
+LIBS = obj/libthreadcached.so
+LINKOPTS = -lpthread -levent -ldl -ljemalloc 
 EXE = bin/server.exe bin/end.exe
 TEST_RUN = bin/get.exe bin/insert.exe
 PERF_RUN = bin/insert_test.exe bin/get_test.exe
 RPMA_RUN = bin/basic_setup.exe bin/basic_test.exe
+
+# Ralloc by default
+ifeq ($(ALLOC),r)
+	OPTS += -DRALLOC -L./ralloc/test -lralloc
+	LINKOPTS += -L./ralloc/test -lralloc
+endif
+
+ifeq ($(ALLOC),mak)
+	OPTS += -I./ralloc/ext/makalu_alloc/include -DMAKALU -L./ralloc/ext/makalu_alloc/lib -lmakalu
+	LINKOPTS += -L./ralloc/ext/makalu_alloc/lib -lmakalu
+endif
+
+ifeq ($(ALLOC),je)
+	OPTS += -DJEMALLOC
+endif
+
+ifeq ($(ALLOC),lr)
+	# Ralloc without flush and fence is effectively LRMalloc, with optimization
+	OPTS += -DRALLOC -DPWB_IS_NOOP -L./ralloc/test -lralloc
+	LINKOPTS += -L./ralloc/test -lralloc
+endif
+
+ifeq ($(ALLOC),pmdk)
+	OPTS += -DPMDK -lpmemobj
+	LINKOPTS += -lpmemobj
+endif
+
+
 
 .PHONY : perf all lib bin install
 perf: $(EXE) $(PERF_RUN)
@@ -37,9 +65,9 @@ bin: bin/server.exe
 bin/%.exe: $(LIBS) obj/%.o
 	$(CXX) $^ -o $@ $(LINKOPTS)
 obj/libthreadcached.so: $(PROT_OBJ)
-	$(CXX) -shared $(PROT_OBJ) $(OPTS) -o $@ 
-$(libralloc)/libralloc.a:
-	$(MAKE) -C ralloc/test libralloc.a
+	$(CXX) -shared $(PROT_OBJ) $(OPTS) $(libralloc)/libralloc.a -o $@ 
+# $(libralloc)/libralloc.a:
+# 	$(MAKE) -C ralloc/test libralloc.a
 
 obj/%.o: protected/%.cc
 	$(CXX) -c $^ $(OPTS) -o $@
@@ -51,7 +79,7 @@ obj/%.o: unprotected/%.cc
 .PHONY : clean
 clean: 
 	rm -f obj/* exec *.d /dev/shm/memcached* $(EXE) $(TEST_RUN) $(PERF_RUN) $(RPMA_RUN)
-	make -C $(libralloc) clean
+	# make -C $(libralloc) clean
 .PHONY : reset
 reset:
 	sudo rm -f /dev/shm/memcached*
