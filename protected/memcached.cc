@@ -68,6 +68,15 @@
 #include <utility>
 int is_restart;
 
+#ifdef PMDK 
+  PMEMobjpool* pop = nullptr;
+  PMEMoid root;
+#endif
+
+#ifdef JEMALLOC
+  void* roots[1024];
+#endif
+
 /* defaults */
 static void settings_init(void);
 
@@ -439,11 +448,11 @@ void agnostic_init(){
     current_time = (rel_time_t*)pm_malloc(sizeof(rel_time_t));
     assert(end_signal != nullptr);
     assert(current_time != nullptr);
-    RP_set_root(end_signal, RPMRoot::EndSignal);
-    RP_set_root((void*)current_time, RPMRoot::CTime);
+    pm_set_root(end_signal, RPMRoot::EndSignal);
+    pm_set_root((void*)current_time, RPMRoot::CTime);
   } else {
-    end_signal = RP_get_root<std::atomic<int> >(RPMRoot::EndSignal);
-    current_time = RP_get_root<rel_time_t>(RPMRoot::CTime);
+    end_signal = pm_get_root<std::atomic<int> >(RPMRoot::EndSignal);
+    current_time = pm_get_root<rel_time_t>(RPMRoot::CTime);
   }
   enum {
     MAXCONNS_FAST = 0,
@@ -512,7 +521,7 @@ void* server_thread (void *pargs) {
   
 
   if (is_restart) {
-    RP_recover();
+    pm_recover();
   }
   /* handle SIGINT and SIGTERM */
   signal(SIGINT, sig_handler);
@@ -541,7 +550,7 @@ void* server_thread (void *pargs) {
   }
 
   stop_assoc_maintenance_thread();
-  RP_close();
+  pm_close();
   return NULL;
 }
 

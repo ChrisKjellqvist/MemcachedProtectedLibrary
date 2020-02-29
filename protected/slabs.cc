@@ -115,8 +115,8 @@ void slabs_init(const double factor) {
   // them dynamically allocated so that we can make them persistent
   if (is_restart){
     slabclass = pptr<slabclass_t>(
-        RP_get_root<slabclass_t>(RPMRoot::SlabclassAr));
-    slabs_lock = (pthread_mutex_t*)RP_get_root<pthread_mutex_t>
+        pm_get_root<slabclass_t>(RPMRoot::SlabclassAr));
+    slabs_lock = (pthread_mutex_t*)pm_get_root<pthread_mutex_t>
       (RPMRoot::SlabLock);
     power_largest = MAX_NUMBER_OF_SLAB_CLASSES - 1;
   } else {
@@ -144,8 +144,8 @@ void slabs_init(const double factor) {
     slabclass[power_largest].size = settings.slab_chunk_size_max;
     slabclass[power_largest].perslab =
       settings.slab_page_size / settings.slab_chunk_size_max;
-    RP_set_root(&*slabclass, RPMRoot::SlabclassAr);
-    RP_set_root(slabs_lock, RPMRoot::SlabLock);
+    pm_set_root(&*slabclass, RPMRoot::SlabclassAr);
+    pm_set_root(slabs_lock, RPMRoot::SlabLock);
   }
 }
 
@@ -159,7 +159,7 @@ static int grow_slab_list (const unsigned int id) {
     void *vptr = (void*)sl_list_ptr;
     // this should be fine. all pptrs are the same size
     size_t amt = new_size * sizeof(pptr<int>);
-    void *new_list = RP_realloc(vptr, amt);
+    void *new_list = pm_realloc(vptr, amt);
     if (new_list == 0)
       return 0;
     p->list_size = new_size;
@@ -378,7 +378,7 @@ static void memory_release() {
   void *p = NULL;
   while (mem_malloced > MEMORY_MAX &&
       (p = get_page_from_global_pool()) != NULL) {
-    RP_free(p);
+    pm_free(p);
     mem_malloced -= settings.slab_page_size;
   }
 }

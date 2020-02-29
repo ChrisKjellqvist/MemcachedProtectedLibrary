@@ -65,17 +65,17 @@ void assoc_init(const int hashtable_init) {
   }
   if (!is_restart){
     primary_hashtable = (pptr<item>*)
-      RP_calloc(hashsize(hashpower), sizeof(pptr<item>));
+      pm_calloc(hashsize(hashpower), sizeof(pptr<item>));
     assert(primary_hashtable != nullptr);
-    RP_set_root((void*)(&*primary_hashtable), RPMRoot::PrimaryHT);
-    RP_set_root(nullptr, RPMRoot::OldHT);
+    pm_set_root((void*)(&*primary_hashtable), RPMRoot::PrimaryHT);
+    pm_set_root(nullptr, RPMRoot::OldHT);
     void ** temp = (void**)primary_hashtable;
     for(unsigned int i = 0; i < hashsize(hashpower); ++i){
       temp[i] = (void*)0xDEADBEEF;
     }
   } else {
-    primary_hashtable = (pptr<item>*)RP_get_root<char >(RPMRoot::PrimaryHT);
-    old_hashtable =     (pptr<item>*)RP_get_root<char >(RPMRoot::OldHT);
+    primary_hashtable = (pptr<item>*)pm_get_root<char >(RPMRoot::PrimaryHT);
+    old_hashtable =     (pptr<item>*)pm_get_root<char >(RPMRoot::OldHT);
     printf("Restart seen in assoc!\n");
   }
   STATS_LOCK();
@@ -137,11 +137,11 @@ static void assoc_expand(void) {
   old_hashtable = primary_hashtable;
 
   primary_hashtable = pptr<pptr<item> >(
-      (pptr<item>*)RP_calloc(hashsize(hashpower + 1), sizeof(pptr<item>)));
+      (pptr<item>*)pm_calloc(hashsize(hashpower + 1), sizeof(pptr<item>)));
   if (primary_hashtable != nullptr) {
     // Hash table expansion starting
-    RP_set_root((void*)(&*old_hashtable), RPMRoot::OldHT);
-    RP_set_root((void*)(&*primary_hashtable), RPMRoot::PrimaryHT);
+    pm_set_root((void*)(&*old_hashtable), RPMRoot::OldHT);
+    pm_set_root((void*)(&*primary_hashtable), RPMRoot::PrimaryHT);
     hashpower++;
     expanding = true;
     expand_bucket = 0;
@@ -234,7 +234,7 @@ static void *assoc_maintenance_thread(void *arg) {
         expand_bucket++;
         if (expand_bucket == hashsize(hashpower - 1)) {
           expanding = false;
-          RP_free(old_hashtable);
+          pm_free(old_hashtable);
           STATS_LOCK();
           stats_state.hash_bytes -= hashsize(hashpower - 1) * sizeof(void *);
           stats_state.hash_is_expanding = false;

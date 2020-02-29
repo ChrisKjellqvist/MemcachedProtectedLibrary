@@ -60,7 +60,7 @@ bipbuf_t *bipbuf_new(const unsigned int size)
 
 void bipbuf_free(bipbuf_t* me)
 {
-   RP_free(me);
+   pm_free(me);
 }
 
 int bipbuf_is_empty(const bipbuf_t* me)

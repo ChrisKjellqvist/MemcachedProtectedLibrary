@@ -33,14 +33,14 @@ typedef struct {
 void *slab_automove_init(struct settings *settings) {
     uint32_t window_size = settings->slab_automove_window;
     double max_age_ratio = settings->slab_automove_ratio;
-    slab_automove *a = (slab_automove*)RP_calloc(1, sizeof(slab_automove));
+    slab_automove *a = (slab_automove*)pm_calloc(1, sizeof(slab_automove));
     if (a == NULL)
         return NULL;
-    a->window_data = (struct window_data*)RP_calloc(window_size * MAX_NUMBER_OF_SLAB_CLASSES, sizeof(struct window_data));
+    a->window_data = (struct window_data*)pm_calloc(window_size * MAX_NUMBER_OF_SLAB_CLASSES, sizeof(struct window_data));
     a->window_size = window_size;
     a->max_age_ratio = max_age_ratio;
     if (a->window_data == NULL) {
-        RP_free(a);
+        pm_free(a);
         return NULL;
     }
 
@@ -53,8 +53,8 @@ void *slab_automove_init(struct settings *settings) {
 
 void slab_automove_free(void *arg) {
     slab_automove *a = (slab_automove *)arg;
-    RP_free(a->window_data);
-    RP_free(a);
+    pm_free(a->window_data);
+    pm_free(a);
 }
 
 static void window_sum(struct window_data *wd, struct window_data *w, uint32_t size) {

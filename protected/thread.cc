@@ -65,21 +65,21 @@ void item_unlock(uint32_t hv) {
 void memcached_thread_init() {
   item_lock_count = hashsize(item_lock_hashpower);
   if (is_restart){
-    item_locks = RP_get_root<pthread_mutex_t>(RPMRoot::ItemLocks);
-    stats_lock = RP_get_root<pthread_mutex_t>(RPMRoot::StatLock);
-    lru_locks = RP_get_root<pthread_mutex_t>(RPMRoot::LRULocks);
+    item_locks = pm_get_root<pthread_mutex_t>(RPMRoot::ItemLocks);
+    stats_lock = pm_get_root<pthread_mutex_t>(RPMRoot::StatLock);
+    lru_locks = pm_get_root<pthread_mutex_t>(RPMRoot::LRULocks);
   } else {
     lru_locks = (pthread_mutex_t*)pm_malloc(sizeof(pthread_mutex_t)*POWER_LARGEST);
-    item_locks = (pthread_mutex_t*)RP_calloc(item_lock_count, sizeof(pthread_mutex_t));
+    item_locks = (pthread_mutex_t*)pm_calloc(item_lock_count, sizeof(pthread_mutex_t));
     stats_lock = (pthread_mutex_t*)pm_malloc(sizeof(pthread_mutex_t));
 
     assert(item_locks != nullptr);
     assert(stats_lock != nullptr);
     assert(lru_locks  != nullptr);
 
-    RP_set_root(item_locks, RPMRoot::ItemLocks);
-    RP_set_root(stats_lock, RPMRoot::StatLock);
-    RP_set_root(lru_locks, RPMRoot::LRULocks);
+    pm_set_root(item_locks, RPMRoot::ItemLocks);
+    pm_set_root(stats_lock, RPMRoot::StatLock);
+    pm_set_root(lru_locks, RPMRoot::LRULocks);
     
     pthread_mutexattr_t attr;
     pthread_mutexattr_init(&attr);

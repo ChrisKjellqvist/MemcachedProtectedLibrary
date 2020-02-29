@@ -303,15 +303,15 @@ void memcached_init(){
   if (!run_once){
     run_once = true;
   } else return;
-  is_restart = RP_init("memcached.rpma", 2*MIN_SB_REGION_SIZE);
+  is_restart = pm_init();
   printf("is restart? %d\n", is_restart);
-  fetch_ptrs = (item**)RP_malloc(sizeof(item*)*128);
+  fetch_ptrs = (item**)pm_malloc(sizeof(item*)*128);
   agnostic_init();
 }
 
 void
 memcached_close() {
-  RP_close();
+  pm_close();
 }
 
 }

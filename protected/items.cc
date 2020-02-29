@@ -54,25 +54,25 @@ static pthread_mutex_t lru_maintainer_lock = PTHREAD_MUTEX_INITIALIZER;
 void items_init(){
   if (is_restart){
     // get roots
-    heads = (pptr<item>*)RP_get_root<item*>(RPMRoot::Heads);
-    tails = (pptr<item>*)RP_get_root<item*>(RPMRoot::Tails);
-    itemstats = RP_get_root<itemstats_t>(RPMRoot::ItemStats);
-    sizes = RP_get_root<unsigned int>(RPMRoot::Sizes);
-    sizes_bytes = RP_get_root<uint64_t>(RPMRoot::SizesBytes);
+    heads = (pptr<item>*)pm_get_root<item*>(RPMRoot::Heads);
+    tails = (pptr<item>*)pm_get_root<item*>(RPMRoot::Tails);
+    itemstats = pm_get_root<itemstats_t>(RPMRoot::ItemStats);
+    sizes = pm_get_root<unsigned int>(RPMRoot::Sizes);
+    sizes_bytes = pm_get_root<uint64_t>(RPMRoot::SizesBytes);
   } else {
-    heads = (pptr<item>*)RP_calloc(sizeof(item*), LARGEST_ID);
-    tails = (pptr<item>*)RP_calloc(sizeof(item*), LARGEST_ID);
-    itemstats = (itemstats_t*)RP_calloc(sizeof(itemstats_t), LARGEST_ID);
-    sizes = (unsigned int*)RP_calloc(sizeof(unsigned int), LARGEST_ID);
-    sizes_bytes = (uint64_t*)RP_calloc(sizeof(uint64_t), LARGEST_ID);
+    heads = (pptr<item>*)pm_calloc(sizeof(item*), LARGEST_ID);
+    tails = (pptr<item>*)pm_calloc(sizeof(item*), LARGEST_ID);
+    itemstats = (itemstats_t*)pm_calloc(sizeof(itemstats_t), LARGEST_ID);
+    sizes = (unsigned int*)pm_calloc(sizeof(unsigned int), LARGEST_ID);
+    sizes_bytes = (uint64_t*)pm_calloc(sizeof(uint64_t), LARGEST_ID);
     for(unsigned i = 0; i < LARGEST_ID; ++i)
       heads[i] = tails[i] = NULL;
 
-    RP_set_root(heads, RPMRoot::Heads);
-    RP_set_root(tails, RPMRoot::Tails);
-    RP_set_root(itemstats, RPMRoot::ItemStats);
-    RP_set_root(sizes, RPMRoot::Sizes);
-    RP_set_root(sizes_bytes, RPMRoot::SizesBytes);
+    pm_set_root(heads, RPMRoot::Heads);
+    pm_set_root(tails, RPMRoot::Tails);
+    pm_set_root(itemstats, RPMRoot::ItemStats);
+    pm_set_root(sizes, RPMRoot::Sizes);
+    pm_set_root(sizes_bytes, RPMRoot::SizesBytes);
   }
 }
 
@@ -849,7 +849,7 @@ static void lru_bump_buf_link_q(lru_bump_buf *b) {
 }
 
 void *item_lru_bump_buf_create(void) {
-  lru_bump_buf *b = (lru_bump_buf*)RP_calloc(1, sizeof(lru_bump_buf));
+  lru_bump_buf *b = (lru_bump_buf*)pm_calloc(1, sizeof(lru_bump_buf));
   if (b == NULL) {
     return NULL;
   }
@@ -1019,7 +1019,7 @@ static void *lru_maintainer_thread(void *arg) {
   useconds_t next_juggles[MAX_NUMBER_OF_SLAB_CLASSES] = {0};
   useconds_t backoff_juggles[MAX_NUMBER_OF_SLAB_CLASSES] = {0};
   crawler_expired_data *cdata = (crawler_expired_data*)
-    RP_calloc(1, sizeof(struct crawler_expired_data));
+    pm_calloc(1, sizeof(struct crawler_expired_data));
   if (cdata == NULL) {
     fprintf(stderr, "Failed to allocate crawler data for LRU maintainer thread\n");
     abort();
