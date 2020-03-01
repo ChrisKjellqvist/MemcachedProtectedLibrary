@@ -77,6 +77,11 @@ int is_restart;
   void* roots[1024];
 #endif
 
+#ifdef MAKALU
+  char *base_addr = NULL;
+  char *curr_addr = NULL;
+#endif
+
 /* defaults */
 static void settings_init(void);
 
