@@ -185,6 +185,7 @@ item *do_item_alloc_pull(const size_t ntotal, const unsigned int id) {
         break;
       }
     } else {
+      new (it) item();
       break;
     }
   }
