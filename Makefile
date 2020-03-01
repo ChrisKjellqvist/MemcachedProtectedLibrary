@@ -1,19 +1,19 @@
 CXX=g++
 PROT_OBJ = obj/memcached.o\
 	   obj/murmur3_hash.o obj/items.o obj/assoc.o obj/thread.o \
-	   obj/bipbuffer.o obj/crawler.o obj/slabs.o \
-	   obj/slab_automove.o obj/pku_memcached.o obj/util.o\
+	   obj/bipbuffer.o obj/crawler.o \
+	   obj/pku_memcached.o obj/util.o\
 	   obj/itoa_ljust.o 
 
 SERV_OBJ = obj/memcached.o\
 	   obj/murmur3_hash.o obj/items.o obj/assoc.o obj/thread.o \
-	   obj/bipbuffer.o obj/crawler.o obj/slabs.o \
-	   obj/slab_automove.o obj/util.o obj/itoa_ljust.o 
+	   obj/bipbuffer.o obj/crawler.o \
+	   obj/util.o obj/itoa_ljust.o 
 
 libralloc=ralloc/test
 
-#OPT_LEVEL = -O0 -g
-OPT_LEVEL = -O3
+OPT_LEVEL = -O0 -g
+#OPT_LEVEL = -O3
 ERROR     = -DFAIL_ASSERT
 OPTS = -Iinclude/  -levent\
 	       -DHAVE_CONFIG_H -Wall -Werror \
@@ -82,6 +82,6 @@ clean:
 	# make -C $(libralloc) clean
 .PHONY : reset
 reset:
-	sudo rm -f /dev/shm/memcached*
+	rm -f /dev/shm/test*
 
 # include/hodo-plib.h

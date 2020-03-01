@@ -6,8 +6,6 @@
 #include <stdlib.h>
 #include <string>
 #include <string.h>
-#include <hodor-plib.h>
-#include <hodor.h>
 
 static inline void cpuid(void) {
   asm volatile(
@@ -55,12 +53,7 @@ char *keys[N_INSERT];
 char *dats[N_INSERT];
 
 int main(){
-	int res = 0;
-	res = hodor_init();
-	assert(res == 0);
-	res = hodor_enter();
-	assert(res == 0);
-
+  memcached_init();
   std::string name = "chris";
   std::string quality = " tests memcached";
 
