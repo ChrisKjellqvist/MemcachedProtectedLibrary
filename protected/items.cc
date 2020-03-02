@@ -141,6 +141,18 @@ unsigned int do_get_lru_size(uint32_t id) {
 # define DEBUG_REFCNT(it,op) while(0)
 #endif
 
+inline int round_up(int numToRound, int multiple)
+{
+    if (multiple == 0)
+        return numToRound;
+
+    int remainder = numToRound % multiple;
+    if (remainder == 0)
+        return numToRound;
+
+    return numToRound + multiple - remainder;
+}
+
 /**
  * Generates the variable-sized part of the header for an object.
  *
@@ -159,7 +171,8 @@ static size_t item_make_header(const uint8_t nkey, const unsigned int flags, con
   } else {
     *nsuffix = sizeof(flags);
   }
-  return sizeof(item) + nkey + *nsuffix + nbytes;
+  // round up to multiple of cache line size (64B)
+  return round_up(sizeof(item) + nkey + *nsuffix + nbytes, 64);
 }
 
 item *do_item_alloc_pull(const size_t ntotal, const unsigned int id) {
