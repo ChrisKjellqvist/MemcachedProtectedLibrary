@@ -363,8 +363,8 @@ static int sigignore(int sig) {
 // run this regardless of whether you're a server or a client
 void agnostic_init(){
   if (!is_restart){
-    end_signal = (std::atomic<int>*)pm_malloc(sizeof(std::atomic<int>));
-    current_time = (rel_time_t*)pm_malloc(sizeof(rel_time_t));
+    end_signal = new std::atomic<int>(0);
+    current_time = new rel_time_t();
     assert(end_signal != nullptr);
     assert(current_time != nullptr);
     pm_set_root(end_signal, RPMRoot::EndSignal);
