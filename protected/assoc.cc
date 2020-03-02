@@ -67,12 +67,12 @@ void assoc_init(const int hashtable_init) {
     primary_hashtable = (pptr<item>*)
       pm_calloc(hashsize(hashpower), sizeof(pptr<item>));
     assert(primary_hashtable != nullptr);
-    pm_set_root((void*)(&*primary_hashtable), RPMRoot::PrimaryHT);
+    pm_set_root((void*)(primary_hashtable), RPMRoot::PrimaryHT);
     pm_set_root(nullptr, RPMRoot::OldHT);
-    void ** temp = (void**)primary_hashtable;
-    for(unsigned int i = 0; i < hashsize(hashpower); ++i){
-      temp[i] = (void*)0xDEADBEEF;
-    }
+    // pptr<item>* temp = primary_hashtable;
+    // for(unsigned int i = 0; i < hashsize(hashpower); ++i){
+    //   temp[i] = (item*)0xDEADBEEF;
+    // }
   } else {
     primary_hashtable = (pptr<item>*)pm_get_root<char >(RPMRoot::PrimaryHT);
     old_hashtable =     (pptr<item>*)pm_get_root<char >(RPMRoot::OldHT);
@@ -127,7 +127,7 @@ static pptr<item>* _hashitem_before (const char *key, const size_t nkey, const u
 
   // CHRIS TODO 
   while ((*pos != nullptr) && ((nkey != (*pos)->nkey) || memcmp(key, ITEM_key(*pos), nkey))) {
-    pos = &(*pos)->h_next;
+    pos = &((*pos)->h_next);
   }
   return pos;
 }
@@ -136,7 +136,7 @@ static pptr<item>* _hashitem_before (const char *key, const size_t nkey, const u
 static void assoc_expand(void) {
   old_hashtable = primary_hashtable;
 
-  primary_hashtable = pptr<pptr<item> >(
+  primary_hashtable = (
       (pptr<item>*)pm_calloc(hashsize(hashpower + 1), sizeof(pptr<item>)));
   if (primary_hashtable != nullptr) {
     // Hash table expansion starting
