@@ -305,7 +305,7 @@ void memcached_init(){
   } else return;
   is_restart = pm_init();
   printf("is restart? %d\n", is_restart);
-  fetch_ptrs = (item**)pm_malloc(sizeof(item*)*128);
+  fetch_ptrs = (item**)malloc(sizeof(item*)*128);
   agnostic_init();
 }
 
