@@ -13,8 +13,8 @@ SERV_OBJ = obj/memcached.o\
 libralloc=ralloc/test
 libhodor=hodor/libhodor/
 
-OPT_LEVEL = -O0 -g
-#OPT_LEVEL = -O3
+#OPT_LEVEL = -O0 -g
+OPT_LEVEL = -O3
 ERROR     = -DFAIL_ASSERT
 OPTS = -Iinclude/ -Iralloc/src -levent -m64 \
 	       -Ihodor/include -DHAVE_CONFIG_H -Wall -Werror \
@@ -54,7 +54,7 @@ clean:
 	make -C $(libralloc) clean
 .PHONY : reset
 reset:
-	sudo rm -f /dev/shm/memcached*
+	rm -f /dev/shm/memcached*
 
 # hodor/apps/kv/app/Makefile
 # include/hodo-plib.h

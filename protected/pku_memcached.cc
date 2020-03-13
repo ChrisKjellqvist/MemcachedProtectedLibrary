@@ -143,7 +143,7 @@ memcached_fetch_result_internal
   return result;
 } HODOR_FUNC_EXPORT(memcached_fetch_result_internal, 2);
 
-//HODOR_FUNC_ATTR
+HODOR_FUNC_ATTR
 char *
 memcached_get_internal
   (const char * key, size_t key_length, size_t *value_length, uint32_t *flags,
@@ -154,7 +154,7 @@ memcached_get_internal
   *error = pku_memcached_get(key, key_length, buff, value_length,
       flags);
   return buff;
-}// HODOR_FUNC_EXPORT(memcached_get_internal, 5);
+} HODOR_FUNC_EXPORT(memcached_get_internal, 5);
 
 HODOR_FUNC_ATTR
 memcached_return_t
@@ -169,14 +169,14 @@ memcached_mget_internal
   return MEMCACHED_SUCCESS;
 } HODOR_FUNC_EXPORT(memcached_mget_internal, 3);
 
-//HODOR_FUNC_ATTR
+HODOR_FUNC_ATTR
 memcached_return_t
 memcached_set_internal
   (const char* key, size_t nkey, const char * data, size_t datan, uint32_t exptime, 
    uint32_t flags){
   assert(run_once && "You must run memcached_init before calling memcached_functions");
   return pku_memcached_set(key, nkey, data, datan, exptime);
-}// HODOR_FUNC_EXPORT(memcached_set_internal, 6);
+} HODOR_FUNC_EXPORT(memcached_set_internal, 6);
 
 HODOR_FUNC_ATTR
 memcached_return_t
