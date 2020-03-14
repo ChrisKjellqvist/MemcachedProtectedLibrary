@@ -318,7 +318,6 @@ void memcached_init(){
     run_once = true;
   } else return;
   is_restart = RP_init("memcached.rpma", 2*MIN_SB_REGION_SIZE);
-  printf("is restart? %d\n", is_restart);
   int i = 0;
   void *start, *end;
   fetch_ptrs = (item**)RP_malloc(sizeof(item*)*128);
@@ -331,8 +330,6 @@ void memcached_init(){
       exit(0);
     }
   }
-  printf("success\n");
-  fflush(stdout);
 } HODOR_INIT_FUNC(memcached_init);
 
 HODOR_FUNC_ATTR

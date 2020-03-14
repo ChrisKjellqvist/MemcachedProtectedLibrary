@@ -76,7 +76,6 @@ void assoc_init(const int hashtable_init) {
   } else {
     primary_hashtable = (pptr<item>*)RP_get_root<char >(RPMRoot::PrimaryHT);
     old_hashtable =     (pptr<item>*)RP_get_root<char >(RPMRoot::OldHT);
-    printf("Restart seen in assoc!\n");
   }
   STATS_LOCK();
   stats_state.hash_power_level = hashpower;
