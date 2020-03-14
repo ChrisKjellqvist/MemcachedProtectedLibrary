@@ -41,10 +41,7 @@ obj/libthreadcached.so: $(PROT_OBJ)
 $(libralloc)/libralloc.a:
 	$(MAKE) -C ralloc/test libralloc.a
 
-obj/%.o: protected/%.cc
-	$(CXX) -c $^ $(OPTS) -o $@
-
-obj/%.o: unprotected/%.cc
+obj/%.o: src/%.cc
 	$(CXX) -c $^ $(OPTS) -o $@
 
 
