@@ -65,8 +65,10 @@ void items_init(){
     itemstats = (itemstats_t*)RP_calloc(sizeof(itemstats_t), LARGEST_ID);
     sizes = (unsigned int*)RP_calloc(sizeof(unsigned int), LARGEST_ID);
     sizes_bytes = (uint64_t*)RP_calloc(sizeof(uint64_t), LARGEST_ID);
-    for(unsigned i = 0; i < LARGEST_ID; ++i)
+    for(unsigned i = 0; i < LARGEST_ID; ++i) {
       heads[i] = tails[i] = NULL;
+      size[i] = size[i] = itemstats[i] = 0;
+    }
 
     RP_set_root(heads, RPMRoot::Heads);
     RP_set_root(tails, RPMRoot::Tails);
