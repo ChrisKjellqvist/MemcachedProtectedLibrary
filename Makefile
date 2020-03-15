@@ -1,14 +1,14 @@
 CXX=g++
 PROT_OBJ = obj/memcached.o\
 	   obj/murmur3_hash.o obj/items.o obj/assoc.o obj/thread.o \
-	   obj/bipbuffer.o obj/crawler.o obj/slabs.o \
-	   obj/slab_automove.o obj/pku_memcached.o obj/util.o\
+	   obj/bipbuffer.o obj/crawler.o \
+	   obj/pku_memcached.o obj/util.o\
 	   obj/itoa_ljust.o 
 
 SERV_OBJ = obj/memcached.o\
 	   obj/murmur3_hash.o obj/items.o obj/assoc.o obj/thread.o \
-	   obj/bipbuffer.o obj/crawler.o obj/slabs.o \
-	   obj/slab_automove.o obj/util.o obj/itoa_ljust.o 
+	   obj/bipbuffer.o obj/crawler.o  \
+	   obj/util.o obj/itoa_ljust.o 
 
 libralloc=ralloc/test
 libhodor=hodor/libhodor/
@@ -22,24 +22,22 @@ OPTS = -Iinclude/ -Iralloc/src -levent -m64 \
 
 LIBS = obj/libthreadcached.so $(libralloc)/libralloc.a
 LINKOPTS = $(libralloc)/libralloc.a obj/libthreadcached.so -L$(libhodor) -lhodor -ldl -lpthread
-EXE = bin/server.exe bin/end.exe
-TEST_RUN = bin/get.exe bin/insert.exe
-PERF_RUN = bin/insert_test.exe bin/get_test.exe
-RPMA_RUN = bin/basic_setup.exe bin/basic_test.exe
+EXE = bin/server.exe bin/end.exe bin/get.exe bin/insert.exe
 
-.PHONY : perf all lib bin install
-perf: $(EXE) $(PERF_RUN)
-all: $(EXE) $(TEST_RUN)
+.PHONY : all lib bin install
+all: $(LIBS) $(EXE)
 lib: obj/libthreadcached.so
 bin: bin/server.exe
 	mv $^ bin/memcached
 
-bin/%.exe: $(LIBS) obj/%.o
-	$(CXX) $^ -o $@ $(LINKOPTS)
-obj/libthreadcached.so: $(PROT_OBJ)
-	$(CXX) -shared $(PROT_OBJ) $(OPTS) -o $@ 
 $(libralloc)/libralloc.a:
 	$(MAKE) -C ralloc/test libralloc.a
+
+bin/%.exe: $(LIBS) obj/%.o
+	$(CXX) $^ -o $@ $(LINKOPTS)
+
+obj/libthreadcached.so: $(PROT_OBJ)
+	$(CXX) -shared $(PROT_OBJ) $(OPTS) -o $@ 
 
 obj/%.o: src/%.cc
 	$(CXX) -c $^ $(OPTS) -o $@
@@ -53,6 +51,3 @@ clean:
 reset:
 	rm -f /dev/shm/memcached*
 
-# hodor/apps/kv/app/Makefile
-# include/hodo-plib.h
-# localdisk/qemu-clean.img -- for vm

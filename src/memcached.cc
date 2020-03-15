@@ -142,100 +142,14 @@ static void settings_init(void) {
   settings.slab_automove_window = 30;
 }
 
-/* Destination must always be chunked */
-/* This should be part of item.c */
-static int _store_item_copy_chunks(item *d_it, item *s_it, const int len) {
-  item_chunk *dch = (item_chunk *) ITEM_schunk(d_it);
-  /* Advance dch until we find free space */
-  while (dch->size == dch->used) {
-    if (dch->next != nullptr) {
-      dch = dch->next;
-    } else {
-      break;
-    }
-  }
-
-  if (s_it->it_flags & ITEM_CHUNKED) {
-    int remain = len;
-    item_chunk *sch = (item_chunk *) ITEM_schunk(s_it);
-    int copied = 0;
-    /* Fills dch's to capacity, not straight copy sch in case data is
-     * being added or removed (ie append/prepend)
-     */
-    while (sch && dch && remain) {
-      assert(dch->used <= dch->size);
-      int todo = (dch->size - dch->used < sch->used - copied)
-	? dch->size - dch->used : sch->used - copied;
-      if (remain < todo)
-	todo = remain;
-      memcpy(dch->data + dch->used, sch->data + copied, todo);
-      dch->used += todo;
-      copied += todo;
-      remain -= todo;
-      assert(dch->used <= dch->size);
-      if (dch->size == dch->used) {
-	item_chunk *tch = do_item_alloc_chunk(dch, remain);
-	if (tch) {
-	  dch = tch;
-	} else {
-	  return -1;
-	}
-      }
-      assert(copied <= sch->used);
-      if (copied == sch->used) {
-	copied = 0;
-	sch = sch->next;
-      }
-    }
-    /* assert that the destination had enough space for the source */
-    assert(remain == 0);
-  } else {
-    int done = 0;
-    /* Fill dch's via a non-chunked item. */
-    while (len > done && dch) {
-      int todo = (dch->size - dch->used < len - done)
-	? dch->size - dch->used : len - done;
-      //assert(dch->size - dch->used != 0);
-      memcpy(dch->data + dch->used, ITEM_data(s_it) + done, todo);
-      done += todo;
-      dch->used += todo;
-      assert(dch->used <= dch->size);
-      if (dch->size == dch->used) {
-	item_chunk *tch = do_item_alloc_chunk(dch, len - done);
-	if (tch) {
-	  dch = tch;
-	} else {
-	  return -1;
-	}
-      }
-    }
-    assert(len == done);
-  }
-  return 0;
-}
-
 static int _store_item_copy_data(int comm, item *old_it, item *new_it, item *add_it) {
   if (comm == NREAD_APPEND) {
-    if (new_it->it_flags & ITEM_CHUNKED) {
-      if (_store_item_copy_chunks(new_it, old_it, old_it->nbytes - 2) == -1 ||
-	  _store_item_copy_chunks(new_it, add_it, add_it->nbytes) == -1) {
-	return -1;
-      }
-    } else {
-      memcpy(ITEM_data(new_it), ITEM_data(old_it), old_it->nbytes);
-      memcpy(ITEM_data(new_it) + old_it->nbytes - 2 /* CRLF */, ITEM_data(add_it), add_it->nbytes);
-    }
+    memcpy(ITEM_data(new_it), ITEM_data(old_it), old_it->nbytes);
+    memcpy(ITEM_data(new_it) + old_it->nbytes - 2 /* CRLF */, ITEM_data(add_it), add_it->nbytes);
   } else {
     /* NREAD_PREPEND */
-    if (new_it->it_flags & ITEM_CHUNKED) {
-      if (_store_item_copy_chunks(new_it, add_it, add_it->nbytes - 2) == -1 ||
-	  _store_item_copy_chunks(new_it, old_it, old_it->nbytes) == -1) {
-	return -1;
-      }
-    } else {
-      memcpy(ITEM_data(new_it), ITEM_data(add_it), add_it->nbytes);
-      memcpy(ITEM_data(new_it) + add_it->nbytes - 2 /* CRLF */, ITEM_data(old_it), old_it->nbytes);
-    }
+    memcpy(ITEM_data(new_it), ITEM_data(add_it), add_it->nbytes);
+    memcpy(ITEM_data(new_it) + add_it->nbytes - 2 /* CRLF */, ITEM_data(old_it), old_it->nbytes);
   }
   return 0;
 }
@@ -259,7 +173,7 @@ std::pair<store_item_type, size_t> do_store_item(item *it, int comm, const uint3
     /* add only adds a nonexistent item, but promote to head of LRU */
     do_item_update(old_it);
   } else if (!old_it && (comm == NREAD_REPLACE
-	|| comm == NREAD_APPEND || comm == NREAD_PREPEND))
+        || comm == NREAD_APPEND || comm == NREAD_PREPEND))
   {
     /* replace only replaces an existing value; don't store */
   } else if (comm == NREAD_CAS) {
@@ -288,29 +202,29 @@ std::pair<store_item_type, size_t> do_store_item(item *it, int comm, const uint3
        * Validate CAS
        */
       if (stored == NOT_STORED) {
-	/* we have it and old_it here - alloc memory to hold both */
-	/* flags was already lost - so recover them from ITEM_suffix(it) */
-	FLAGS_CONV(false, old_it, flags);
-	new_it = do_item_alloc(key, it->nkey, flags, old_it->exptime, it->nbytes + old_it->nbytes - 2 /* CRLF */);
+        /* we have it and old_it here - alloc memory to hold both */
+        /* flags was already lost - so recover them from ITEM_suffix(it) */
+        FLAGS_CONV(false, old_it, flags);
+        new_it = do_item_alloc(key, it->nkey, flags, old_it->exptime, it->nbytes + old_it->nbytes - 2 /* CRLF */);
 
-	/* copy data from it and old_it to new_it */
-	if (new_it == NULL || _store_item_copy_data(comm, old_it, new_it, it) == -1) {
-	  failed_alloc = 1;
-	  stored = NOT_STORED;
-	  // failed data copy, free up.
-	  if (new_it != NULL)
-	    item_remove(new_it);
-	} else {
-	  it = new_it;
-	}
+        /* copy data from it and old_it to new_it */
+        if (new_it == NULL || _store_item_copy_data(comm, old_it, new_it, it) == -1) {
+          failed_alloc = 1;
+          stored = NOT_STORED;
+          // failed data copy, free up.
+          if (new_it != NULL)
+            item_remove(new_it);
+        } else {
+          it = new_it;
+        }
       }
     }
 
     if (stored == NOT_STORED && failed_alloc == 0) {
       if (old_it != NULL) {
-	item_replace(old_it, it, hv);
+        item_replace(old_it, it, hv);
       } else {
-	do_item_link(it, hv);
+        do_item_link(it, hv);
       }
 
       cas = ITEM_get_cas(it);
@@ -395,7 +309,7 @@ static void clock_handler(const int fd, const short which, void *arg) {
   // While we're here, check for hash table expansion.
   // This function should be quick to avoid delaying the timer.
   assoc_start_expand(stats_state.curr_items);
-    
+
   evtimer_set(&clockevent, clock_handler, 0);
   event_base_set(main_base, &clockevent);
   evtimer_add(&clockevent, &t);
@@ -479,14 +393,13 @@ void agnostic_init(){
   items_init();
 
   /* Run regardless of initializing it later */
-  init_lru_maintainer();
+  //init_lru_maintainer();
 
   /* set stderr non-buffering (for running under, say, daemontools) */
   setbuf(stderr, NULL);
 
   /* initialize other stuff */
   assoc_init(settings.hashpower_init);
-  slabs_init(settings.factor);
 }
 
 static inline unsigned int rdpkru(void) {
@@ -500,16 +413,16 @@ static inline unsigned int rdpkru(void) {
 }
 
 void* server_thread (void *pargs) {
-  unsigned int mynt= rdpkru();
-  printf("enters server_thread() %x\n", mynt);
-  fflush(stdout);
+  // unsigned int mynt= rdpkru();
+  // printf("enters server_thread() %x\n", mynt);
+  // fflush(stdout);
   *end_signal = 0;
   struct event_config *ev_config;
   ev_config = event_config_new();
   event_config_set_flag(ev_config, EVENT_BASE_FLAG_NOLOCK);
   main_base = event_base_new_with_config(ev_config);
   event_config_free(ev_config);
-  
+
 
   if (is_restart) {
     RP_recover();
@@ -576,71 +489,71 @@ char buf[32];
 enum delta_result_type do_add_delta(const char *key,
     const size_t nkey, const bool incr,
     const uint64_t delta, uint64_t *value_ptr, const uint32_t hv) {
-    char *ptr;
-    uint64_t value;
-    int res;
-    item *it;
+  char *ptr;
+  uint64_t value;
+  int res;
+  item *it;
 
-    it = do_item_get(key, nkey, hv, DONT_UPDATE);
-    if (!it) {
-        return DELTA_ITEM_NOT_FOUND;
-    }
+  it = do_item_get(key, nkey, hv, DONT_UPDATE);
+  if (!it) {
+    return DELTA_ITEM_NOT_FOUND;
+  }
 
-    if (it->nbytes <= 2 || (it->it_flags & (ITEM_CHUNKED)) != 0) {
-        do_item_remove(it);
-        return NON_NUMERIC;
-    }
+  if (it->nbytes <= 2) {
+    do_item_remove(it);
+    return NON_NUMERIC;
+  }
 
-    ptr = ITEM_data(it);
+  ptr = ITEM_data(it);
 
-    if (!safe_strtoull(ptr, &value)) {
-        do_item_remove(it);
-        return NON_NUMERIC;
-    }
+  if (!safe_strtoull(ptr, &value)) {
+    do_item_remove(it);
+    return NON_NUMERIC;
+  }
 
-    if (incr) {
-        value += delta;
+  if (incr) {
+    value += delta;
+  } else {
+    if(delta > value) {
+      value = 0;
     } else {
-        if(delta > value) {
-            value = 0;
-        } else {
-            value -= delta;
-        }
+      value -= delta;
     }
-    *value_ptr = value;
+  }
+  *value_ptr = value;
 
-    itoa_u64(value, buf);
-    res = strlen(buf);
-    /* refcount == 2 means we are the only ones holding the item, and it is
-     * linked. We hold the item's lock in this function, so refcount cannot
-     * increase. */
-    if (res + 2 <= it->nbytes && it->refcount == 2) { 
-      /* replace in-place */
-      memcpy(ITEM_data(it), buf, res);
-      memset(ITEM_data(it) + res, ' ', it->nbytes - res - 2);
-      do_item_update(it);
-    } else if (it->refcount > 1) {
-      item *new_it;
-      uint32_t flags;
-      FLAGS_CONV(nullptr, it, flags);
-      new_it = do_item_alloc(ITEM_key(it), it->nkey, flags, it->exptime, res + 2);
-      if (new_it == 0) {
-        do_item_remove(it);
-        return EOM;
-      }
-      memcpy(ITEM_data(new_it), buf, res);
-      memcpy(ITEM_data(new_it) + res, "\r\n", 2);
-      item_replace(it, new_it, hv);
-      do_item_remove(new_it);       /* release our reference */
-    } else {
-      /* Should never get here. This means we somehow fetched an unlinked
-       * item. TODO: Add a counter? */
-      if (it->refcount == 1)
-        do_item_remove(it);
-      return DELTA_ITEM_NOT_FOUND;
+  itoa_u64(value, buf);
+  res = strlen(buf);
+  /* refcount == 2 means we are the only ones holding the item, and it is
+   * linked. We hold the item's lock in this function, so refcount cannot
+   * increase. */
+  if (res + 2 <= it->nbytes && it->refcount == 2) { 
+    /* replace in-place */
+    memcpy(ITEM_data(it), buf, res);
+    memset(ITEM_data(it) + res, ' ', it->nbytes - res - 2);
+    do_item_update(it);
+  } else if (it->refcount > 1) {
+    item *new_it;
+    uint32_t flags;
+    FLAGS_CONV(nullptr, it, flags);
+    new_it = do_item_alloc(ITEM_key(it), it->nkey, flags, it->exptime, res + 2);
+    if (new_it == 0) {
+      do_item_remove(it);
+      return EOM;
     }
-    do_item_remove(it);         /* release our reference */
-    return OK;
+    memcpy(ITEM_data(new_it), buf, res);
+    memcpy(ITEM_data(new_it) + res, "\r\n", 2);
+    item_replace(it, new_it, hv);
+    do_item_remove(new_it);       /* release our reference */
+  } else {
+    /* Should never get here. This means we somehow fetched an unlinked
+     * item. TODO: Add a counter? */
+    if (it->refcount == 1)
+      do_item_remove(it);
+    return DELTA_ITEM_NOT_FOUND;
+  }
+  do_item_remove(it);         /* release our reference */
+  return OK;
 }
 
 // Race conditions don't happen in get operations. We never do in place writes,
@@ -669,7 +582,7 @@ pku_memcached_get(const char* key, size_t nkey, char* &buffer, size_t* buffLen,
 // be unfreeable. TODO - change this
 memcached_return_t
 pku_memcached_mget(const char * const *keys, const size_t *key_length,
-   size_t number_of_keys, item **list){
+    size_t number_of_keys, item **list){
   for(unsigned i = 0; i < number_of_keys; ++i)
     list[i] = item_get(keys[i], key_length[i], 1);
   return MEMCACHED_SUCCESS;

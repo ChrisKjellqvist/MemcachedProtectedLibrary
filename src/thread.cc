@@ -23,7 +23,7 @@ pthread_mutex_t* lru_locks;
 pthread_mutex_t* stats_lock;
 
 #define item_locks (*item_locks_storage)
-pthread_mutex_t **item_locks_storage;
+pptr<pthread_mutex_t> *item_locks_storage;
 /* size of the item lock hash table */
 static uint32_t item_lock_count;
 unsigned int item_lock_hashpower = 11;
@@ -66,12 +66,12 @@ void item_unlock(uint32_t hv) {
 void memcached_thread_init() {
   item_lock_count = hashsize(item_lock_hashpower);
   if (is_restart){
-    item_locks_storage = RP_get_root<pthread_mutex_t*>(RPMRoot::ItemLocks);
+    item_locks_storage = RP_get_root<pptr<pthread_mutex_t> >(RPMRoot::ItemLocks);
     stats_lock = RP_get_root<pthread_mutex_t>(RPMRoot::StatLock);
     lru_locks = RP_get_root<pthread_mutex_t>(RPMRoot::LRULocks);
   } else {
     lru_locks = (pthread_mutex_t*)RP_malloc(sizeof(pthread_mutex_t)*POWER_LARGEST);
-    item_locks_storage = (pthread_mutex_t**)RP_malloc(sizeof(pthread_mutex_t*));
+    item_locks_storage = (pptr<pthread_mutex_t> *)RP_malloc(sizeof(pptr<pthread_mutex_t>));
     item_locks = (pthread_mutex_t*)RP_calloc(item_lock_count, sizeof(pthread_mutex_t));
     stats_lock = (pthread_mutex_t*)RP_malloc(sizeof(pthread_mutex_t));
 

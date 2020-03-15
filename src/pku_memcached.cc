@@ -338,4 +338,3 @@ memcached_close() {
   RP_close();
 } HODOR_FUNC_EXPORT(memcached_close, 0); 
 }
-

@@ -389,8 +389,6 @@ extern struct settings settings;
 #define ITEM_ACTIVE 16
 /* If an item's storage are chained chunks. */
 // This happens if |item| > size_slab_page / 2
-#define ITEM_CHUNKED 32
-#define ITEM_CHUNK 64
 
 /**
  * Structure for storing items within memcached.
@@ -506,7 +504,6 @@ extern int daemonize(int nochdir, int noclose);
 #define mutex_lock(x) pthread_mutex_lock(x)
 #define mutex_unlock(x) pthread_mutex_unlock(x)
 
-#include "slabs.h"
 #include "assoc.h"
 #include "items.h"
 #include "crawler.h"

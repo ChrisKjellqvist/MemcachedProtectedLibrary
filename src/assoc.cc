@@ -68,8 +68,10 @@ void assoc_init(const int hashtable_init) {
   if (!is_restart){
     primary_hashtable_storage = (pptr<pptr<item>>*)RP_malloc(sizeof(pptr<pptr<item> >));
     assert(primary_hashtable_storage != nullptr);
+
     primary_hashtable = pptr<pptr<item> > ((pptr<item>*)RP_calloc(hashsize(hashpower), sizeof(pptr<item>)));
     assert(primary_hashtable != nullptr);
+
     RP_set_root(primary_hashtable_storage, RPMRoot::PrimaryHT);
     RP_set_root(nullptr, RPMRoot::OldHT);
     

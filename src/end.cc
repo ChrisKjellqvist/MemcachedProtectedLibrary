@@ -6,12 +6,10 @@
 #include <stdlib.h>
 #include <string>
 #include <string.h>
-#include <hodor-plib.h>
-#include <hodor.h>
 
 int main(){
-	hodor_init();
-	hodor_enter();
+  memcached_init();
   memcached_end();
+  memcached_close();
   return 0;
 }

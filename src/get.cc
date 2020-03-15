@@ -6,13 +6,14 @@
 #include <stdlib.h>
 #include <string>
 #include <string.h>
-#include <hodor-plib.h>
 #include <hodor.h>
+#include <hodor-plib.h>
 
 #define BUFF_LEN 32
 int main(){
-  hodor_init();
-  hodor_enter();
+  assert(hodor_init() == 0);
+  printf("initialized\n");
+  fflush(stdout);
   std::string name = "chris";
 
   char nbuff[BUFF_LEN];
