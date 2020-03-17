@@ -5,6 +5,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef USE_HODOR
+#include <hodor.h>
+#include <hodor-plib.h>
+#endif
+
 extern std::atomic<int> *end_signal;
 extern "C" {
 
@@ -139,6 +144,9 @@ memcached_fetch_result_internal
   return result;
 } 
 
+#ifdef USE_HODOR
+HODOR_FUNC_ATTR
+#endif
 char *
 memcached_get_internal
   (const char * key, size_t key_length, size_t *value_length, uint32_t *flags,
@@ -149,7 +157,11 @@ memcached_get_internal
   *error = pku_memcached_get(key, key_length, buff, value_length,
       flags);
   return buff;
-}
+} 
+#ifdef USE_HODOR
+HODOR_FUNC_EXPORT(memcached_get_internal, 5);
+#endif
+
 
 memcached_return_t
 memcached_mget_internal
@@ -163,6 +175,9 @@ memcached_mget_internal
   return MEMCACHED_SUCCESS;
 } 
 
+#ifdef USE_HODOR
+HODOR_FUNC_ATTR
+#endif
 memcached_return_t
 memcached_set_internal
   (const char* key, size_t nkey, const char * data, size_t datan, uint32_t exptime, 
@@ -170,6 +185,9 @@ memcached_set_internal
   assert(run_once && "You must run memcached_init before calling memcached_functions");
   return pku_memcached_set(key, nkey, data, datan, exptime);
 } 
+#ifdef USE_HODOR
+HODOR_FUNC_EXPORT(memcached_set_internal, 6); 
+#endif
 
 memcached_return_t
 memcached_add_internal
@@ -201,13 +219,22 @@ memcached_prepend_internal(const char * key, size_t nkey, const char * data, siz
   return pku_memcached_prepend(key, nkey, data, datan, exptime, flags);
 } 
 
+#ifdef USE_HODOR
+HODOR_FUNC_ATTR
+#endif
 memcached_return_t
 memcached_delete_internal(const char* key, size_t nkey, uint32_t exptime){
   assert(run_once && "You must run memcached_init before calling memcached_functions");
   return pku_memcached_delete(key, nkey, exptime);
 } 
+#ifdef USE_HODOR
+HODOR_FUNC_EXPORT(memcached_delete_internal, 3);
+#endif
 
 
+#ifdef USE_HODOR
+HODOR_FUNC_ATTR
+#endif
 memcached_return_t
 memcached_increment_internal
   (const char* key, size_t nkey, uint64_t delta, uint64_t *value){
@@ -219,6 +246,9 @@ memcached_increment_internal
       return MEMCACHED_FAILURE;
   }
 } 
+#ifdef USE_HODOR
+HODOR_FUNC_EXPORT(memcached_increment_internal, 4)
+#endif
 
 
 memcached_return_t
@@ -234,6 +264,9 @@ memcached_decrement_internal
 } 
 
 
+#ifdef USE_HODOR
+HODOR_FUNC_ATTR
+#endif
 memcached_return_t
 memcached_increment_with_initial_internal
   (const char * key, size_t nkey, uint64_t delta, uint64_t initial, uint32_t exptime, 
@@ -252,6 +285,9 @@ memcached_increment_with_initial_internal
       return MEMCACHED_FAILURE;
   }
 } 
+#ifdef USE_HODOR
+HODOR_FUNC_EXPORT(memcached_increment_with_initial_internal, 6);
+#endif
 
 
 memcached_return_t
@@ -308,6 +344,10 @@ void memcached_init(){
   fetch_ptrs = (item**)pm_malloc(sizeof(item*)*128);
   agnostic_init();
 }
+
+#ifdef USE_HODOR
+HODOR_INIT_FUNC(memcached_init);
+#endif
 
 void
 memcached_close() {

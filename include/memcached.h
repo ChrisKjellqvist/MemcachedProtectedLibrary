@@ -53,6 +53,8 @@ enum RPMRoot {
   EndSignal = 12,
   CTime = 13,
   SlabLock = 14,
+  PSig = 15,
+  NLookers = 16,
 };
 extern int is_server;
 extern int is_restart;

@@ -85,7 +85,7 @@ int is_restart;
 /* defaults */
 static void settings_init(void);
 
-std::atomic<int> *end_signal;
+std::atomic_int *end_signal;
 pthread_mutex_t begin_ops_mutex = PTHREAD_MUTEX_INITIALIZER;
 /** exported globals **/
 struct stats stats;
@@ -359,19 +359,32 @@ static int sigignore(int sig) {
   return 0;
 }
 #endif
+static std::atomic_int *pause_sig;
+static std::atomic_int *num_lookers;
+
 
 // run this regardless of whether you're a server or a client
 void agnostic_init(){
   if (!is_restart){
-    end_signal = (std::atomic<int>*)pm_malloc(sizeof(std::atomic<int>));
+    end_signal = (std::atomic_int*)pm_malloc(sizeof(std::atomic_int));
     current_time = (rel_time_t*)pm_malloc(sizeof(rel_time_t));
-    assert(end_signal != nullptr);
-    assert(current_time != nullptr);
+    pause_sig = (std::atomic_int*)pm_malloc(sizeof(std::atomic_int));
+    num_lookers = (std::atomic_int*)pm_malloc(sizeof(std::atomic_int));
+    assert(end_signal != nullptr &&
+        current_time != nullptr &&
+        pause_sig != nullptr &&
+        num_lookers != nullptr);
+    *pause_sig = 0;
+    *num_lookers = 0;
+    pm_set_root(num_lookers, RPMRoot::NLookers);
+    pm_set_root(pause_sig, RPMRoot::PSig);
     pm_set_root(end_signal, RPMRoot::EndSignal);
     pm_set_root((void*)current_time, RPMRoot::CTime);
   } else {
-    end_signal = pm_get_root<std::atomic<int> >(RPMRoot::EndSignal);
+    end_signal = pm_get_root<std::atomic_int >(RPMRoot::EndSignal);
     current_time = pm_get_root<rel_time_t>(RPMRoot::CTime);
+    num_lookers = pm_get_root<std::atomic_int>(RPMRoot::NLookers);
+    pause_sig = pm_get_root<std::atomic_int>(RPMRoot::PSig);
   }
   enum {
     MAXCONNS_FAST = 0,
@@ -472,30 +485,27 @@ void* server_thread (void *pargs) {
   return NULL;
 }
 
-static int pause_sig = 0;
-static int num_lookers = 0;
-static pthread_mutex_t counting_lock = PTHREAD_MUTEX_INITIALIZER;
-
 static void inc_lookers (void){
-  pthread_mutex_lock(&counting_lock);
-  while(pause_sig); //spin until we can move forward
-  ++num_lookers;
-  pthread_mutex_unlock(&counting_lock);
+  if (num_lookers->fetch_add(1) < 0){
+    --(*num_lookers);
+    while(*pause_sig);
+    ++(*num_lookers);
+  }
 }
 
 static void dec_lookers (void){
-  pthread_mutex_lock(&counting_lock);
-  --num_lookers;
-  pthread_mutex_unlock(&counting_lock);
+  --(*num_lookers);
 }
 
 void pause_accesses(void){
-  pause_sig = 1;
-  while(num_lookers);
+  *pause_sig = 1;
+  num_lookers->fetch_sub(1000);
+  while(*num_lookers != -1000);
 }
 
 void unpause_accesses(void){
-  pause_sig = 0;
+  num_lookers->fetch_add(1000);
+  *pause_sig = 0;
 }
 
 char buf[32];
