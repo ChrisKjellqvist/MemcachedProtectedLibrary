@@ -267,13 +267,25 @@ item *do_item_alloc(const char *key, const size_t nkey, const unsigned int flags
 }
 
 void item_free(item *it) {
+  printf("0\n");
+  fflush(stdout);
   assert((it->it_flags & ITEM_LINKED) == 0);
+  printf("1\n");
+  fflush(stdout);
   assert(it != heads[it->slabs_clsid]);
+  printf("2\n");
+  fflush(stdout);
   assert(it != tails[it->slabs_clsid]);
+  printf("3\n");
+  fflush(stdout);
   assert(it->refcount == 0);
+  printf("4\n");
+  fflush(stdout);
 
   /* so slab size changer can tell later if item is already free or not */
   pm_free(it);
+  printf("5\n");
+  fflush(stdout);
 }
 
 /**

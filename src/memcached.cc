@@ -714,11 +714,10 @@ pku_memcached_delete(const char * key, size_t nkey, uint32_t exptime){
   item *it;
   memcached_return_t ret;
   uint32_t hv;
-
   it = item_get_locked(key, nkey, DONT_UPDATE, &hv);
   if (it) {
     do_item_unlink(it, hv);
-    do_item_remove(it);      /* release our reference */
+    do_item_remove(it);      /* release our reference */ // has our break
     ret = MEMCACHED_SUCCESS;
   } else ret = MEMCACHED_FAILURE;
   item_unlock(hv);
