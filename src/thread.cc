@@ -98,10 +98,10 @@ void memcached_thread_init() {
 /*
  * Allocates a new item.
  */
-item *item_alloc(const char * key, size_t nkey, int flags, rel_time_t exptime, int nbytes) {
+item *item_alloc(const char * key, size_t nkey, int flags, rel_time_t exptime, int nbytes, const uint32_t hv) {
   item *it;
   /* do_item_alloc handles its own locks */
-  it = do_item_alloc(key, nkey, flags, exptime, nbytes);
+  it = do_item_alloc(key, nkey, flags, exptime, nbytes, hv);
   return it;
 }
 
@@ -126,27 +126,6 @@ item *item_get_locked(const char *key, const size_t nkey, const bool do_update, 
     *hv = tcd_hash(key, nkey);
     item_lock(*hv);
     return  do_item_get(key, nkey, *hv, do_update);
-}
-
-memcached_return_t
-item_set(const char *key, const size_t nkey, const char* data, const size_t datan, uint32_t exptime, const bool do_update) {
-  item *it;
-  memcached_return_t success;
-  uint32_t hv;
-  hv = tcd_hash(key, nkey);
-  item_lock(hv);
-  it = do_item_get(key, nkey, hv, do_update);
-  if (it == nullptr) {
-    success = MEMCACHED_NOTFOUND;
-  } else if ((size_t)it->nbytes < datan + 2){
-    success = MEMCACHED_E2BIG;
-  } else {
-    success = MEMCACHED_SUCCESS;
-    memset(ITEM_data(it), 0, (size_t)it->nbytes);
-    memcpy(ITEM_data(it), data, datan);
-  }
-  item_unlock(hv);
-  return success;
 }
 
 item *item_touch(const char *key, size_t nkey, uint32_t exptime) {
@@ -225,22 +204,9 @@ enum delta_result_type add_delta(const char *key,
 /*
  * Stores an item in the cache (high level, obeys set/add/replace semantics)
  */
-enum store_item_type store_item(item *item, int comm) {
-  uint32_t hv;
-
-  hv = tcd_hash(ITEM_key(item), item->nkey);
+enum store_item_type store_item(item *item, int comm, const uint32_t hv) {
   item_lock(hv);
   auto ret = do_store_item(item, comm, hv).first;
   item_unlock(hv);
   return ret;
-}
-
-/******************************* GLOBAL STATS ******************************/
-
-void STATS_LOCK() {
-  pthread_mutex_lock(stats_lock);
-}
-
-void STATS_UNLOCK() {
-  pthread_mutex_unlock(stats_lock);
 }

@@ -219,7 +219,7 @@ std::pair<store_item_type, size_t> do_store_item(item *it, int comm, const uint3
         /* we have it and old_it here - alloc memory to hold both */
         /* flags was already lost - so recover them from ITEM_suffix(it) */
         FLAGS_CONV(false, old_it, flags);
-        new_it = do_item_alloc(key, it->nkey, flags, old_it->exptime, it->nbytes + old_it->nbytes - 2 /* CRLF */);
+        new_it = do_item_alloc(key, it->nkey, flags, old_it->exptime, it->nbytes + old_it->nbytes - 2 /* CRLF */, hv);
 
         /* copy data from it and old_it to new_it */
         if (new_it == NULL || _store_item_copy_data(comm, old_it, new_it, it) == -1) {
@@ -560,7 +560,7 @@ enum delta_result_type do_add_delta(const char *key,
     item *new_it;
     uint32_t flags;
     FLAGS_CONV(nullptr, it, flags);
-    new_it = do_item_alloc(ITEM_key(it), it->nkey, flags, it->exptime, res + 2);
+    new_it = do_item_alloc(ITEM_key(it), it->nkey, flags, it->exptime, res + 2, hv);
     if (new_it == 0) {
       do_item_remove(it);
       return EOM;
@@ -616,8 +616,10 @@ memcached_return_t
 pku_memcached_insert(const char* key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime){
   // do what we're here for
+
+  const uint32_t hv = tcd_hash(key, nkey);
   inc_lookers();
-  item *it = item_alloc(key, nkey, 0, realtime(exptime), datan + 2);
+  item *it = item_alloc(key, nkey, 0, realtime(exptime), datan + 2, hv);
 
   if (it != NULL) {
     memcpy(ITEM_data(it), data, datan);
@@ -649,7 +651,8 @@ memcached_return_t
 pku_memcached_set(const char * key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime){
   inc_lookers();
-  item *it = item_alloc(key, nkey, 0, realtime(exptime), datan + 2);
+  auto hv = tcd_hash(key, nkey);
+  item *it = item_alloc(key, nkey, 0, realtime(exptime), datan + 2, hv);
 
   if (it == 0) {
     if (! item_size_ok(nkey, 0, datan)) {
@@ -672,7 +675,7 @@ pku_memcached_set(const char * key, size_t nkey, const char * data, size_t datan
   if (it != NULL) {
     memcpy(ITEM_data(it), data, datan);
     memcpy(ITEM_data(it) + datan, "\r\n", 2);
-    auto res = store_item(it, NREAD_SET);
+    auto res = store_item(it, NREAD_SET, hv);
     item_remove(it);         /* release our reference */
     dec_lookers();
     switch(res) {
@@ -727,8 +730,9 @@ pku_memcached_delete(const char * key, size_t nkey, uint32_t exptime){
 memcached_return_t
 pku_memcached_append(const char * key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime, uint32_t flags) {
+  const uint32_t hv = tcd_hash(key, nkey);
   inc_lookers();
-  item *it = item_alloc(key, nkey, 0, 0, datan+2);
+  item *it = item_alloc(key, nkey, 0, 0, datan+2, hv);
 
   if (it == 0) {
     if (! item_size_ok(nkey, 0, datan + 2)) {
@@ -741,7 +745,7 @@ pku_memcached_append(const char * key, size_t nkey, const char * data, size_t da
   }
   memcpy(ITEM_data(it), data, datan);
   memcpy(ITEM_data(it) + datan, "\r\n", 2);
-  if (store_item(it, NREAD_APPEND) != STORED){
+  if (store_item(it, NREAD_APPEND, hv) != STORED){
     dec_lookers();
     return MEMCACHED_NOTSTORED;
   }
@@ -753,8 +757,9 @@ pku_memcached_append(const char * key, size_t nkey, const char * data, size_t da
 memcached_return_t
 pku_memcached_prepend(const char * key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime, uint32_t flags) {
+  const uint32_t hv = tcd_hash(key, nkey);
   inc_lookers();
-  item *it = item_alloc(key, nkey, 0, 0, datan+2);
+  item *it = item_alloc(key, nkey, 0, 0, datan+2, hv);
 
   if (it == 0) {
     if (! item_size_ok(nkey, 0, datan + 2)) {
@@ -767,7 +772,7 @@ pku_memcached_prepend(const char * key, size_t nkey, const char * data, size_t d
   }
   memcpy(ITEM_data(it), data, datan);
   memcpy(ITEM_data(it) + datan, "\r\n", 2);
-  if (store_item(it, NREAD_PREPEND) != STORED){
+  if (store_item(it, NREAD_PREPEND, hv) != STORED){
     dec_lookers();
     return MEMCACHED_NOTSTORED;
   }
@@ -779,8 +784,9 @@ pku_memcached_prepend(const char * key, size_t nkey, const char * data, size_t d
 memcached_return_t
 pku_memcached_replace(const char * key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime, uint32_t flags){
+  const uint32_t hv = tcd_hash(key, nkey);
   inc_lookers();
-  item *it = item_alloc(key, nkey, 0, 0, datan+2);
+  item *it = item_alloc(key, nkey, 0, 0, datan+2, hv);
 
   if (it == 0) {
     if (! item_size_ok(nkey, 0, datan + 2)) {
@@ -793,7 +799,6 @@ pku_memcached_replace(const char * key, size_t nkey, const char * data, size_t d
   }
   memcpy(ITEM_data(it), data, datan);
   memcpy(ITEM_data(it) + datan, "\r\n", 2);
-  uint32_t hv = tcd_hash(key, nkey);
   auto pr = do_store_item(it, NREAD_REPLACE, hv);
   switch(pr.first) {
     case EXISTS:

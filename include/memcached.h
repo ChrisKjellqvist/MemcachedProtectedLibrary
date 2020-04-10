@@ -98,7 +98,7 @@ const size_t MEMORY_MAX = 4*1024*1024*1024ULL;
 #define BIN_PKT_HDR_WORDS (MIN_BIN_PKT_LENGTH/sizeof(uint32_t))
 
 /* Initial power multiplier for the hash table */
-#define HASHPOWER_DEFAULT 16
+#define HASHPOWER_DEFAULT 25
 #define HASHPOWER_MAX 32
 
 /*
@@ -524,19 +524,17 @@ enum delta_result_type add_delta(const char *key,
     const size_t nkey, bool incr,
     const uint64_t delta, uint64_t *value);
 
-item *item_alloc(const char * key, size_t nkey, int flags, rel_time_t exptime, int nbytes);
+item *item_alloc(const char * key, size_t nkey, int flags, rel_time_t exptime, int nbytes, uint32_t hv);
 #define DO_UPDATE true
 #define DONT_UPDATE false
 item *item_get(const char *key, const size_t nkey, const bool do_update);
 item *item_get_locked(const char *key, const size_t nkey, const bool do_update, uint32_t *hv);
 item *item_touch(const char *key, const size_t nkey, uint32_t exptime);
-memcached_return_t
-item_set(const char *key, const size_t nkey, const char* data, const size_t datan, uint32_t exptime, const bool do_update);
 int   item_link(item *it);
 void  item_remove(item *it);
 int   item_replace(item *it, item *new_it, const uint32_t hv);
 void  item_unlink(item *it);
-enum store_item_type store_item(item *item, int comm);
+enum store_item_type store_item(item *item, int comm, const uint32_t hv);
 void* server_thread(void* pargs);
 
 void item_lock(uint32_t hv);

@@ -1,4 +1,5 @@
 CXX=g++
+ALLOC=r
 PROT_OBJ = obj/memcached.o\
 	   obj/murmur3_hash.o obj/items.o obj/assoc.o obj/thread.o \
 	   obj/bipbuffer.o obj/crawler.o \
@@ -12,14 +13,14 @@ SERV_OBJ = obj/memcached.o\
 
 libralloc=ralloc/test
 
-OPT_LEVEL = -O0 -g
-#OPT_LEVEL = -O3
+#OPT_LEVEL = -O0 -g
+OPT_LEVEL = -O3
 ERROR     = -DFAIL_ASSERT
 OPTS = -Iinclude/  -levent -DHAVE_CONFIG_H -Wall -Werror -std=c++17 \
        -fPIC $(OPT_LEVEL) $(ERROR) -I./ralloc/src \
-       #-DUSE_HODOR -I./hodor/libhodor -I./hodor/include
+       -DUSE_HODOR -I./hodor/libhodor -I./hodor/include
 
-LIBS = obj/libthreadcached.so
+LIBS = obj/libthreadcached.so ralloc/test/libralloc.a
 LINKOPTS = -Lhodor/libhodor -lpthread -levent -ldl -ljemalloc -lhodor
 EXE = bin/server.exe bin/end.exe bin/get.exe bin/insert.exe
 
@@ -68,7 +69,6 @@ obj/%.o: src/%.cc
 .PHONY : clean
 clean: 
 	rm -f obj/* exec *.d /dev/shm/memcached* $(EXE) $(TEST_RUN) $(PERF_RUN) $(RPMA_RUN)
-	# make -C $(libralloc) clean
 .PHONY : reset
 reset:
 	rm -f /dev/shm/test*

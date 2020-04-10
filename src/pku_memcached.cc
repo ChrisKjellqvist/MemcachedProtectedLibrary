@@ -354,7 +354,7 @@ memcached_decrement_with_initial_internal
   }
 } 
 #ifdef USE_HODOR
-HODOR_FUNC_EXPORT(memcached_derement_with_initial_internal, 6);
+HODOR_FUNC_EXPORT(memcached_decrement_with_initial_internal, 6);
 #endif
 
 
@@ -406,7 +406,6 @@ void memcached_init(){
     run_once = true;
   } else return;
   is_restart = pm_init();
-  printf("is restart? %d\n", is_restart);
   fetch_ptrs = (item**)pm_malloc(sizeof(item*)*128);
   agnostic_init();
 }
