@@ -65,7 +65,7 @@ void assoc_init(const int hashtable_init) {
   }
   if (!is_restart){
     primary_hashtable = (pptr<item>*)
-      pm_calloc(hashsize(hashpower), sizeof(pptr<item>));
+      pm_malloc(hashsize(hashpower) * sizeof(pptr<item>));
     assert(primary_hashtable != nullptr);
     pm_set_root((void*)(primary_hashtable), RPMRoot::PrimaryHT);
     pm_set_root(nullptr, RPMRoot::OldHT);
@@ -137,7 +137,7 @@ static void assoc_expand(void) {
   old_hashtable = primary_hashtable;
 
   primary_hashtable = (
-      (pptr<item>*)pm_calloc(hashsize(hashpower + 1), sizeof(pptr<item>)));
+      (pptr<item>*)pm_malloc(hashsize(hashpower + 1) * sizeof(pptr<item>)));
   if (primary_hashtable != nullptr) {
     // Hash table expansion starting
     pm_set_root((void*)(&*old_hashtable), RPMRoot::OldHT);

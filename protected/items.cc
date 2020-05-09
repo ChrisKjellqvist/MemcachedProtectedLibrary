@@ -60,11 +60,11 @@ void items_init(){
     sizes = pm_get_root<unsigned int>(RPMRoot::Sizes);
     sizes_bytes = pm_get_root<uint64_t>(RPMRoot::SizesBytes);
   } else {
-    heads = (pptr<item>*)pm_calloc(sizeof(item*), LARGEST_ID);
-    tails = (pptr<item>*)pm_calloc(sizeof(item*), LARGEST_ID);
-    itemstats = (itemstats_t*)pm_calloc(sizeof(itemstats_t), LARGEST_ID);
-    sizes = (unsigned int*)pm_calloc(sizeof(unsigned int), LARGEST_ID);
-    sizes_bytes = (uint64_t*)pm_calloc(sizeof(uint64_t), LARGEST_ID);
+    heads = (pptr<item>*)pm_malloc(sizeof(item*) * LARGEST_ID);
+    tails = (pptr<item>*)pm_malloc(sizeof(item*) * LARGEST_ID);
+    itemstats = (itemstats_t*)pm_malloc(sizeof(itemstats_t) * LARGEST_ID);
+    sizes = (unsigned int*)pm_malloc(sizeof(unsigned int) * LARGEST_ID);
+    sizes_bytes = (uint64_t*)pm_malloc(sizeof(uint64_t) * LARGEST_ID);
     for(unsigned i = 0; i < LARGEST_ID; ++i)
       heads[i] = tails[i] = NULL;
 
@@ -791,7 +791,7 @@ static void lru_bump_buf_link_q(lru_bump_buf *b) {
 }
 
 void *item_lru_bump_buf_create(void) {
-  lru_bump_buf *b = (lru_bump_buf*)pm_calloc(1, sizeof(lru_bump_buf));
+  lru_bump_buf *b = (lru_bump_buf*)pm_malloc(sizeof(lru_bump_buf));
   if (b == NULL) {
     return NULL;
   }
@@ -959,7 +959,7 @@ static void *lru_maintainer_thread(void *arg) {
   useconds_t next_juggles[MAX_NUMBER_OF_SLAB_CLASSES] = {0};
   useconds_t backoff_juggles[MAX_NUMBER_OF_SLAB_CLASSES] = {0};
   crawler_expired_data *cdata = (crawler_expired_data*)
-    pm_calloc(1, sizeof(struct crawler_expired_data));
+    pm_malloc(sizeof(struct crawler_expired_data));
   if (cdata == NULL) {
     fprintf(stderr, "Failed to allocate crawler data for LRU maintainer thread\n");
     abort();

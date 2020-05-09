@@ -70,7 +70,7 @@ void memcached_thread_init() {
     lru_locks = pm_get_root<pthread_mutex_t>(RPMRoot::LRULocks);
   } else {
     lru_locks = (pthread_mutex_t*)pm_malloc(sizeof(pthread_mutex_t)*POWER_LARGEST);
-    item_locks = (pthread_mutex_t*)pm_calloc(item_lock_count, sizeof(pthread_mutex_t));
+    item_locks = (pthread_mutex_t*)pm_malloc(item_lock_count * sizeof(pthread_mutex_t));
     stats_lock = (pthread_mutex_t*)pm_malloc(sizeof(pthread_mutex_t));
 
     assert(item_locks != nullptr);
