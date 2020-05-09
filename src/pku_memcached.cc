@@ -415,9 +415,9 @@ void memcached_init(){
     run_once = true;
   } else return;
   is_restart = RP_init("memcached.rpma", 6*MIN_SB_REGION_SIZE);
-  fetch_ptrs = (item**)RP_malloc(sizeof(item*)*128);
   agnostic_init();
   if (is_restart) RP_recover();
+  fetch_ptrs = (item**)RP_malloc(sizeof(item*)*128);
 }
 
 #ifdef USE_HODOR
@@ -426,6 +426,7 @@ HODOR_INIT_FUNC(memcached_init);
 
 void
 memcached_close() {
+  RP_free(fetch_ptrs);
   RP_close();
 }
 
