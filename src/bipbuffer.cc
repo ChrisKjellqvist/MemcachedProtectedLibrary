@@ -51,7 +51,7 @@ void bipbuf_init(bipbuf_t* me, const unsigned int size)
 
 bipbuf_t *bipbuf_new(const unsigned int size)
 {
-    bipbuf_t *me = (bipbuf_t*)pm_malloc(bipbuf_sizeof(size));
+    bipbuf_t *me = (bipbuf_t*)RP_malloc(bipbuf_sizeof(size));
     if (!me)
         return NULL;
     bipbuf_init(me, size);
@@ -60,7 +60,7 @@ bipbuf_t *bipbuf_new(const unsigned int size)
 
 void bipbuf_free(bipbuf_t* me)
 {
-   pm_free(me);
+   RP_free(me);
 }
 
 int bipbuf_is_empty(const bipbuf_t* me)

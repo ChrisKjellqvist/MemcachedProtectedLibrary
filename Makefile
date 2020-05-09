@@ -1,4 +1,5 @@
 CXX=g++
+ALLOC=r
 PROT_OBJ = obj/memcached.o\
 	   obj/murmur3_hash.o obj/items.o obj/assoc.o obj/thread.o \
 	   obj/bipbuffer.o obj/crawler.o \
@@ -12,20 +13,16 @@ SERV_OBJ = obj/memcached.o\
 
 libralloc=ralloc/test
 
-# OPT_LEVEL = -O0 -g
-OPT_LEVEL = -O3 -g
+OPT_LEVEL = -O0 -g
+#OPT_LEVEL = -O3
 ERROR     = -DFAIL_ASSERT
-OPTS = -Iinclude/  -levent\
-	       -DHAVE_CONFIG_H -Wall -Werror \
-	       -std=c++17 -fPIC $(OPT_LEVEL) $(ERROR) \
-		   -I./ralloc/src 
+OPTS = -Iinclude/  -levent -DHAVE_CONFIG_H -Wall -Werror -std=c++17 \
+       -fPIC $(OPT_LEVEL) $(ERROR) -I./ralloc/src \
+       #-DUSE_HODOR -I./hodor/libhodor -I./hodor/include
 
-LIBS = obj/libthreadcached.a
-LINKOPTS = -lpthread -levent -ldl -ljemalloc 
-EXE = bin/server.exe bin/end.exe
-TEST_RUN = bin/get.exe bin/insert.exe
-PERF_RUN = bin/insert_test.exe bin/get_test.exe
-RPMA_RUN = bin/basic_setup.exe bin/basic_test.exe
+LIBS = obj/libthreadcached.so ralloc/test/libralloc.a
+LINKOPTS = -Lhodor/libhodor -lpthread -levent -ldl -ljemalloc -lhodor
+EXE = bin/server.exe bin/end.exe bin/get.exe bin/insert.exe
 
 # Ralloc by default
 ifeq ($(ALLOC),r)
@@ -56,30 +53,23 @@ endif
 
 
 .PHONY : perf all lib bin install
-perf: $(EXE) $(PERF_RUN)
 all: $(EXE) $(TEST_RUN)
-lib: obj/libthreadcached.a
+lib: obj/libthreadcached.so
 bin: bin/server.exe
 	mv $^ bin/memcached
 
 bin/%.exe: obj/%.o $(LIBS) 
 	$(CXX) $^ -o $@ $(LINKOPTS)
-obj/libthreadcached.a: $(PROT_OBJ)
-	ar -rcs $@ $^ 
-# $(libralloc)/libralloc.a:
-# 	$(MAKE) -C ralloc/test libralloc.a
 
-obj/%.o: protected/%.cc
+obj/libthreadcached.so: $(PROT_OBJ)
+	$(CXX) -shared $(PROT_OBJ) $(OPTS) -o $@ 
+
+obj/%.o: src/%.cc
 	$(CXX) -c $^ $(OPTS) -o $@
-
-obj/%.o: unprotected/%.cc
-	$(CXX) -c $^ $(OPTS) -o $@
-
 
 .PHONY : clean
 clean: 
 	rm -f obj/* exec *.d /dev/shm/memcached* $(EXE) $(TEST_RUN) $(PERF_RUN) $(RPMA_RUN)
-	# make -C $(libralloc) clean
 .PHONY : reset
 reset:
 	rm -f /dev/shm/test*
