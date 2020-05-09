@@ -65,17 +65,18 @@ void assoc_init(const int hashtable_init) {
   }
   if (!is_restart){
     primary_hashtable = (pptr<item>*)
-      pm_malloc(hashsize(hashpower) * sizeof(pptr<item>));
+      RP_malloc(hashsize(hashpower) * sizeof(pptr<item>));
     assert(primary_hashtable != nullptr);
-    pm_set_root((void*)(primary_hashtable), RPMRoot::PrimaryHT);
-    pm_set_root(nullptr, RPMRoot::OldHT);
+    new (primary_hashtable) pptr<item> [hashsize(hashpower)];
+    RP_set_root((void*)(primary_hashtable), RPMRoot::PrimaryHT);
+    RP_set_root(nullptr, RPMRoot::OldHT);
     pptr<item>* temp = primary_hashtable;
     for(unsigned int i = 0; i < hashsize(hashpower); ++i){
-       temp[i] = pptr<item>(NULL);
+       temp[i] = nullptr;
     }
   } else {
-    primary_hashtable = (pptr<item>*)pm_get_root<char >(RPMRoot::PrimaryHT);
-    old_hashtable =     (pptr<item>*)pm_get_root<char >(RPMRoot::OldHT);
+    primary_hashtable = (pptr<item>*)RP_get_root<char >(RPMRoot::PrimaryHT);
+    old_hashtable =     (pptr<item>*)RP_get_root<char >(RPMRoot::OldHT);
     printf("Restart seen in assoc!\n");
   }
 }
@@ -133,11 +134,11 @@ static void assoc_expand(void) {
   old_hashtable = primary_hashtable;
 
   primary_hashtable = (
-      (pptr<item>*)pm_malloc(hashsize(hashpower + 1) * sizeof(pptr<item>)));
+      (pptr<item>*)RP_malloc(hashsize(hashpower + 1) * sizeof(pptr<item>)));
   if (primary_hashtable != nullptr) {
     // Hash table expansion starting
-    pm_set_root((void*)(&*old_hashtable), RPMRoot::OldHT);
-    pm_set_root((void*)(&*primary_hashtable), RPMRoot::PrimaryHT);
+    RP_set_root((void*)(&*old_hashtable), RPMRoot::OldHT);
+    RP_set_root((void*)(&*primary_hashtable), RPMRoot::PrimaryHT);
     hashpower++;
     expanding = true;
     expand_bucket = 0;
@@ -225,7 +226,7 @@ static void *assoc_maintenance_thread(void *arg) {
         expand_bucket++;
         if (expand_bucket == hashsize(hashpower - 1)) {
           expanding = false;
-          pm_free(old_hashtable);
+          RP_free(old_hashtable);
           // hash table expansion done
         }
       } else {

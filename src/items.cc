@@ -35,12 +35,16 @@ void items_init(){
     sizes = RP_get_root<unsigned int>(RPMRoot::Sizes);
     sizes_bytes = RP_get_root<uint64_t>(RPMRoot::SizesBytes);
   } else {
-    heads = (pptr<item>*)RP_calloc(sizeof(item*), LARGEST_ID);
-    tails = (pptr<item>*)RP_calloc(sizeof(item*), LARGEST_ID);
+    heads = (pptr<item>*)RP_calloc(sizeof(pptr<item>), LARGEST_ID);
+    tails = (pptr<item>*)RP_calloc(sizeof(pptr<item>), LARGEST_ID);
     sizes = (unsigned int*)RP_calloc(sizeof(unsigned int), LARGEST_ID);
     sizes_bytes = (uint64_t*)RP_calloc(sizeof(uint64_t), LARGEST_ID);
-    for(unsigned i = 0; i < LARGEST_ID; ++i)
-      heads[i] = tails[i] = NULL;
+    new (heads) pptr<item> [LARGEST_ID];
+    new (tails) pptr<item> [LARGEST_ID];
+    for(unsigned i = 0; i < LARGEST_ID; ++i){
+      heads[i] = nullptr;
+      tails[i] = nullptr;
+    }
 
     RP_set_root(heads, RPMRoot::Heads);
     RP_set_root(tails, RPMRoot::Tails);

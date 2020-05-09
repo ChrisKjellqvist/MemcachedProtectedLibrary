@@ -374,6 +374,9 @@ void agnostic_init(){
         current_time != nullptr &&
         pause_sig != nullptr &&
         num_lookers != nullptr);
+    new (end_signal) std::atomic_int();
+    new (pause_sig) std::atomic_int();
+    new (num_lookers) std::atomic_int();
     *pause_sig = 0;
     *num_lookers = 0;
     RP_set_root(num_lookers, RPMRoot::NLookers);
@@ -451,9 +454,9 @@ void* server_thread (void *pargs) {
   event_config_free(ev_config);
 
 
-  if (is_restart) {
-    RP_recover();
-  }
+  // if (is_restart) {
+  //   RP_recover();
+  // }
   /* handle SIGINT and SIGTERM */
   signal(SIGINT, sig_handler);
   signal(SIGTERM, sig_handler);
