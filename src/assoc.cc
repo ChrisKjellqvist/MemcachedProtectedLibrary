@@ -69,10 +69,10 @@ void assoc_init(const int hashtable_init) {
     assert(primary_hashtable != nullptr);
     pm_set_root((void*)(primary_hashtable), RPMRoot::PrimaryHT);
     pm_set_root(nullptr, RPMRoot::OldHT);
-    // pptr<item>* temp = primary_hashtable;
-    // for(unsigned int i = 0; i < hashsize(hashpower); ++i){
-    //   temp[i] = (item*)0xDEADBEEF;
-    // }
+    pptr<item>* temp = primary_hashtable;
+    for(unsigned int i = 0; i < hashsize(hashpower); ++i){
+       temp[i] = pptr<item>(NULL);
+    }
   } else {
     primary_hashtable = (pptr<item>*)pm_get_root<char >(RPMRoot::PrimaryHT);
     old_hashtable =     (pptr<item>*)pm_get_root<char >(RPMRoot::OldHT);

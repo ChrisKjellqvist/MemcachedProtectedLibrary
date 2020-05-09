@@ -228,7 +228,8 @@ void item_free(item *it) {
   assert(it->refcount == 0);
 
   /* so slab size changer can tell later if item is already free or not */
-#if 0
+  printf("freeing %p\n", it);
+#if 1
   RP_free(it);
 #endif
 }
