@@ -366,25 +366,25 @@ static std::atomic_int *num_lookers;
 // run this regardless of whether you're a server or a client
 void agnostic_init(){
   if (!is_restart){
-    end_signal = (std::atomic_int*)pm_malloc(sizeof(std::atomic_int));
-    current_time = (rel_time_t*)pm_malloc(sizeof(rel_time_t));
-    pause_sig = (std::atomic_int*)pm_malloc(sizeof(std::atomic_int));
-    num_lookers = (std::atomic_int*)pm_malloc(sizeof(std::atomic_int));
+    end_signal = (std::atomic_int*)RP_malloc(sizeof(std::atomic_int));
+    current_time = (rel_time_t*)RP_malloc(sizeof(rel_time_t));
+    pause_sig = (std::atomic_int*)RP_malloc(sizeof(std::atomic_int));
+    num_lookers = (std::atomic_int*)RP_malloc(sizeof(std::atomic_int));
     assert(end_signal != nullptr &&
         current_time != nullptr &&
         pause_sig != nullptr &&
         num_lookers != nullptr);
     *pause_sig = 0;
     *num_lookers = 0;
-    pm_set_root(num_lookers, RPMRoot::NLookers);
-    pm_set_root(pause_sig, RPMRoot::PSig);
-    pm_set_root(end_signal, RPMRoot::EndSignal);
-    pm_set_root((void*)current_time, RPMRoot::CTime);
+    RP_set_root(num_lookers, RPMRoot::NLookers);
+    RP_set_root(pause_sig, RPMRoot::PSig);
+    RP_set_root(end_signal, RPMRoot::EndSignal);
+    RP_set_root((void*)current_time, RPMRoot::CTime);
   } else {
-    end_signal = pm_get_root<std::atomic_int >(RPMRoot::EndSignal);
-    current_time = pm_get_root<rel_time_t>(RPMRoot::CTime);
-    num_lookers = pm_get_root<std::atomic_int>(RPMRoot::NLookers);
-    pause_sig = pm_get_root<std::atomic_int>(RPMRoot::PSig);
+    end_signal = RP_get_root<std::atomic_int >(RPMRoot::EndSignal);
+    current_time = RP_get_root<rel_time_t>(RPMRoot::CTime);
+    num_lookers = RP_get_root<std::atomic_int>(RPMRoot::NLookers);
+    pause_sig = RP_get_root<std::atomic_int>(RPMRoot::PSig);
   }
   enum {
     MAXCONNS_FAST = 0,
@@ -452,7 +452,7 @@ void* server_thread (void *pargs) {
 
 
   if (is_restart) {
-    pm_recover();
+    RP_recover();
   }
   /* handle SIGINT and SIGTERM */
   signal(SIGINT, sig_handler);
@@ -481,7 +481,7 @@ void* server_thread (void *pargs) {
   }
 
   stop_assoc_maintenance_thread();
-  pm_close();
+  RP_close();
   return NULL;
 }
 

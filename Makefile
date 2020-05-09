@@ -13,12 +13,12 @@ SERV_OBJ = obj/memcached.o\
 
 libralloc=ralloc/test
 
-#OPT_LEVEL = -O0 -g
-OPT_LEVEL = -O3
+OPT_LEVEL = -O0 -g
+#OPT_LEVEL = -O3
 ERROR     = -DFAIL_ASSERT
 OPTS = -Iinclude/  -levent -DHAVE_CONFIG_H -Wall -Werror -std=c++17 \
        -fPIC $(OPT_LEVEL) $(ERROR) -I./ralloc/src \
-       -DUSE_HODOR -I./hodor/libhodor -I./hodor/include
+       #-DUSE_HODOR -I./hodor/libhodor -I./hodor/include
 
 LIBS = obj/libthreadcached.so ralloc/test/libralloc.a
 LINKOPTS = -Lhodor/libhodor -lpthread -levent -ldl -ljemalloc -lhodor
@@ -60,6 +60,7 @@ bin: bin/server.exe
 
 bin/%.exe: obj/%.o $(LIBS) 
 	$(CXX) $^ -o $@ $(LINKOPTS)
+
 obj/libthreadcached.so: $(PROT_OBJ)
 	$(CXX) -shared $(PROT_OBJ) $(OPTS) -o $@ 
 

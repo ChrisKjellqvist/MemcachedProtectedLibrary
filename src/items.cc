@@ -30,22 +30,22 @@ static volatile int do_run_lru_maintainer_thread = 0;
 void items_init(){
   if (is_restart){
     // get roots
-    heads = (pptr<item>*)pm_get_root<item*>(RPMRoot::Heads);
-    tails = (pptr<item>*)pm_get_root<item*>(RPMRoot::Tails);
-    sizes = pm_get_root<unsigned int>(RPMRoot::Sizes);
-    sizes_bytes = pm_get_root<uint64_t>(RPMRoot::SizesBytes);
+    heads = (pptr<item>*)RP_get_root<item*>(RPMRoot::Heads);
+    tails = (pptr<item>*)RP_get_root<item*>(RPMRoot::Tails);
+    sizes = RP_get_root<unsigned int>(RPMRoot::Sizes);
+    sizes_bytes = RP_get_root<uint64_t>(RPMRoot::SizesBytes);
   } else {
-    heads = (pptr<item>*)pm_calloc(sizeof(item*), LARGEST_ID);
-    tails = (pptr<item>*)pm_calloc(sizeof(item*), LARGEST_ID);
-    sizes = (unsigned int*)pm_calloc(sizeof(unsigned int), LARGEST_ID);
-    sizes_bytes = (uint64_t*)pm_calloc(sizeof(uint64_t), LARGEST_ID);
+    heads = (pptr<item>*)RP_calloc(sizeof(item*), LARGEST_ID);
+    tails = (pptr<item>*)RP_calloc(sizeof(item*), LARGEST_ID);
+    sizes = (unsigned int*)RP_calloc(sizeof(unsigned int), LARGEST_ID);
+    sizes_bytes = (uint64_t*)RP_calloc(sizeof(uint64_t), LARGEST_ID);
     for(unsigned i = 0; i < LARGEST_ID; ++i)
       heads[i] = tails[i] = NULL;
 
-    pm_set_root(heads, RPMRoot::Heads);
-    pm_set_root(tails, RPMRoot::Tails);
-    pm_set_root(sizes, RPMRoot::Sizes);
-    pm_set_root(sizes_bytes, RPMRoot::SizesBytes);
+    RP_set_root(heads, RPMRoot::Heads);
+    RP_set_root(tails, RPMRoot::Tails);
+    RP_set_root(sizes, RPMRoot::Sizes);
+    RP_set_root(sizes_bytes, RPMRoot::SizesBytes);
   }
 }
 
@@ -152,7 +152,7 @@ item *do_item_alloc_pull(const size_t ntotal, const unsigned int id) {
     uint64_t total_bytes = 0;
     /* Try to reclaim memory first */
     lru_pull_tail(id, COLD_LRU, 0, 0, 0, NULL);
-    it = (item*)pm_malloc(ntotal);
+    it = (item*)RP_malloc(ntotal);
 
     if (it == NULL) {
       // We send '0' in for "total_bytes" as this routine is always
@@ -183,7 +183,7 @@ item *do_item_alloc(const char *key, const size_t nkey, const unsigned int flags
   if (nbytes < 2)
     return 0;
 
-  size_t ntotal = item_make_header(nkey + 1, flags, nbytes, suffix, &nsuffix);
+  size_t ntotal = item_make_header(nkey + 2, flags, nbytes, suffix, &nsuffix);
 
   unsigned int id = hv & (SLAB_CLASSES - 1); // & 63
   if (ntotal > ITEM_MAX_SZ) return 0;
@@ -228,7 +228,9 @@ void item_free(item *it) {
   assert(it->refcount == 0);
 
   /* so slab size changer can tell later if item is already free or not */
-  pm_free(it);
+#if 0
+  RP_free(it);
+#endif
 }
 
 /**
@@ -241,7 +243,7 @@ bool item_size_ok(const size_t nkey, const int flags, const int nbytes) {
   if (nbytes < 2)
     return false;
 
-  size_t ntotal = item_make_header(nkey + 1, flags, nbytes,
+  size_t ntotal = item_make_header(nkey + 2, flags, nbytes,
       prefix, &nsuffix);
 
   return ntotal <= ITEM_MAX_SZ;
@@ -402,7 +404,7 @@ char *item_cachedump(const unsigned int slabs_clsid, const unsigned int limit, u
   pthread_mutex_lock(&lru_locks[id]);
   it = heads[id];
 
-  buffer = (char*)pm_malloc((size_t)memlimit);
+  buffer = (char*)RP_malloc((size_t)memlimit);
   if (buffer == 0) {
     pthread_mutex_unlock(&lru_locks[id]);
     return NULL;
@@ -690,7 +692,7 @@ static void lru_bump_buf_link_q(lru_bump_buf *b) {
 }
 
 void *item_lru_bump_buf_create(void) {
-  lru_bump_buf *b = (lru_bump_buf*)pm_calloc(1, sizeof(lru_bump_buf));
+  lru_bump_buf *b = (lru_bump_buf*)RP_calloc(1, sizeof(lru_bump_buf));
   if (b == NULL) {
     return NULL;
   }
@@ -858,7 +860,7 @@ static void *lru_maintainer_thread(void *arg) {
   useconds_t next_juggles[MAX_NUMBER_OF_SLAB_CLASSES] = {0};
   useconds_t backoff_juggles[MAX_NUMBER_OF_SLAB_CLASSES] = {0};
   crawler_expired_data *cdata = (crawler_expired_data*)
-    pm_calloc(1, sizeof(struct crawler_expired_data));
+    RP_calloc(1, sizeof(struct crawler_expired_data));
   if (cdata == NULL) {
     fprintf(stderr, "Failed to allocate crawler data for LRU maintainer thread\n");
     abort();

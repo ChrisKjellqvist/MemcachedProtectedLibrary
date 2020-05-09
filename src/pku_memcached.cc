@@ -160,8 +160,12 @@ memcached_get_internal
   assert(run_once && "You must run memcached_init before calling memcached_functions");
   *error = MEMCACHED_FAILURE;
   char *buff;
+  printf("get operation START\n");
+  fflush(stdout);
   *error = pku_memcached_get(key, key_length, buff, value_length,
       flags);
+  printf("get operation END\n");
+  fflush(stdout);
   return buff;
 } 
 #ifdef USE_HODOR
@@ -195,7 +199,12 @@ memcached_set_internal
   (const char* key, size_t nkey, const char * data, size_t datan, uint32_t exptime, 
    uint32_t flags){
   assert(run_once && "You must run memcached_init before calling memcached_functions");
-  return pku_memcached_set(key, nkey, data, datan, exptime);
+  printf("set START\n");
+  fflush(stdout);
+  auto q = pku_memcached_set(key, nkey, data, datan, exptime);
+  printf("set END\n");
+  fflush(stdout);
+  return q;
 } 
 #ifdef USE_HODOR
 HODOR_FUNC_EXPORT(memcached_set_internal, 6); 
@@ -405,9 +414,10 @@ void memcached_init(){
   if (!run_once){
     run_once = true;
   } else return;
-  is_restart = pm_init();
-  fetch_ptrs = (item**)pm_malloc(sizeof(item*)*128);
+  is_restart = RP_init("memcached.rpma", 6*MIN_SB_REGION_SIZE);
+  fetch_ptrs = (item**)RP_malloc(sizeof(item*)*128);
   agnostic_init();
+  if (is_restart) RP_recover();
 }
 
 #ifdef USE_HODOR
@@ -416,7 +426,7 @@ HODOR_INIT_FUNC(memcached_init);
 
 void
 memcached_close() {
-  pm_close();
+  RP_close();
 }
 
 }
