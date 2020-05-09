@@ -78,10 +78,6 @@ void assoc_init(const int hashtable_init) {
     old_hashtable =     (pptr<item>*)pm_get_root<char >(RPMRoot::OldHT);
     printf("Restart seen in assoc!\n");
   }
-  STATS_LOCK();
-  stats_state.hash_power_level = hashpower;
-  stats_state.hash_bytes = hashsize(hashpower) * sizeof(void *);
-  STATS_UNLOCK();
 }
 
 item *assoc_find(const char *key, const size_t nkey, const uint32_t hv) {
@@ -145,11 +141,6 @@ static void assoc_expand(void) {
     hashpower++;
     expanding = true;
     expand_bucket = 0;
-    STATS_LOCK();
-    stats_state.hash_power_level = hashpower;
-    stats_state.hash_bytes += hashsize(hashpower) * sizeof(void *);
-    stats_state.hash_is_expanding = true;
-    STATS_UNLOCK();
   } else {
     primary_hashtable = old_hashtable;
     /* Bad news, but we can keep running. */
@@ -235,10 +226,6 @@ static void *assoc_maintenance_thread(void *arg) {
         if (expand_bucket == hashsize(hashpower - 1)) {
           expanding = false;
           pm_free(old_hashtable);
-          STATS_LOCK();
-          stats_state.hash_bytes -= hashsize(hashpower - 1) * sizeof(void *);
-          stats_state.hash_is_expanding = false;
-          STATS_UNLOCK();
           // hash table expansion done
         }
       } else {

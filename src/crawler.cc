@@ -369,28 +369,19 @@ static int do_lru_crawler_start(uint32_t id, uint32_t remaining) {
     starts++;
   }
   pthread_mutex_unlock(&lru_locks[sid]);
-  if (starts) {
-    STATS_LOCK();
-    stats_state.lru_crawler_running = true;
-    stats.lru_crawler_starts++;
-    STATS_UNLOCK();
-  }
   return starts;
 }
 
 int lru_crawler_start(uint8_t *ids, uint32_t remaining,
     const enum crawler_run_type type, void *data,
     void *c, const int sfd) {
+#if 0
   int starts = 0;
   bool is_running;
   static rel_time_t block_ae_until = 0;
   pthread_mutex_lock(&lru_crawler_lock);
   pthread_mutex_lock(&lru_running);
-  STATS_LOCK();
-  is_running = stats_state.lru_crawler_running;
-  STATS_UNLOCK();
-  if (is_running &&
-      !(type == CRAWLER_AUTOEXPIRE && active_crawler_type == CRAWLER_AUTOEXPIRE)) {
+  if (type == CRAWLER_AUTOEXPIRE && active_crawler_type == CRAWLER_AUTOEXPIRE) {
     pthread_mutex_unlock(&lru_crawler_lock);
     block_ae_until = *current_time + 60;
     return -1;
@@ -423,6 +414,10 @@ int lru_crawler_start(uint8_t *ids, uint32_t remaining,
   pthread_mutex_unlock(&lru_crawler_lock);
   pthread_mutex_unlock(&lru_running);
   return starts;
+#else
+  do_lru_crawler_start(0, 0);
+  return 0;
+#endif
 }
 
 /* If we hold this lock, crawler can't wake up or move */

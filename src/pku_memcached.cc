@@ -5,6 +5,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef USE_HODOR
+#include <hodor.h>
+#include <hodor-plib.h>
+#endif
+
 extern std::atomic<int> *end_signal;
 extern "C" {
 
@@ -111,6 +116,9 @@ static unsigned nptrs = 0;
 static unsigned ptrcnt = 0;
 
 // This may not work...
+#ifdef USE_HODOR
+HODOR_FUNC_ATTR
+#endif
 memcached_result_st*
 memcached_fetch_result_internal
   (memcached_result_st *result, memcached_return_t *error){
@@ -138,7 +146,13 @@ memcached_fetch_result_internal
   result->item_expiration = (time_t)it->exptime;
   return result;
 } 
+#ifdef USE_HODOR
+HODOR_FUNC_EXPORT(memcached_fetch_result_internal, 2);
+#endif
 
+#ifdef USE_HODOR
+HODOR_FUNC_ATTR
+#endif
 char *
 memcached_get_internal
   (const char * key, size_t key_length, size_t *value_length, uint32_t *flags,
@@ -146,11 +160,22 @@ memcached_get_internal
   assert(run_once && "You must run memcached_init before calling memcached_functions");
   *error = MEMCACHED_FAILURE;
   char *buff;
+  printf("get operation START\n");
+  fflush(stdout);
   *error = pku_memcached_get(key, key_length, buff, value_length,
       flags);
+  printf("get operation END\n");
+  fflush(stdout);
   return buff;
-}
+} 
+#ifdef USE_HODOR
+HODOR_FUNC_EXPORT(memcached_get_internal, 5);
+#endif
 
+
+#ifdef USE_HODOR
+HODOR_FUNC_ATTR
+#endif
 memcached_return_t
 memcached_mget_internal
   (const char * const *keys, const size_t *key_length, size_t number_of_keys){
@@ -162,15 +187,32 @@ memcached_mget_internal
   nptrs = number_of_keys;
   return MEMCACHED_SUCCESS;
 } 
+#ifdef USE_HODOR
+HODOR_FUNC_EXPORT(memcached_mget_internal, 3);
+#endif
 
+#ifdef USE_HODOR
+HODOR_FUNC_ATTR
+#endif
 memcached_return_t
 memcached_set_internal
   (const char* key, size_t nkey, const char * data, size_t datan, uint32_t exptime, 
    uint32_t flags){
   assert(run_once && "You must run memcached_init before calling memcached_functions");
-  return pku_memcached_set(key, nkey, data, datan, exptime);
+  printf("set START\n");
+  fflush(stdout);
+  auto q = pku_memcached_set(key, nkey, data, datan, exptime);
+  printf("set END\n");
+  fflush(stdout);
+  return q;
 } 
+#ifdef USE_HODOR
+HODOR_FUNC_EXPORT(memcached_set_internal, 6); 
+#endif
 
+#ifdef USE_HODOR
+HODOR_FUNC_ATTR
+#endif
 memcached_return_t
 memcached_add_internal
   (const char* key, size_t nkey, const char * data, size_t datan, uint32_t exptime,
@@ -178,7 +220,13 @@ memcached_add_internal
   assert(run_once && "You must run memcached_init before calling memcached_functions");
   return pku_memcached_insert(key, nkey, data, datan, exptime);
 } 
+#ifdef USE_HODOR
+HODOR_FUNC_EXPORT(memcached_add_internal, 6);
+#endif
 
+#ifdef USE_HODOR
+HODOR_FUNC_ATTR
+#endif
 memcached_return_t
 memcached_replace_internal
   (const char* key, size_t nkey, const char * data, size_t datan, uint32_t exptime,
@@ -186,28 +234,52 @@ memcached_replace_internal
   assert(run_once && "You must run memcached_init before calling memcached_functions");
   return pku_memcached_replace(key, nkey, data, datan, exptime, flags);
 } 
+#ifdef USE_HODOR
+HODOR_FUNC_EXPORT(memcached_replace_internal, 6);
+#endif
 
+#ifdef USE_HODOR
+HODOR_FUNC_ATTR
+#endif
 memcached_return_t
 memcached_append_internal(const char * key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime, uint32_t flags){
   assert(run_once && "You must run memcached_init before calling memcached_functions");
   return pku_memcached_append(key, nkey, data, datan, exptime, flags);
 } 
+#ifdef USE_HODOR
+HODOR_FUNC_EXPORT(memcached_append_internal, 6);
+#endif
 
+#ifdef USE_HODOR
+HODOR_FUNC_ATTR
+#endif
 memcached_return_t
 memcached_prepend_internal(const char * key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime, uint32_t flags){
   assert(run_once && "You must run memcached_init before calling memcached_functions");
   return pku_memcached_prepend(key, nkey, data, datan, exptime, flags);
 } 
+#ifdef USE_HODOR
+HODOR_FUNC_EXPORT(memcached_prepend_internal, 6);
+#endif
 
+#ifdef USE_HODOR
+HODOR_FUNC_ATTR
+#endif
 memcached_return_t
 memcached_delete_internal(const char* key, size_t nkey, uint32_t exptime){
   assert(run_once && "You must run memcached_init before calling memcached_functions");
   return pku_memcached_delete(key, nkey, exptime);
 } 
+#ifdef USE_HODOR
+HODOR_FUNC_EXPORT(memcached_delete_internal, 3);
+#endif
 
 
+#ifdef USE_HODOR
+HODOR_FUNC_ATTR
+#endif
 memcached_return_t
 memcached_increment_internal
   (const char* key, size_t nkey, uint64_t delta, uint64_t *value){
@@ -219,8 +291,14 @@ memcached_increment_internal
       return MEMCACHED_FAILURE;
   }
 } 
+#ifdef USE_HODOR
+HODOR_FUNC_EXPORT(memcached_increment_internal, 4)
+#endif
 
 
+#ifdef USE_HODOR
+HODOR_FUNC_ATTR
+#endif
 memcached_return_t
 memcached_decrement_internal
   (const char* key, size_t nkey, uint64_t delta, uint64_t *value){
@@ -232,8 +310,14 @@ memcached_decrement_internal
       return MEMCACHED_FAILURE;
   }
 } 
+#ifdef USE_HODOR
+HODOR_FUNC_EXPORT(memcached_decrement_internal, 4);
+#endif
 
 
+#ifdef USE_HODOR
+HODOR_FUNC_ATTR
+#endif
 memcached_return_t
 memcached_increment_with_initial_internal
   (const char * key, size_t nkey, uint64_t delta, uint64_t initial, uint32_t exptime, 
@@ -252,8 +336,14 @@ memcached_increment_with_initial_internal
       return MEMCACHED_FAILURE;
   }
 } 
+#ifdef USE_HODOR
+HODOR_FUNC_EXPORT(memcached_increment_with_initial_internal, 6);
+#endif
 
 
+#ifdef USE_HODOR
+HODOR_FUNC_ATTR
+#endif
 memcached_return_t
 memcached_decrement_with_initial_internal
   (const char * key, size_t nkey, uint64_t delta, uint64_t initial, uint32_t exptime, 
@@ -272,26 +362,47 @@ memcached_decrement_with_initial_internal
       return MEMCACHED_FAILURE;
   }
 } 
+#ifdef USE_HODOR
+HODOR_FUNC_EXPORT(memcached_decrement_with_initial_internal, 6);
+#endif
 
 
+#ifdef USE_HODOR
+HODOR_FUNC_ATTR
+#endif
 memcached_return_t
 memcached_flush_internal(uint32_t exptime){
   assert(run_once && "You must run memcached_init before calling memcached_functions");
   return pku_memcached_flush(exptime);
 } 
+#ifdef USE_HODOR
+HODOR_FUNC_EXPORT(memcached_flush_internal, 1);
+#endif
 
+#ifdef USE_HODOR
+HODOR_FUNC_ATTR
+#endif
 memcached_return_t
 memcached_end(){
   assert(run_once && "You must run memcached_init before calling memcached_functions");
   end_signal->store(1);
   return MEMCACHED_SUCCESS;
 } 
+#ifdef USE_HODOR
+HODOR_FUNC_EXPORT(memcached_end, 0);
+#endif
 
+#ifdef USE_HODOR
+HODOR_FUNC_ATTR
+#endif
 void
 memcached_start_server() {
   assert(run_once && "You must run memcached_init before calling memcached_functions");
   server_thread(nullptr);
 }
+#ifdef USE_HODOR
+HODOR_FUNC_EXPORT(memcached_start_server, 0);
+#endif
 
 // Start memcached maintainence processes
 // server is either 0 or 1 to represent whether or not we are initializing
@@ -303,15 +414,19 @@ void memcached_init(){
   if (!run_once){
     run_once = true;
   } else return;
-  is_restart = pm_init();
-  printf("is restart? %d\n", is_restart);
-  fetch_ptrs = (item**)malloc(sizeof(item*)*128);
+  is_restart = RP_init("memcached.rpma", 6*MIN_SB_REGION_SIZE);
+  fetch_ptrs = (item**)RP_malloc(sizeof(item*)*128);
   agnostic_init();
+  if (is_restart) RP_recover();
 }
+
+#ifdef USE_HODOR
+HODOR_INIT_FUNC(memcached_init);
+#endif
 
 void
 memcached_close() {
-  pm_close();
+  RP_close();
 }
 
 }

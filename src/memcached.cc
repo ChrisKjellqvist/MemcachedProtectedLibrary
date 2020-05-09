@@ -85,7 +85,7 @@ int is_restart;
 /* defaults */
 static void settings_init(void);
 
-std::atomic<int> *end_signal;
+std::atomic_int *end_signal;
 pthread_mutex_t begin_ops_mutex = PTHREAD_MUTEX_INITIALIZER;
 /** exported globals **/
 struct stats stats;
@@ -219,7 +219,7 @@ std::pair<store_item_type, size_t> do_store_item(item *it, int comm, const uint3
         /* we have it and old_it here - alloc memory to hold both */
         /* flags was already lost - so recover them from ITEM_suffix(it) */
         FLAGS_CONV(false, old_it, flags);
-        new_it = do_item_alloc(key, it->nkey, flags, old_it->exptime, it->nbytes + old_it->nbytes - 2 /* CRLF */);
+        new_it = do_item_alloc(key, it->nkey, flags, old_it->exptime, it->nbytes + old_it->nbytes - 2 /* CRLF */, hv);
 
         /* copy data from it and old_it to new_it */
         if (new_it == NULL || _store_item_copy_data(comm, old_it, new_it, it) == -1) {
@@ -359,19 +359,32 @@ static int sigignore(int sig) {
   return 0;
 }
 #endif
+static std::atomic_int *pause_sig;
+static std::atomic_int *num_lookers;
+
 
 // run this regardless of whether you're a server or a client
 void agnostic_init(){
   if (!is_restart){
-    end_signal = new std::atomic<int>(0);
-    current_time = new rel_time_t();
-    assert(end_signal != nullptr);
-    assert(current_time != nullptr);
-    pm_set_root(end_signal, RPMRoot::EndSignal);
-    pm_set_root((void*)current_time, RPMRoot::CTime);
+    end_signal = (std::atomic_int*)RP_malloc(sizeof(std::atomic_int));
+    current_time = (rel_time_t*)RP_malloc(sizeof(rel_time_t));
+    pause_sig = (std::atomic_int*)RP_malloc(sizeof(std::atomic_int));
+    num_lookers = (std::atomic_int*)RP_malloc(sizeof(std::atomic_int));
+    assert(end_signal != nullptr &&
+        current_time != nullptr &&
+        pause_sig != nullptr &&
+        num_lookers != nullptr);
+    *pause_sig = 0;
+    *num_lookers = 0;
+    RP_set_root(num_lookers, RPMRoot::NLookers);
+    RP_set_root(pause_sig, RPMRoot::PSig);
+    RP_set_root(end_signal, RPMRoot::EndSignal);
+    RP_set_root((void*)current_time, RPMRoot::CTime);
   } else {
-    end_signal = pm_get_root<std::atomic<int> >(RPMRoot::EndSignal);
-    current_time = pm_get_root<rel_time_t>(RPMRoot::CTime);
+    end_signal = RP_get_root<std::atomic_int >(RPMRoot::EndSignal);
+    current_time = RP_get_root<rel_time_t>(RPMRoot::CTime);
+    num_lookers = RP_get_root<std::atomic_int>(RPMRoot::NLookers);
+    pause_sig = RP_get_root<std::atomic_int>(RPMRoot::PSig);
   }
   enum {
     MAXCONNS_FAST = 0,
@@ -439,7 +452,7 @@ void* server_thread (void *pargs) {
 
 
   if (is_restart) {
-    pm_recover();
+    RP_recover();
   }
   /* handle SIGINT and SIGTERM */
   signal(SIGINT, sig_handler);
@@ -468,34 +481,31 @@ void* server_thread (void *pargs) {
   }
 
   stop_assoc_maintenance_thread();
-  pm_close();
+  RP_close();
   return NULL;
 }
 
-static int pause_sig = 0;
-static int num_lookers = 0;
-static pthread_mutex_t counting_lock = PTHREAD_MUTEX_INITIALIZER;
-
 static void inc_lookers (void){
-  pthread_mutex_lock(&counting_lock);
-  while(pause_sig); //spin until we can move forward
-  ++num_lookers;
-  pthread_mutex_unlock(&counting_lock);
+  if (num_lookers->fetch_add(1) < 0){
+    --(*num_lookers);
+    while(*pause_sig);
+    ++(*num_lookers);
+  }
 }
 
 static void dec_lookers (void){
-  pthread_mutex_lock(&counting_lock);
-  --num_lookers;
-  pthread_mutex_unlock(&counting_lock);
+  --(*num_lookers);
 }
 
 void pause_accesses(void){
-  pause_sig = 1;
-  while(num_lookers);
+  *pause_sig = 1;
+  num_lookers->fetch_sub(1000);
+  while(*num_lookers != -1000);
 }
 
 void unpause_accesses(void){
-  pause_sig = 0;
+  num_lookers->fetch_add(1000);
+  *pause_sig = 0;
 }
 
 char buf[32];
@@ -550,7 +560,7 @@ enum delta_result_type do_add_delta(const char *key,
     item *new_it;
     uint32_t flags;
     FLAGS_CONV(nullptr, it, flags);
-    new_it = do_item_alloc(ITEM_key(it), it->nkey, flags, it->exptime, res + 2);
+    new_it = do_item_alloc(ITEM_key(it), it->nkey, flags, it->exptime, res + 2, hv);
     if (new_it == 0) {
       do_item_remove(it);
       return EOM;
@@ -606,8 +616,10 @@ memcached_return_t
 pku_memcached_insert(const char* key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime){
   // do what we're here for
+
+  const uint32_t hv = tcd_hash(key, nkey);
   inc_lookers();
-  item *it = item_alloc(key, nkey, 0, realtime(exptime), datan + 2);
+  item *it = item_alloc(key, nkey, 0, realtime(exptime), datan + 2, hv);
 
   if (it != NULL) {
     memcpy(ITEM_data(it), data, datan);
@@ -639,7 +651,8 @@ memcached_return_t
 pku_memcached_set(const char * key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime){
   inc_lookers();
-  item *it = item_alloc(key, nkey, 0, realtime(exptime), datan + 2);
+  auto hv = tcd_hash(key, nkey);
+  item *it = item_alloc(key, nkey, 0, realtime(exptime), datan + 2, hv);
 
   if (it == 0) {
     if (! item_size_ok(nkey, 0, datan)) {
@@ -662,7 +675,7 @@ pku_memcached_set(const char * key, size_t nkey, const char * data, size_t datan
   if (it != NULL) {
     memcpy(ITEM_data(it), data, datan);
     memcpy(ITEM_data(it) + datan, "\r\n", 2);
-    auto res = store_item(it, NREAD_SET);
+    auto res = store_item(it, NREAD_SET, hv);
     item_remove(it);         /* release our reference */
     dec_lookers();
     switch(res) {
@@ -704,11 +717,10 @@ pku_memcached_delete(const char * key, size_t nkey, uint32_t exptime){
   item *it;
   memcached_return_t ret;
   uint32_t hv;
-
   it = item_get_locked(key, nkey, DONT_UPDATE, &hv);
   if (it) {
     do_item_unlink(it, hv);
-    do_item_remove(it);      /* release our reference */
+    do_item_remove(it);      /* release our reference */ // has our break
     ret = MEMCACHED_SUCCESS;
   } else ret = MEMCACHED_FAILURE;
   item_unlock(hv);
@@ -718,8 +730,9 @@ pku_memcached_delete(const char * key, size_t nkey, uint32_t exptime){
 memcached_return_t
 pku_memcached_append(const char * key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime, uint32_t flags) {
+  const uint32_t hv = tcd_hash(key, nkey);
   inc_lookers();
-  item *it = item_alloc(key, nkey, 0, 0, datan+2);
+  item *it = item_alloc(key, nkey, 0, 0, datan+2, hv);
 
   if (it == 0) {
     if (! item_size_ok(nkey, 0, datan + 2)) {
@@ -732,7 +745,7 @@ pku_memcached_append(const char * key, size_t nkey, const char * data, size_t da
   }
   memcpy(ITEM_data(it), data, datan);
   memcpy(ITEM_data(it) + datan, "\r\n", 2);
-  if (store_item(it, NREAD_APPEND) != STORED){
+  if (store_item(it, NREAD_APPEND, hv) != STORED){
     dec_lookers();
     return MEMCACHED_NOTSTORED;
   }
@@ -744,8 +757,9 @@ pku_memcached_append(const char * key, size_t nkey, const char * data, size_t da
 memcached_return_t
 pku_memcached_prepend(const char * key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime, uint32_t flags) {
+  const uint32_t hv = tcd_hash(key, nkey);
   inc_lookers();
-  item *it = item_alloc(key, nkey, 0, 0, datan+2);
+  item *it = item_alloc(key, nkey, 0, 0, datan+2, hv);
 
   if (it == 0) {
     if (! item_size_ok(nkey, 0, datan + 2)) {
@@ -758,7 +772,7 @@ pku_memcached_prepend(const char * key, size_t nkey, const char * data, size_t d
   }
   memcpy(ITEM_data(it), data, datan);
   memcpy(ITEM_data(it) + datan, "\r\n", 2);
-  if (store_item(it, NREAD_PREPEND) != STORED){
+  if (store_item(it, NREAD_PREPEND, hv) != STORED){
     dec_lookers();
     return MEMCACHED_NOTSTORED;
   }
@@ -770,8 +784,9 @@ pku_memcached_prepend(const char * key, size_t nkey, const char * data, size_t d
 memcached_return_t
 pku_memcached_replace(const char * key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime, uint32_t flags){
+  const uint32_t hv = tcd_hash(key, nkey);
   inc_lookers();
-  item *it = item_alloc(key, nkey, 0, 0, datan+2);
+  item *it = item_alloc(key, nkey, 0, 0, datan+2, hv);
 
   if (it == 0) {
     if (! item_size_ok(nkey, 0, datan + 2)) {
@@ -784,7 +799,6 @@ pku_memcached_replace(const char * key, size_t nkey, const char * data, size_t d
   }
   memcpy(ITEM_data(it), data, datan);
   memcpy(ITEM_data(it) + datan, "\r\n", 2);
-  uint32_t hv = tcd_hash(key, nkey);
   auto pr = do_store_item(it, NREAD_REPLACE, hv);
   switch(pr.first) {
     case EXISTS:
