@@ -82,7 +82,7 @@ void assoc_init(const int hashtable_init) {
 }
 
 item *assoc_find(const char *key, const size_t nkey, const uint32_t hv) {
-  pptr<item> it;
+  item* it;
   unsigned int oldbucket;
 
   if (expanding &&
@@ -171,7 +171,7 @@ int assoc_insert(item *it, const uint32_t hv) {
   } else {
     size_t ind = hv & hashmask(hashpower);
     it->h_next = primary_hashtable[ind];
-    primary_hashtable[ind] = pptr<item>(it);
+    primary_hashtable[ind] = it;
   }
   return 1;
 }
@@ -180,15 +180,15 @@ void assoc_delete(const char *key, const size_t nkey, const uint32_t hv) {
   pptr<item> *before = _hashitem_before(key, nkey, hv);
 
   if (*before != nullptr) {
-    pptr<item> nxt;
+    item* nxt;
     nxt = (*before)->h_next;
-    (*before)->h_next = 0;   /* probably pointless, but whatever. */
+    (*before)->h_next = nullptr;   /* probably pointless, but whatever. */
     *before = nxt;
     return;
   }
   /* Note:  we never actually get here.  the callers don't delete things
      they can't find. */
-  assert(*before != 0);
+  assert(*before != nullptr);
 }
 
 

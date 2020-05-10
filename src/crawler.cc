@@ -42,8 +42,8 @@ struct crawler_module_reg_t {
 };
 
 struct crawler_module_t {
-  pptr<crawler_expired_data> data = 0; /* opaque data pointer */
-  pptr<crawler_module_reg_t> mod = 0;
+  pptr<crawler_expired_data> data = nullptr; /* opaque data pointer */
+  pptr<crawler_module_reg_t> mod = nullptr;
 };
 
 static int crawler_expired_init(crawler_module_t *cm, void *data);
@@ -98,7 +98,7 @@ static int crawler_expired_init(crawler_module_t *cm, void *data) {
   if (data != NULL) {
     d = (crawler_expired_data*)data;
     d->is_external = true;
-    cm->data = pptr<crawler_expired_data>((crawler_expired_data*)data);
+    cm->data = (crawler_expired_data*)data;
   } else {
     // allocate data.
     d = (crawler_expired_data*)pm_malloc(sizeof(crawler_expired_data));
@@ -110,7 +110,7 @@ static int crawler_expired_init(crawler_module_t *cm, void *data) {
     d->is_external = false;
     d->start_time = *current_time;
 
-    cm->data = pptr<crawler_expired_data>(d);
+    cm->data = d;
   }
   pthread_mutex_lock(&d->lock);
   memset(&d->crawlerstats, 0, sizeof(crawlerstats_t) * POWER_LARGEST);
