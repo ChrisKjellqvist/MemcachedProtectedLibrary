@@ -73,5 +73,6 @@ clean:
 .PHONY : reset
 reset:
 	rm -f /dev/shm/test*
+	rm -f /mnt/pmem/test*
 
 # include/hodo-plib.h
