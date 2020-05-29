@@ -219,7 +219,7 @@ std::pair<store_item_type, size_t> do_store_item(item *it, int comm, const uint3
         /* we have it and old_it here - alloc memory to hold both */
         /* flags was already lost - so recover them from ITEM_suffix(it) */
         FLAGS_CONV(false, old_it, flags);
-        new_it = do_item_alloc(key, it->nkey, flags, old_it->exptime, it->nbytes + old_it->nbytes - 2 /* CRLF */, hv);
+        new_it = do_item_alloc(key, it->nkey, flags, old_it->exptime, it->nbytes + old_it->nbytes - 2 /* CRLF */);
 
         /* copy data from it and old_it to new_it */
         if (new_it == NULL || _store_item_copy_data(comm, old_it, new_it, it) == -1) {
@@ -563,7 +563,7 @@ enum delta_result_type do_add_delta(const char *key,
     item *new_it;
     uint32_t flags;
     FLAGS_CONV(nullptr, it, flags);
-    new_it = do_item_alloc(ITEM_key(it), it->nkey, flags, it->exptime, res + 2, hv);
+    new_it = do_item_alloc(ITEM_key(it), it->nkey, flags, it->exptime, res + 2);
     if (new_it == 0) {
       do_item_remove(it);
       return EOM;
@@ -585,23 +585,31 @@ enum delta_result_type do_add_delta(const char *key,
 
 // Race conditions don't happen in get operations. We never do in place writes,
 // only full replacements. Whenever you do a item_get operation, it increments
-// the refcounts and prevents it from being freed. NOTE - YOU MUST refcount_decr
-// after you read the item so that it may be freed if necessary. 
+// the refcounts and prevents it from being freed. 
 memcached_return_t
 pku_memcached_get(const char* key, size_t nkey, char* &buffer, size_t* buffLen,
     uint32_t *flags){
-  *flags = 0; // make sure these don't segfault when it really matters
-  *buffLen = 0;
+  // Can't use user pointers inside protected function. Copy to private buffer
+  // before resources are acquired
+  const char * key_prot = RP_malloc(nkey);
+  memcpy(key_prot, key, nkey);
   inc_lookers();
-  item* it = item_get(key, nkey, 1);
-  if (it == NULL)
+  item* it = item_get(key_prot, nkey, 1);
+  if (it == NULL){
+    RP_free(key_prot);
     return MEMCACHED_NOTFOUND;
-  buffer = (char*)malloc(it->nbytes);
-  memcpy(buffer, ITEM_data(it), it->nbytes);
-  *flags = it->it_flags;
-  *buffLen = it->nbytes;
+  }
+  const char * dat_prot = RP_malloc(it->nbytes);
+  memcpy(dat_prot, ITEM_data(it), it->nbytes);
+  size_t flag_prot = it->it_flags;
+  size_t buffLen_prot = it->nbytes;
   item_remove(it); /* release our reference */
   dec_lookers();
+  if (buffer == NULL)
+    buffer = malloc(buffLen_prot);
+  memcpy(buffer, dat_prot, buffLen_prot);
+  *buffLen = buffLen_prot;
+  *flags = flag_prot;
   return MEMCACHED_SUCCESS;
 }
 
@@ -618,25 +626,34 @@ pku_memcached_mget(const char * const *keys, const size_t *key_length,
 memcached_return_t
 pku_memcached_insert(const char* key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime){
-  // do what we're here for
+  // Reduce the number of allocations we have to do
+  const char * key_prot = RP_malloc(nkey + datan);
+  if (key_prot == NULL) 
+    return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
+  const char * dat_prot = key_prot + nkey;
 
-  const uint32_t hv = tcd_hash(key, nkey);
+  memcpy(key_prot, key, nkey);
+  memcpy(dat_prot, data, datan);
   inc_lookers();
-  item *it = item_alloc(key, nkey, 0, realtime(exptime), datan + 2, hv);
+  item *it = item_alloc(key_prot, nkey, 0, realtime(exptime), datan + 2);
 
   if (it != NULL) {
-    memcpy(ITEM_data(it), data, datan);
+    memcpy(ITEM_data(it), dat_prot, datan);
     memcpy(ITEM_data(it) + datan, "\r\n", 2);
     uint32_t hv = tcd_hash(key, nkey);
     auto pr = do_store_item(it, NREAD_ADD, hv);
     switch(pr.first){
       case NOT_FOUND:
+        RP_free(key_prot);
         return MEMCACHED_NOTFOUND;
       case TOO_LARGE: 
+        RP_free(key_prot);
         return MEMCACHED_E2BIG;
       case NO_MEMORY:
+        RP_free(key_prot);
         return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
       case NOT_STORED:
+        RP_free(key_prot);
         return MEMCACHED_NOTSTORED;
       default:
         break;
@@ -644,39 +661,49 @@ pku_memcached_insert(const char* key, size_t nkey, const char * data, size_t dat
     item_remove(it);         /* release our reference */
   } else {
     perror("SERVER_ERROR Out of memory allocating new item");
+    RP_free(key_prot);
     return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
   }
   dec_lookers();
+  RP_free(key_prot);
   return MEMCACHED_SUCCESS;
 }
 
 memcached_return_t
 pku_memcached_set(const char * key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime){
+  const char * key_prot = RP_malloc(nkey + datan);
+  if (key_prot == NULL)
+    return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
+  const char * dat_prot = key_prot + nkey;
+  memcpy(key_prot, key, nkey);
+  memcpy(dat_prot, data, datan);
   inc_lookers();
-  auto hv = tcd_hash(key, nkey);
-  item *it = item_alloc(key, nkey, 0, realtime(exptime), datan + 2, hv);
+  item *it = item_alloc(key, nkey, 0, realtime(exptime), datan + 2);
 
   if (it == 0) {
     if (! item_size_ok(nkey, 0, datan)) {
+      RP_free(key_prot);
       fprintf(stderr, "SERVER_ERROR too big for the cache\n");
       return MEMCACHED_KEY_TOO_BIG; // Maybe make this more informative
     } else {
+      RP_free(key_prot);
       fprintf(stderr, "SERVER_ERROR out of memory storing object");
       return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
     }
-    it = item_get(key, nkey, DONT_UPDATE);
+    it = item_get(key_prot, nkey, DONT_UPDATE);
     if (it) {
       item_unlink(it); // remove item from table
       item_remove(it); // lazily delete it
     }
     // If we're storing, don't allow data to overwrite to persist in cache,
     // we prefer old data to not exist than pollute the cache
+    RP_free(key_prot);
     return MEMCACHED_NOTSTORED;
   }
 
   if (it != NULL) {
-    memcpy(ITEM_data(it), data, datan);
+    memcpy(ITEM_data(it), dat_prot, datan);
     memcpy(ITEM_data(it) + datan, "\r\n", 2);
     auto res = store_item(it, NREAD_SET, hv);
     item_remove(it);         /* release our reference */
@@ -686,18 +713,24 @@ pku_memcached_set(const char * key, size_t nkey, const char * data, size_t datan
       case STORED:
         break;
       case NOT_FOUND:
+        RP_free(key_prot);
         return MEMCACHED_NOTFOUND;
       case TOO_LARGE: 
+        RP_free(key_prot);
         return MEMCACHED_E2BIG;
       case NO_MEMORY:
+        RP_free(key_prot);
         return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
       case NOT_STORED:
+        RP_free(key_prot);
         return MEMCACHED_NOTSTORED;
     }
   } else {
+    RP_free(key_prot);
     perror("SERVER_ERROR Out of memory allocating new item");
     return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
   }
+  RP_free(key_prot);
   return MEMCACHED_STORED;
 }
 
@@ -717,90 +750,114 @@ pku_memcached_flush(uint32_t exptime){
 
 memcached_return_t
 pku_memcached_delete(const char * key, size_t nkey, uint32_t exptime){
+  const char * key_prot = RP_malloc(nkey);
+  memcpy(key_prot, key, nkey);
+  inc_lookers();
   item *it;
   memcached_return_t ret;
   uint32_t hv;
-  it = item_get_locked(key, nkey, DONT_UPDATE, &hv);
+  it = item_get_locked(key_prot, nkey, DONT_UPDATE, &hv);
   if (it) {
     do_item_unlink(it, hv);
     do_item_remove(it);      /* release our reference */ // has our break
     ret = MEMCACHED_SUCCESS;
   } else ret = MEMCACHED_FAILURE;
   item_unlock(hv);
+  dec_lookers();
+  RP_free(key_prot);
   return ret;
 }
 
 memcached_return_t
 pku_memcached_append(const char * key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime, uint32_t flags) {
-  const uint32_t hv = tcd_hash(key, nkey);
+  const char * key_prot = RP_malloc(nkey + datan);
+  const char * dat_prot = key_prot = nkey; 
+  memcpy(key_prot, key, nkey);
+  memcpy(dat_prot, data, datan);
   inc_lookers();
-  item *it = item_alloc(key, nkey, 0, 0, datan+2, hv);
+  item *it = item_alloc(key_prot, nkey, 0, 0, datan+2);
 
   if (it == 0) {
     if (! item_size_ok(nkey, 0, datan + 2)) {
       dec_lookers();
+      RP_free(key_prot);
       return MEMCACHED_E2BIG;
     } else {
       dec_lookers();
+      RP_free(key_prot);
       return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
     }
   }
-  memcpy(ITEM_data(it), data, datan);
+  memcpy(ITEM_data(it), dat_prot , datan);
   memcpy(ITEM_data(it) + datan, "\r\n", 2);
   if (store_item(it, NREAD_APPEND, hv) != STORED){
     dec_lookers();
+    RP_free(key_prot);
     return MEMCACHED_NOTSTORED;
   }
   item_remove(it);
   dec_lookers();
+  RP_free(key_prot);
   return MEMCACHED_STORED;  
 }
 
 memcached_return_t
 pku_memcached_prepend(const char * key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime, uint32_t flags) {
-  const uint32_t hv = tcd_hash(key, nkey);
+  const char * key_prot = RP_malloc(nkey + datan);
+  const char * dat_prot = key_prot = nkey; 
+  memcpy(key_prot, key, nkey);
+  memcpy(dat_prot, data, datan);
   inc_lookers();
-  item *it = item_alloc(key, nkey, 0, 0, datan+2, hv);
+  item *it = item_alloc(key_prot, nkey, 0, 0, datan+2);
 
   if (it == 0) {
     if (! item_size_ok(nkey, 0, datan + 2)) {
       dec_lookers();
+      RP_free(key_prot);
       return MEMCACHED_E2BIG;
     } else {
       dec_lookers();
+      RP_free(key_prot);
       return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
     }
   }
-  memcpy(ITEM_data(it), data, datan);
+  memcpy(ITEM_data(it), dat_prot , datan);
   memcpy(ITEM_data(it) + datan, "\r\n", 2);
   if (store_item(it, NREAD_PREPEND, hv) != STORED){
     dec_lookers();
+    RP_free(key_prot);
     return MEMCACHED_NOTSTORED;
   }
   item_remove(it);
   dec_lookers();
-  return MEMCACHED_STORED;
+  RP_free(key_prot);
+  return MEMCACHED_STORED;  
 }
 
 memcached_return_t
 pku_memcached_replace(const char * key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime, uint32_t flags){
-  const uint32_t hv = tcd_hash(key, nkey);
+  const char * key_prot = RP_malloc(nkey + datan);
+  const char * dat_prot = key_prot + nkey;
+  memcpy(key_prot, key, nkey);
+  memcpy(dat_prot, data, datan);
   inc_lookers();
-  item *it = item_alloc(key, nkey, 0, 0, datan+2, hv);
+  item *it = item_alloc(key_prot, nkey, 0, 0, datan+2);
 
   if (it == 0) {
     if (! item_size_ok(nkey, 0, datan + 2)) {
       dec_lookers();
+      RP_free(key_prot);
       return MEMCACHED_E2BIG;
     } else {
       dec_lookers();
+      RP_free(key_prot);
       return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
     }
   }
-  memcpy(ITEM_data(it), data, datan);
+  memcpy(ITEM_data(it), dat_prot, datan);
   memcpy(ITEM_data(it) + datan, "\r\n", 2);
   auto pr = do_store_item(it, NREAD_REPLACE, hv);
   switch(pr.first) {
@@ -809,19 +866,24 @@ pku_memcached_replace(const char * key, size_t nkey, const char * data, size_t d
       break;
     case NOT_FOUND:
       dec_lookers();
+      RP_free(key_prot);
       return MEMCACHED_NOTFOUND;
     case TOO_LARGE: 
       dec_lookers();
+      RP_free(key_prot);
       return MEMCACHED_E2BIG;
     case NO_MEMORY:
       dec_lookers();
+      RP_free(key_prot);
       return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
     case NOT_STORED:
       dec_lookers();
+      RP_free(key_prot);
       return MEMCACHED_NOTSTORED;
   }
   item_remove(it);
   dec_lookers();
+  RP_free(key_prot);
   return MEMCACHED_SUCCESS;  
 
 }
