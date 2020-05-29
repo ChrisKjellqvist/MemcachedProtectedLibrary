@@ -591,7 +591,7 @@ pku_memcached_get(const char* key, size_t nkey, char* &buffer, size_t* buffLen,
     uint32_t *flags){
   // Can't use user pointers inside protected function. Copy to private buffer
   // before resources are acquired
-  const char * key_prot = RP_malloc(nkey);
+  char * key_prot = (char*)RP_malloc(nkey);
   memcpy(key_prot, key, nkey);
   inc_lookers();
   item* it = item_get(key_prot, nkey, 1);
@@ -599,14 +599,14 @@ pku_memcached_get(const char* key, size_t nkey, char* &buffer, size_t* buffLen,
     RP_free(key_prot);
     return MEMCACHED_NOTFOUND;
   }
-  const char * dat_prot = RP_malloc(it->nbytes);
+  char * dat_prot = (char*)RP_malloc(it->nbytes);
   memcpy(dat_prot, ITEM_data(it), it->nbytes);
   size_t flag_prot = it->it_flags;
   size_t buffLen_prot = it->nbytes;
   item_remove(it); /* release our reference */
   dec_lookers();
   if (buffer == NULL)
-    buffer = malloc(buffLen_prot);
+    buffer = (char*)malloc(buffLen_prot);
   memcpy(buffer, dat_prot, buffLen_prot);
   *buffLen = buffLen_prot;
   *flags = flag_prot;
@@ -627,10 +627,10 @@ memcached_return_t
 pku_memcached_insert(const char* key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime){
   // Reduce the number of allocations we have to do
-  const char * key_prot = RP_malloc(nkey + datan);
+  char * key_prot = (char*)RP_malloc(nkey + datan);
   if (key_prot == NULL) 
     return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
-  const char * dat_prot = key_prot + nkey;
+  char * dat_prot = key_prot + nkey;
 
   memcpy(key_prot, key, nkey);
   memcpy(dat_prot, data, datan);
@@ -672,10 +672,10 @@ pku_memcached_insert(const char* key, size_t nkey, const char * data, size_t dat
 memcached_return_t
 pku_memcached_set(const char * key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime){
-  const char * key_prot = RP_malloc(nkey + datan);
+  char * key_prot = (char*)RP_malloc(nkey + datan);
   if (key_prot == NULL)
     return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
-  const char * dat_prot = key_prot + nkey;
+  char * dat_prot = key_prot + nkey;
   memcpy(key_prot, key, nkey);
   memcpy(dat_prot, data, datan);
   inc_lookers();
@@ -705,7 +705,7 @@ pku_memcached_set(const char * key, size_t nkey, const char * data, size_t datan
   if (it != NULL) {
     memcpy(ITEM_data(it), dat_prot, datan);
     memcpy(ITEM_data(it) + datan, "\r\n", 2);
-    auto res = store_item(it, NREAD_SET, hv);
+    auto res = store_item(it, NREAD_SET);
     item_remove(it);         /* release our reference */
     dec_lookers();
     switch(res) {
@@ -750,7 +750,7 @@ pku_memcached_flush(uint32_t exptime){
 
 memcached_return_t
 pku_memcached_delete(const char * key, size_t nkey, uint32_t exptime){
-  const char * key_prot = RP_malloc(nkey);
+  char * key_prot = (char*)RP_malloc(nkey);
   memcpy(key_prot, key, nkey);
   inc_lookers();
   item *it;
@@ -771,8 +771,8 @@ pku_memcached_delete(const char * key, size_t nkey, uint32_t exptime){
 memcached_return_t
 pku_memcached_append(const char * key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime, uint32_t flags) {
-  const char * key_prot = RP_malloc(nkey + datan);
-  const char * dat_prot = key_prot = nkey; 
+  char * key_prot = (char*)RP_malloc(nkey + datan);
+  char * dat_prot = key_prot + nkey; 
   memcpy(key_prot, key, nkey);
   memcpy(dat_prot, data, datan);
   inc_lookers();
@@ -791,7 +791,7 @@ pku_memcached_append(const char * key, size_t nkey, const char * data, size_t da
   }
   memcpy(ITEM_data(it), dat_prot , datan);
   memcpy(ITEM_data(it) + datan, "\r\n", 2);
-  if (store_item(it, NREAD_APPEND, hv) != STORED){
+  if (store_item(it, NREAD_APPEND) != STORED){
     dec_lookers();
     RP_free(key_prot);
     return MEMCACHED_NOTSTORED;
@@ -805,8 +805,8 @@ pku_memcached_append(const char * key, size_t nkey, const char * data, size_t da
 memcached_return_t
 pku_memcached_prepend(const char * key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime, uint32_t flags) {
-  const char * key_prot = RP_malloc(nkey + datan);
-  const char * dat_prot = key_prot = nkey; 
+  char * key_prot = (char*)RP_malloc(nkey + datan);
+  char * dat_prot = key_prot + nkey; 
   memcpy(key_prot, key, nkey);
   memcpy(dat_prot, data, datan);
   inc_lookers();
@@ -825,7 +825,7 @@ pku_memcached_prepend(const char * key, size_t nkey, const char * data, size_t d
   }
   memcpy(ITEM_data(it), dat_prot , datan);
   memcpy(ITEM_data(it) + datan, "\r\n", 2);
-  if (store_item(it, NREAD_PREPEND, hv) != STORED){
+  if (store_item(it, NREAD_PREPEND) != STORED){
     dec_lookers();
     RP_free(key_prot);
     return MEMCACHED_NOTSTORED;
@@ -839,8 +839,8 @@ pku_memcached_prepend(const char * key, size_t nkey, const char * data, size_t d
 memcached_return_t
 pku_memcached_replace(const char * key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime, uint32_t flags){
-  const char * key_prot = RP_malloc(nkey + datan);
-  const char * dat_prot = key_prot + nkey;
+  char * key_prot = (char*)RP_malloc(nkey + datan);
+  char * dat_prot = key_prot + nkey;
   memcpy(key_prot, key, nkey);
   memcpy(dat_prot, data, datan);
   inc_lookers();
@@ -859,8 +859,7 @@ pku_memcached_replace(const char * key, size_t nkey, const char * data, size_t d
   }
   memcpy(ITEM_data(it), dat_prot, datan);
   memcpy(ITEM_data(it) + datan, "\r\n", 2);
-  auto pr = do_store_item(it, NREAD_REPLACE, hv);
-  switch(pr.first) {
+  switch(store_item(it, NREAD_REPLACE)) {
     case EXISTS:
     case STORED:
       break;

@@ -25,7 +25,7 @@ bin: server.exe
 	mv $^ bin/memcached
 
 %.exe: test/%.cc $(LIBS)
-	$(CXX) $^ -o $@ $(LINKOPTS)
+	$(CXX) $^ -o $@ $(OPTS) $(LINKOPTS)
 
 obj/libthreadcached.so: $(PROT_OBJ)
 	$(CXX) -shared $(PROT_OBJ) $(OPTS) -o $@ 

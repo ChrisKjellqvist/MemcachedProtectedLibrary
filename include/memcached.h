@@ -32,7 +32,7 @@ using rel_time_t = int;
 #include "murmur3_hash.h"
 #include "itoa_ljust.h"
 #include <atomic>
-#include <AllocatorMacro.hpp>
+#include <ralloc.hpp>
 #include <BaseMeta.hpp>
 #define tcd_hash MurmurHash3_x86_32
 /* RPMalloc Root IDs */
@@ -524,7 +524,7 @@ enum delta_result_type add_delta(const char *key,
     const size_t nkey, bool incr,
     const uint64_t delta, uint64_t *value);
 
-item *item_alloc(const char * key, size_t nkey, int flags, rel_time_t exptime, int nbytes, uint32_t hv);
+item *item_alloc(const char * key, size_t nkey, int flags, rel_time_t exptime, int nbytes);
 #define DO_UPDATE true
 #define DONT_UPDATE false
 item *item_get(const char *key, const size_t nkey, const bool do_update);
@@ -534,7 +534,7 @@ int   item_link(item *it);
 void  item_remove(item *it);
 int   item_replace(item *it, item *new_it, const uint32_t hv);
 void  item_unlink(item *it);
-enum store_item_type store_item(item *item, int comm, const uint32_t hv);
+enum store_item_type store_item(item *item, int comm);
 void* server_thread(void* pargs);
 
 void item_lock(uint32_t hv);

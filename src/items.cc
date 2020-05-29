@@ -210,7 +210,7 @@ static int get_slab_clsid(unsigned sz){
 }
 
 item *do_item_alloc(const char *key, const size_t nkey, const unsigned int flags,
-    const rel_time_t exptime, const int nbytes, const uint32_t hv) {
+    const rel_time_t exptime, const int nbytes) {
   uint8_t nsuffix;
   item *it = NULL;
   char suffix[40];

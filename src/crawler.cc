@@ -101,7 +101,7 @@ static int crawler_expired_init(crawler_module_t *cm, void *data) {
     cm->data = (crawler_expired_data*)data;
   } else {
     // allocate data.
-    d = (crawler_expired_data*)pm_malloc(sizeof(crawler_expired_data));
+    d = (crawler_expired_data*)RP_malloc(sizeof(crawler_expired_data));
     if (d == NULL) {
       return -1;
     }

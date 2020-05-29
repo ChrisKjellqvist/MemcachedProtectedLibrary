@@ -16,7 +16,7 @@
 #include "bipbuffer.h"
 
 // threadcached
-#include <AllocatorMacro.hpp>
+#include <ralloc.hpp>
 
 static size_t bipbuf_sizeof(const unsigned int size)
 {
