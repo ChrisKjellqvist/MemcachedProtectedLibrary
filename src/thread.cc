@@ -214,3 +214,13 @@ enum store_item_type store_item(item *item, int comm) {
   item_unlock(hv);
   return ret;
 }
+
+/******************************* GLOBAL STATS ******************************/
+
+void STATS_LOCK() {
+    pthread_mutex_lock(stats_lock);
+}
+
+void STATS_UNLOCK() {
+    pthread_mutex_unlock(stats_lock);
+}

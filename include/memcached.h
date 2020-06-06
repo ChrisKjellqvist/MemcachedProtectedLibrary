@@ -11,16 +11,11 @@
 #include "config.h"
 #endif
 
-#include <sys/types.h>
-#include <sys/socket.h>
 #include <sys/time.h>
-#include <netinet/in.h>
 #include <event.h>
-#include <netdb.h>
 #include <pthread.h>
 #include <unistd.h>
 #include <assert.h>
-#include <grp.h>
 #include <string>
 
 #include <util.h>
@@ -55,11 +50,15 @@ enum RPMRoot {
   SlabLock = 14,
   PSig = 15,
   NLookers = 16,
+  TStats = 17,
+  GStats = 18,
+  Stats = 19,
+  LRUMaintainerLock = 20,
 };
 extern int is_server;
 extern int is_restart;
-// 4GB
-const size_t MEMORY_MAX = 4*1024*1024*1024ULL;
+// 70GB
+const size_t MEMORY_MAX = 70*1024*1024*1024ULL;
 
 /** Maximum length of a key. */
 #define KEY_MAX_LENGTH 250
@@ -236,59 +235,57 @@ enum store_item_type {
  * aggregation. No longer have to add new stats in 3+ places.
  */
 
-#define SLAB_STATS_FIELDS \
-  X(set_cmds) \
-  X(get_hits) \
-  X(touch_hits) \
-  X(delete_hits) \
-  X(cas_hits) \
-  X(cas_badval) \
-  X(incr_hits) \
-  X(decr_hits)
 
 /** Stats stored per slab (and per thread). */
 struct slab_stats {
-#define X(name) uint64_t    name;
-  SLAB_STATS_FIELDS
-#undef X
-};
+  std::atomic<uint64_t> set_cmds;
+  std::atomic<uint64_t> get_hits;
+  std::atomic<uint64_t> touch_hits;
+  std::atomic<uint64_t> delete_hits;
+  std::atomic<uint64_t> cas_hits;
+  std::atomic<uint64_t> cas_badval;
+  std::atomic<uint64_t> incr_hits;
+  std::atomic<uint64_t> decr_hits;
 
-#define THREAD_STATS_FIELDS \
-  X(get_cmds) \
-  X(get_misses) \
-  X(get_expired) \
-  X(get_flushed) \
-  X(touch_cmds) \
-  X(touch_misses) \
-  X(delete_misses) \
-  X(incr_misses) \
-  X(decr_misses) \
-  X(cas_misses) \
-  X(bytes_read) \
-  X(bytes_written) \
-  X(flush_cmds) \
-  X(conn_yields) /* # of yields for connections (-R option)*/ \
-  X(auth_cmds) \
-  X(auth_errors) \
-  X(idle_kicks) /* idle connections killed */
+};
 
 /**
  * Stats stored per-thread.
  */
 struct thread_stats {
-  pthread_mutex_t   mutex;
-#define X(name) uint64_t    name;
-  THREAD_STATS_FIELDS
-#undef X
-    struct slab_stats slab_stats[MAX_NUMBER_OF_SLAB_CLASSES];
-  uint64_t lru_hits[POWER_LARGEST];
+  // Combine thread stats into stats_state as well and do a kind of fused
+  // approach now that we don't have connections
+  std::atomic<uint64_t> get_cmds; 
+  std::atomic<uint64_t> get_misses; 
+  std::atomic<uint64_t> get_expired; 
+  std::atomic<uint64_t> get_flushed; 
+  std::atomic<uint64_t> touch_cmds; 
+  std::atomic<uint64_t> touch_misses; 
+  std::atomic<uint64_t> delete_misses; 
+  std::atomic<uint64_t> incr_misses; 
+  std::atomic<uint64_t> decr_misses; 
+  std::atomic<uint64_t> cas_misses; 
+  std::atomic<uint64_t> meta_cmds; 
+  std::atomic<uint64_t> bytes_read; 
+  std::atomic<uint64_t> bytes_written; 
+  std::atomic<uint64_t> flush_cmds; 
+  std::atomic<uint64_t> conn_yields; /* # of yields for connections (-R option)*/ 
+  std::atomic<uint64_t> auth_cmds; 
+  std::atomic<uint64_t> auth_errors; 
+  std::atomic<uint64_t> idle_kicks; /* idle connections killed */ 
+  std::atomic<uint64_t> response_obj_oom; 
+  std::atomic<uint64_t> read_buf_oom;
+  struct slab_stats slab_stats[MAX_NUMBER_OF_SLAB_CLASSES];
+  std::atomic<uint64_t> lru_hits[POWER_LARGEST];
+  std::atomic<uint64_t>       curr_items;
+  std::atomic<uint64_t>       curr_bytes;
+  std::atomic<uint64_t>       total_items;
 };
 
 /**
  * Global stats. Only resettable stats should go into this structure.
  */
 struct stats {
-  uint64_t      total_items;
   uint64_t      total_conns;
   uint64_t      rejected_conns;
   uint64_t      malloc_fails;
@@ -314,18 +311,18 @@ struct stats {
  * Global "state" stats. Reflects state that shouldn't be wiped ever.
  * Ordered for some cache line locality for commonly updated counters.
  */
+
 struct stats_state {
-  uint64_t      curr_items;
-  uint64_t      curr_bytes;
-  uint64_t      curr_conns;
-  uint64_t      hash_bytes;       /* size used for hash tables */
-  unsigned int  conn_structs;
-  unsigned int  reserved_fds;
-  unsigned int  hash_power_level; /* Better hope it's not over 9000 */
-  bool          hash_is_expanding; /* If the hash table is being expanded */
-  bool          accepting_conns;  /* whether we are currently accepting */
-  bool          slab_reassign_running; /* slab reassign in progress */
-  bool          lru_crawler_running; /* crawl in progress */
+  std::atomic<uint64_t>       curr_conns;
+  std::atomic<uint64_t>       hash_bytes;       /* size used for hash tables */
+  std::atomic<unsigned int>   conn_structs;
+  std::atomic<unsigned int>   reserved_fds;
+  unsigned int                hash_power_level; /* Better hope it's not over 9000 */
+  bool                        hash_is_expanding; /* If the hash table is being expanded */
+  // std::atomic<bool>           accepting_conns;   whether we are currently accepting 
+  bool                        slab_reassign_running; /* slab reassign in progress */
+  bool                        lru_crawler_running; /* crawl in progress */
+
 };
 
 #define MAX_VERBOSITY_LEVEL 2
@@ -353,7 +350,7 @@ struct settings {
   bool maxconns_fast;     /* Whether or not to early close connections */
   bool lru_crawler;        /* Whether or not to enable the autocrawler thread */
   bool lru_maintainer_thread; /* LRU maintainer background thread */
-//  bool slab_reassign always true. Whether or not slab reassignment is allowed
+  //  bool slab_reassign always true. Whether or not slab reassignment is allowed
   double slab_automove_ratio; /* youngest must be within pct of oldest */
   unsigned int slab_automove_window; /* window mover for algorithm */
   int hashpower_init;     /* Starting hash power level */
@@ -374,11 +371,16 @@ struct settings {
   bool relaxed_privileges;   /* Relax process restrictions when running testapp */
 };
 
-extern struct stats stats;
-extern struct stats_state stats_state;
+extern struct stats * stats;
+extern struct stats_state *__global_stats;
+extern struct thread_stats *__thread_stats;
+#define NUM_STATS 64
+#define STATS_HASH 63
 extern time_t process_started;
 extern struct settings settings;
-
+// each instance of memcached will use a different stats_state to reduce the
+// amount of trashing
+extern unsigned stats_id;
 #define ITEM_LINKED 1
 #define ITEM_CAS 2
 
