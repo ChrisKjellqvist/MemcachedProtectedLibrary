@@ -21,7 +21,7 @@ OPTS = -Iinclude/  -levent -DHAVE_CONFIG_H -Wall -Werror -std=c++17 \
        #-DUSE_HODOR -I./hodor/libhodor -I./hodor/include
 
 LIBS = obj/libthreadcached.so ralloc/test/libralloc.a
-LINKOPTS = -Lhodor/libhodor -lpthread -levent -ldl -ljemalloc -lhodor
+LINKOPTS = -Lhodor/libhodor -lpthread -levent -ldl -ljemalloc #-lhodor
 EXE = bin/server.exe bin/end.exe bin/get.exe bin/insert.exe
 
 # Ralloc by default
