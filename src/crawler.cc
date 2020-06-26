@@ -101,7 +101,7 @@ static int crawler_expired_init(crawler_module_t *cm, void *data) {
     cm->data = (crawler_expired_data*)data;
   } else {
     // allocate data.
-    d = (crawler_expired_data*)pm_malloc(sizeof(crawler_expired_data));
+    d = (crawler_expired_data*)RP_malloc(sizeof(crawler_expired_data));
     if (d == NULL) {
       return -1;
     }
@@ -279,6 +279,9 @@ static void *item_crawler_thread(void *arg) {
     pthread_mutex_unlock(&lru_running);
     // LRU crawler thread sleeping
   }
+  STATS_LOCK();
+  __global_stats->lru_crawler_running = false;
+  STATS_UNLOCK();
   pthread_mutex_unlock(&lru_crawler_lock);
   // LRU crawler thread stopping
   return NULL;
@@ -338,8 +341,14 @@ int start_item_crawler_thread(void) {
 static int do_lru_crawler_start(uint32_t id, uint32_t remaining) {
   uint32_t sid = id;
   int starts = 0;
+//  bool is_running;
 
   pthread_mutex_lock(&lru_locks[sid]);
+//  STATS_LOCK();
+//  is_running = __global_stats->lru_crawler_running;
+//  STATS_UNLOCK();
+
+  // TODO - fix crawler
   if (crawlers[sid].it_flags == 0) {
     // Kicking LRU crawler off for LRU 'sid'
     crawlers[sid].nbytes = 0;
@@ -368,7 +377,16 @@ static int do_lru_crawler_start(uint32_t id, uint32_t remaining) {
     crawler_count++;
     starts++;
   }
+
   pthread_mutex_unlock(&lru_locks[sid]);
+
+  if (starts) {
+    STATS_LOCK();
+    __global_stats->lru_crawler_running = true;
+    stats->lru_crawler_starts++;
+    STATS_UNLOCK();
+  }
+
   return starts;
 }
 

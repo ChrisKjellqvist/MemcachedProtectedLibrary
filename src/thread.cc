@@ -98,10 +98,10 @@ void memcached_thread_init() {
 /*
  * Allocates a new item.
  */
-item *item_alloc(const char * key, size_t nkey, int flags, rel_time_t exptime, int nbytes, const uint32_t hv) {
+item *item_alloc(const char * key, size_t nkey, int flags, rel_time_t exptime, int nbytes) {
   item *it;
   /* do_item_alloc handles its own locks */
-  it = do_item_alloc(key, nkey, flags, exptime, nbytes, hv);
+  it = do_item_alloc(key, nkey, flags, exptime, nbytes);
   return it;
 }
 
@@ -204,9 +204,23 @@ enum delta_result_type add_delta(const char *key,
 /*
  * Stores an item in the cache (high level, obeys set/add/replace semantics)
  */
-enum store_item_type store_item(item *item, int comm, const uint32_t hv) {
+enum store_item_type store_item(item *item, int comm) {
+  enum store_item_type ret;
+  uint32_t hv;
+
+  hv = tcd_hash(ITEM_key(item), item->nkey);
   item_lock(hv);
-  auto ret = do_store_item(item, comm, hv).first;
+  ret = do_store_item(item, comm, hv).first;
   item_unlock(hv);
   return ret;
+}
+
+/******************************* GLOBAL STATS ******************************/
+
+void STATS_LOCK() {
+    pthread_mutex_lock(stats_lock);
+}
+
+void STATS_UNLOCK() {
+    pthread_mutex_unlock(stats_lock);
 }

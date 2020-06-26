@@ -1,24 +1,18 @@
 CXX=g++
 ALLOC=r
-PROT_OBJ = obj/memcached.o\
-	   obj/murmur3_hash.o obj/items.o obj/assoc.o obj/thread.o \
-	   obj/bipbuffer.o obj/crawler.o \
-	   obj/pku_memcached.o obj/util.o\
+PROT_OBJ = obj/memcached.o obj/murmur3_hash.o obj/items.o obj/assoc.o obj/thread.o \
+	   obj/bipbuffer.o obj/crawler.o obj/pku_memcached.o obj/util.o\
 	   obj/itoa_ljust.o 
-
-SERV_OBJ = obj/memcached.o\
-	   obj/murmur3_hash.o obj/items.o obj/assoc.o obj/thread.o \
-	   obj/bipbuffer.o obj/crawler.o \
-	   obj/util.o obj/itoa_ljust.o 
 
 libralloc=ralloc/test
 
-OPT_LEVEL = -O0 -g
-#OPT_LEVEL = -O3
+#OPT_LEVEL = -O0 -g
+OPT_LEVEL = -O3
+
 ERROR     = -DFAIL_ASSERT
 OPTS = -Iinclude/  -levent -DHAVE_CONFIG_H -Wall -Werror -std=c++17 \
        -fPIC $(OPT_LEVEL) $(ERROR) -I./ralloc/src \
-       #-DUSE_HODOR -I./hodor/libhodor -I./hodor/include
+       -DUSE_HODOR -I./hodor/libhodor -I./hodor/include
 
 LIBS = obj/libthreadcached.so ralloc/test/libralloc.a
 LINKOPTS = -Lhodor/libhodor -lpthread -levent -ldl -ljemalloc #-lhodor
@@ -51,15 +45,14 @@ ifeq ($(ALLOC),pmdk)
 endif
 
 
-
-.PHONY : perf all lib bin install
+.PHONY : all lib bin
 all: $(EXE) $(TEST_RUN)
 lib: obj/libthreadcached.so
-bin: bin/server.exe
+bin: server.exe
 	mv $^ bin/memcached
 
-bin/%.exe: obj/%.o $(LIBS) 
-	$(CXX) $^ -o $@ $(LINKOPTS)
+%.exe: test/%.cc $(LIBS)
+	$(CXX) $^ -o $@ $(OPTS) $(LINKOPTS)
 
 obj/libthreadcached.so: $(PROT_OBJ)
 	$(CXX) -shared $(PROT_OBJ) $(OPTS) -o $@ 
@@ -72,6 +65,9 @@ clean:
 	rm -f obj/* exec *.d /dev/shm/memcached* $(EXE) $(TEST_RUN) $(PERF_RUN) $(RPMA_RUN)
 .PHONY : reset
 reset:
-	rm -f /dev/shm/test*
+	@rm -f /dev/shm/test*
+	@rm -f /dev/shm/memcached*
+	@rm -f /mnt/pmem/test*
+	@rm -f /mnt/pmem/memcached*
 
 # include/hodo-plib.h

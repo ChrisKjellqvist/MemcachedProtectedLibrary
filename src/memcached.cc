@@ -88,13 +88,18 @@ static void settings_init(void);
 std::atomic_int *end_signal;
 pthread_mutex_t begin_ops_mutex = PTHREAD_MUTEX_INITIALIZER;
 /** exported globals **/
-struct stats stats;
-struct stats_state stats_state;
+struct stats * stats;
 struct settings settings;
 time_t process_started;     /* when the process was started */
 struct slab_rebalance slab_rebal;
 volatile int slab_rebalance_signal;
 static struct event_base *main_base;
+
+struct stats_state * __global_stats;
+struct thread_stats * __thread_stats;
+
+unsigned stats_id;
+
 
 enum transmit_result {
   TRANSMIT_COMPLETE,   /** All done writing. */
@@ -219,7 +224,7 @@ std::pair<store_item_type, size_t> do_store_item(item *it, int comm, const uint3
         /* we have it and old_it here - alloc memory to hold both */
         /* flags was already lost - so recover them from ITEM_suffix(it) */
         FLAGS_CONV(false, old_it, flags);
-        new_it = do_item_alloc(key, it->nkey, flags, old_it->exptime, it->nbytes + old_it->nbytes - 2 /* CRLF */, hv);
+        new_it = do_item_alloc(key, it->nkey, flags, old_it->exptime, it->nbytes + old_it->nbytes - 2 /* CRLF */);
 
         /* copy data from it and old_it to new_it */
         if (new_it == NULL || _store_item_copy_data(comm, old_it, new_it, it) == -1) {
@@ -322,7 +327,10 @@ static void clock_handler(const int fd, const short which, void *arg) {
 
   // While we're here, check for hash table expansion.
   // This function should be quick to avoid delaying the timer.
-  assoc_start_expand(stats_state.curr_items);
+  uint32_t curr_items = 0;
+  for(uint32_t i = 0; i < NUM_STATS; ++i)
+    curr_items += __thread_stats[i].curr_items.load();
+  assoc_start_expand(curr_items);
 
   evtimer_set(&clockevent, clock_handler, 0);
   event_base_set(main_base, &clockevent);
@@ -362,9 +370,81 @@ static int sigignore(int sig) {
 static std::atomic_int *pause_sig;
 static std::atomic_int *num_lookers;
 
+static void init_slab_stats(slab_stats * ptr) {
+  ptr->set_cmds = 0;
+  ptr->get_hits = 0;
+  ptr->touch_hits = 0;
+  ptr->delete_hits = 0;
+  ptr->cas_hits = 0;
+  ptr->cas_badval = 0;
+  ptr->incr_hits = 0;
+  ptr->decr_hits = 0;
+}
 
+static void init_thread_stats(thread_stats * ptr) {
+  ptr->get_cmds = 0; 
+  ptr->get_misses = 0; 
+  ptr->get_expired = 0; 
+  ptr->get_flushed = 0; 
+  ptr->touch_cmds = 0; 
+  ptr->touch_misses = 0; 
+  ptr->delete_misses = 0; 
+  ptr->incr_misses = 0; 
+  ptr->decr_misses = 0; 
+  ptr->cas_misses = 0; 
+  ptr->meta_cmds = 0; 
+  ptr->bytes_read = 0; 
+  ptr->bytes_written = 0; 
+  ptr->flush_cmds = 0; 
+  ptr->conn_yields = 0; /* # of yields for connections (-R option)*/ 
+  ptr->auth_cmds = 0; 
+  ptr->auth_errors = 0; 
+  ptr->idle_kicks = 0; /* idle connections killed */ 
+  ptr->response_obj_oom = 0; 
+  ptr->read_buf_oom = 0;
+  ptr->curr_items = 0;
+  ptr->curr_bytes = 0;
+  for(unsigned i = 0; i < MAX_NUMBER_OF_SLAB_CLASSES; ++i)
+    init_slab_stats(&ptr->slab_stats[i]);
+  for(unsigned i = 0; i < POWER_LARGEST; ++i)
+    ptr->lru_hits[i] = 0;
+  ptr->total_items = 0;
+}
+
+static void init_global_stats(stats_state * ptr){
+  ptr->curr_conns = 0;
+  ptr->hash_bytes = 0;       /* size used for hash tables */
+  ptr->conn_structs = 0;
+  ptr->reserved_fds = 0;
+  ptr->hash_power_level = 0; /* Better hope it's not over 9000; */
+  ptr->hash_is_expanding = 0; /* If the hash table is being expanded */
+  // std::atomic<bool>ptr->accepting_conns = 0;   whether we are currently accepting 
+  ptr->slab_reassign_running = 0; /* slab reassign in progress */
+  ptr->lru_crawler_running = 0; /* crawl in progress */
+}
+
+static void stats_init(void) {
+  if (is_restart){
+    __thread_stats = RP_get_root<thread_stats>(RPMRoot::TStats);
+    __global_stats = RP_get_root<struct stats_state>(RPMRoot::GStats);
+    stats = RP_get_root<struct stats>(RPMRoot::Stats);
+  } else {
+    __thread_stats = (thread_stats*)RP_malloc(sizeof(thread_stats)*NUM_STATS);
+    __global_stats = (stats_state*)RP_malloc(sizeof(stats_state));
+    stats = (struct stats*)RP_malloc(sizeof(struct stats));
+    RP_set_root(__thread_stats, RPMRoot::TStats);
+    RP_set_root(__global_stats, RPMRoot::GStats);
+    RP_set_root(stats, RPMRoot::Stats);
+    for(unsigned i = 0; i < NUM_STATS; ++i)
+      init_thread_stats(__thread_stats + i);
+    init_global_stats(__global_stats);
+    memset(stats, 0, sizeof(struct stats));
+  }
+  stats_id = rand() & STATS_HASH;
+}
 // run this regardless of whether you're a server or a client
 void agnostic_init(){
+  srand(time(0));
   if (!is_restart){
     end_signal = (std::atomic_int*)RP_malloc(sizeof(std::atomic_int));
     current_time = (rel_time_t*)RP_malloc(sizeof(rel_time_t));
@@ -421,6 +501,8 @@ void agnostic_init(){
   settings_init();
   memcached_thread_init();
   items_init();
+  // initialize stats
+  stats_init();
 
   /* Run regardless of initializing it later */
   //init_lru_maintainer();
@@ -563,7 +645,7 @@ enum delta_result_type do_add_delta(const char *key,
     item *new_it;
     uint32_t flags;
     FLAGS_CONV(nullptr, it, flags);
-    new_it = do_item_alloc(ITEM_key(it), it->nkey, flags, it->exptime, res + 2, hv);
+    new_it = do_item_alloc(ITEM_key(it), it->nkey, flags, it->exptime, res + 2);
     if (new_it == 0) {
       do_item_remove(it);
       return EOM;
@@ -577,31 +659,71 @@ enum delta_result_type do_add_delta(const char *key,
      * item. TODO: Add a counter? */
     if (it->refcount == 1)
       do_item_remove(it);
+    if (incr) {
+      __thread_stats[stats_id].incr_misses.fetch_add(1);
+    } else {
+      __thread_stats[stats_id].decr_misses.fetch_add(1);
+    }
     return DELTA_ITEM_NOT_FOUND;
   }
+    if (incr) {
+      __thread_stats[stats_id].slab_stats[it->slabs_clsid].incr_hits.fetch_add(1);
+    } else {
+      __thread_stats[stats_id].slab_stats[it->slabs_clsid].decr_hits.fetch_add(1);
+    }
   do_item_remove(it);         /* release our reference */
   return OK;
 }
 
 // Race conditions don't happen in get operations. We never do in place writes,
 // only full replacements. Whenever you do a item_get operation, it increments
-// the refcounts and prevents it from being freed. NOTE - YOU MUST refcount_decr
-// after you read the item so that it may be freed if necessary. 
+// the refcounts and prevents it from being freed. 
 memcached_return_t
 pku_memcached_get(const char* key, size_t nkey, char* &buffer, size_t* buffLen,
     uint32_t *flags){
-  *flags = 0; // make sure these don't segfault when it really matters
-  *buffLen = 0;
+  // Can't use user pointers inside protected function. Copy to private buffer
+  // before resources are acquired
+  char * key_prot = (char*)RP_malloc(nkey);
+  memcpy(key_prot, key, nkey);
+
+  // increment number of readers/writers
   inc_lookers();
-  item* it = item_get(key, nkey, 1);
-  if (it == NULL)
+
+  // Get the item using the protected key
+  item* it = item_get(key_prot, nkey, 1);
+  // We don't need the key anymore
+  RP_free(key_prot);
+  if (it == NULL){
+    // stats
+    __thread_stats[stats_id].get_cmds.fetch_add(1);
+    __thread_stats[stats_id].get_misses.fetch_add(1);
     return MEMCACHED_NOTFOUND;
-  buffer = (char*)malloc(it->nbytes);
-  memcpy(buffer, ITEM_data(it), it->nbytes);
-  *flags = it->it_flags;
-  *buffLen = it->nbytes;
-  item_remove(it); /* release our reference */
+  }
+  __thread_stats[stats_id].get_cmds.fetch_add(1);
+  __thread_stats[stats_id].lru_hits[it->slabs_clsid].fetch_add(1);
+
+  // We found the item so we need somewhere to copy its data to while
+  // important resources are held (in this case, reference counts)
+  char * dat_prot = (char*)RP_malloc(it->nbytes);
+  memcpy(dat_prot, ITEM_data(it), it->nbytes);
+  size_t flag_prot = it->it_flags;
+  size_t buffLen_prot = it->nbytes;
+  
+  // release our reference
+  item_remove(it);
   dec_lookers();
+
+  // create a buffer for the user if they didn't provide one
+  if (buffer == NULL)
+    buffer = (char*)malloc(buffLen_prot);
+
+  // copy protected data to user-accessible locationss
+  *buffLen = buffLen_prot;
+  *flags = flag_prot;
+  memcpy(buffer, dat_prot, *buffLen);
+
+  // free data buffer
+  RP_free(dat_prot);
   return MEMCACHED_SUCCESS;
 }
 
@@ -618,25 +740,36 @@ pku_memcached_mget(const char * const *keys, const size_t *key_length,
 memcached_return_t
 pku_memcached_insert(const char* key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime){
-  // do what we're here for
+  // Reduce the number of allocations we have to do
+  char * key_prot = (char*)RP_malloc(nkey + datan);
+  if (key_prot == NULL) 
+    return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
+  char * dat_prot = key_prot + nkey;
 
-  const uint32_t hv = tcd_hash(key, nkey);
+  memcpy(key_prot, key, nkey);
+  memcpy(dat_prot, data, datan);
   inc_lookers();
-  item *it = item_alloc(key, nkey, 0, realtime(exptime), datan + 2, hv);
+  item *it = item_alloc(key_prot, nkey, 0, realtime(exptime), datan + 2);
 
   if (it != NULL) {
-    memcpy(ITEM_data(it), data, datan);
+    // increase # of set cmds in stats
+    __thread_stats[stats_id].slab_stats[ITEM_clsid(it)].set_cmds.fetch_add(1);
+    memcpy(ITEM_data(it), dat_prot, datan);
     memcpy(ITEM_data(it) + datan, "\r\n", 2);
     uint32_t hv = tcd_hash(key, nkey);
     auto pr = do_store_item(it, NREAD_ADD, hv);
     switch(pr.first){
       case NOT_FOUND:
+        RP_free(key_prot);
         return MEMCACHED_NOTFOUND;
       case TOO_LARGE: 
+        RP_free(key_prot);
         return MEMCACHED_E2BIG;
       case NO_MEMORY:
+        RP_free(key_prot);
         return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
       case NOT_STORED:
+        RP_free(key_prot);
         return MEMCACHED_NOTSTORED;
       default:
         break;
@@ -644,66 +777,82 @@ pku_memcached_insert(const char* key, size_t nkey, const char * data, size_t dat
     item_remove(it);         /* release our reference */
   } else {
     perror("SERVER_ERROR Out of memory allocating new item");
+    RP_free(key_prot);
     return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
   }
   dec_lookers();
+  RP_free(key_prot);
   return MEMCACHED_SUCCESS;
 }
 
 memcached_return_t
 pku_memcached_set(const char * key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime){
+  // increase # of set cmds in stats
+  char * key_prot = (char*)RP_malloc(nkey + datan);
+  if (key_prot == NULL)
+    return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
+  char * dat_prot = key_prot + nkey;
+  memcpy(key_prot, key, nkey);
+  memcpy(dat_prot, data, datan);
   inc_lookers();
-  auto hv = tcd_hash(key, nkey);
-  item *it = item_alloc(key, nkey, 0, realtime(exptime), datan + 2, hv);
+  item *it = item_alloc(key, nkey, 0, realtime(exptime), datan + 2);
 
   if (it == 0) {
     if (! item_size_ok(nkey, 0, datan)) {
+      RP_free(key_prot);
       fprintf(stderr, "SERVER_ERROR too big for the cache\n");
       return MEMCACHED_KEY_TOO_BIG; // Maybe make this more informative
     } else {
+      RP_free(key_prot);
       fprintf(stderr, "SERVER_ERROR out of memory storing object");
       return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
     }
-    it = item_get(key, nkey, DONT_UPDATE);
+    it = item_get(key_prot, nkey, DONT_UPDATE);
     if (it) {
       item_unlink(it); // remove item from table
       item_remove(it); // lazily delete it
     }
     // If we're storing, don't allow data to overwrite to persist in cache,
     // we prefer old data to not exist than pollute the cache
+    RP_free(key_prot);
     return MEMCACHED_NOTSTORED;
   }
+  
+  // increase # of set cmds in stats
+  __thread_stats[stats_id].slab_stats[ITEM_clsid(it)].set_cmds.fetch_add(1);
+  memcpy(ITEM_data(it), dat_prot, datan);
+  memcpy(ITEM_data(it) + datan, "\r\n", 2);
+  auto res = store_item(it, NREAD_SET);
+  //release our reference
+  item_remove(it);         
 
-  if (it != NULL) {
-    memcpy(ITEM_data(it), data, datan);
-    memcpy(ITEM_data(it) + datan, "\r\n", 2);
-    auto res = store_item(it, NREAD_SET, hv);
-    item_remove(it);         /* release our reference */
-    dec_lookers();
-    switch(res) {
-      case EXISTS:
-      case STORED:
-        break;
-      case NOT_FOUND:
-        return MEMCACHED_NOTFOUND;
-      case TOO_LARGE: 
-        return MEMCACHED_E2BIG;
-      case NO_MEMORY:
-        return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
-      case NOT_STORED:
-        return MEMCACHED_NOTSTORED;
-    }
-  } else {
-    perror("SERVER_ERROR Out of memory allocating new item");
-    return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
+  dec_lookers();
+  switch(res) {
+    case EXISTS:
+    case STORED:
+      break;
+    case NOT_FOUND:
+      RP_free(key_prot);
+      return MEMCACHED_NOTFOUND;
+    case TOO_LARGE: 
+      RP_free(key_prot);
+      return MEMCACHED_E2BIG;
+    case NO_MEMORY:
+      RP_free(key_prot);
+      return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
+    case NOT_STORED:
+      RP_free(key_prot);
+      return MEMCACHED_NOTSTORED;
   }
+  RP_free(key_prot);
   return MEMCACHED_STORED;
 }
 
 memcached_return_t
 pku_memcached_flush(uint32_t exptime){
   pause_accesses();
+  __thread_stats[stats_id].flush_cmds.fetch_add(1);
   rel_time_t new_oldest = 0;
   if (exptime > 0) {
     new_oldest = realtime(exptime);
@@ -717,111 +866,149 @@ pku_memcached_flush(uint32_t exptime){
 
 memcached_return_t
 pku_memcached_delete(const char * key, size_t nkey, uint32_t exptime){
+  char * key_prot = (char*)RP_malloc(nkey);
+  memcpy(key_prot, key, nkey);
+  inc_lookers();
   item *it;
   memcached_return_t ret;
   uint32_t hv;
-  it = item_get_locked(key, nkey, DONT_UPDATE, &hv);
+  it = item_get_locked(key_prot, nkey, DONT_UPDATE, &hv);
   if (it) {
     do_item_unlink(it, hv);
     do_item_remove(it);      /* release our reference */ // has our break
+    __thread_stats[stats_id].slab_stats[it->slabs_clsid].delete_hits.fetch_add(1);
     ret = MEMCACHED_SUCCESS;
-  } else ret = MEMCACHED_FAILURE;
+  } else {
+    __thread_stats[stats_id].delete_misses.fetch_add(1);
+    ret = MEMCACHED_FAILURE;
+  }
   item_unlock(hv);
+  dec_lookers();
+  RP_free(key_prot);
   return ret;
 }
 
 memcached_return_t
 pku_memcached_append(const char * key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime, uint32_t flags) {
-  const uint32_t hv = tcd_hash(key, nkey);
+  char * key_prot = (char*)RP_malloc(nkey + datan);
+  char * dat_prot = key_prot + nkey; 
+  memcpy(key_prot, key, nkey);
+  memcpy(dat_prot, data, datan);
   inc_lookers();
-  item *it = item_alloc(key, nkey, 0, 0, datan+2, hv);
+  item *it = item_alloc(key_prot, nkey, 0, 0, datan+2);
 
   if (it == 0) {
     if (! item_size_ok(nkey, 0, datan + 2)) {
       dec_lookers();
+      RP_free(key_prot);
       return MEMCACHED_E2BIG;
     } else {
       dec_lookers();
+      RP_free(key_prot);
       return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
     }
   }
-  memcpy(ITEM_data(it), data, datan);
+  __thread_stats[stats_id].slab_stats[ITEM_clsid(it)].set_cmds.fetch_add(1);
+  memcpy(ITEM_data(it), dat_prot , datan);
   memcpy(ITEM_data(it) + datan, "\r\n", 2);
-  if (store_item(it, NREAD_APPEND, hv) != STORED){
+  if (store_item(it, NREAD_APPEND) != STORED){
     dec_lookers();
+    RP_free(key_prot);
     return MEMCACHED_NOTSTORED;
   }
   item_remove(it);
   dec_lookers();
+  RP_free(key_prot);
   return MEMCACHED_STORED;  
 }
 
 memcached_return_t
 pku_memcached_prepend(const char * key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime, uint32_t flags) {
-  const uint32_t hv = tcd_hash(key, nkey);
+  char * key_prot = (char*)RP_malloc(nkey + datan);
+  char * dat_prot = key_prot + nkey; 
+  memcpy(key_prot, key, nkey);
+  memcpy(dat_prot, data, datan);
   inc_lookers();
-  item *it = item_alloc(key, nkey, 0, 0, datan+2, hv);
+  item *it = item_alloc(key_prot, nkey, 0, 0, datan+2);
 
   if (it == 0) {
     if (! item_size_ok(nkey, 0, datan + 2)) {
       dec_lookers();
+      RP_free(key_prot);
       return MEMCACHED_E2BIG;
     } else {
       dec_lookers();
+      RP_free(key_prot);
       return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
     }
   }
-  memcpy(ITEM_data(it), data, datan);
+  __thread_stats[stats_id].slab_stats[ITEM_clsid(it)].set_cmds.fetch_add(1);
+  memcpy(ITEM_data(it), dat_prot , datan);
   memcpy(ITEM_data(it) + datan, "\r\n", 2);
-  if (store_item(it, NREAD_PREPEND, hv) != STORED){
+  if (store_item(it, NREAD_PREPEND) != STORED){
     dec_lookers();
+    RP_free(key_prot);
     return MEMCACHED_NOTSTORED;
   }
   item_remove(it);
   dec_lookers();
-  return MEMCACHED_STORED;
+  RP_free(key_prot);
+  return MEMCACHED_STORED;  
 }
 
 memcached_return_t
 pku_memcached_replace(const char * key, size_t nkey, const char * data, size_t datan,
     uint32_t exptime, uint32_t flags){
-  const uint32_t hv = tcd_hash(key, nkey);
+  char * key_prot = (char*)RP_malloc(nkey + datan);
+  char * dat_prot = key_prot + nkey;
+  memcpy(key_prot, key, nkey);
+  memcpy(dat_prot, data, datan);
   inc_lookers();
-  item *it = item_alloc(key, nkey, 0, 0, datan+2, hv);
+  item *it = item_alloc(key_prot, nkey, 0, 0, datan+2);
 
   if (it == 0) {
     if (! item_size_ok(nkey, 0, datan + 2)) {
       dec_lookers();
+      RP_free(key_prot);
       return MEMCACHED_E2BIG;
     } else {
       dec_lookers();
+      RP_free(key_prot);
       return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
     }
   }
-  memcpy(ITEM_data(it), data, datan);
+  
+  // increase # of set cmds in stats
+  __thread_stats[stats_id].slab_stats[ITEM_clsid(it)].set_cmds.fetch_add(1);
+
+  memcpy(ITEM_data(it), dat_prot, datan);
   memcpy(ITEM_data(it) + datan, "\r\n", 2);
-  auto pr = do_store_item(it, NREAD_REPLACE, hv);
-  switch(pr.first) {
+  switch(store_item(it, NREAD_REPLACE)) {
     case EXISTS:
     case STORED:
       break;
     case NOT_FOUND:
       dec_lookers();
+      RP_free(key_prot);
       return MEMCACHED_NOTFOUND;
     case TOO_LARGE: 
       dec_lookers();
+      RP_free(key_prot);
       return MEMCACHED_E2BIG;
     case NO_MEMORY:
       dec_lookers();
+      RP_free(key_prot);
       return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
     case NOT_STORED:
       dec_lookers();
+      RP_free(key_prot);
       return MEMCACHED_NOTSTORED;
   }
   item_remove(it);
   dec_lookers();
+  RP_free(key_prot);
   return MEMCACHED_SUCCESS;  
 
 }
