@@ -1,3 +1,6 @@
+#pragma once
+#include "memcached.h"
+
 #define HOT_LRU 0
 #define WARM_LRU 64
 #define COLD_LRU 128
@@ -6,6 +9,7 @@
 #define CLEAR_LRU(id) (id & ~(3<<6))
 #define GET_LRU(id) (id & (3<<6))
 
+struct item;
 /* See items.c */
 uint64_t get_cas_id(void);
 

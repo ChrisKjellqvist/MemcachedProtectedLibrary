@@ -11,6 +11,7 @@
 #include <assert.h>
 #include <unistd.h>
 #include <poll.h>
+#include "persist_struct_api.hpp"
 
 /* Forward Declarations */
 static void item_link_q(item *it);

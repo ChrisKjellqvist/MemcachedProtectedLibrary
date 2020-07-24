@@ -595,9 +595,7 @@ void unpause_accesses(void){
 
 char buf[32];
 
-enum delta_result_type do_add_delta(const char *key,
-    const size_t nkey, const bool incr,
-    const uint64_t delta, uint64_t *value_ptr, const uint32_t hv) {
+std::pair<enum delta_result_type, item*> do_add_delta(const char *key, const size_t nkey, const bool incr, const uint64_t delta, uint64_t *value_ptr, const uint32_t hv) {
   char *ptr;
   uint64_t value;
   int res;
@@ -605,19 +603,22 @@ enum delta_result_type do_add_delta(const char *key,
 
   it = do_item_get(key, nkey, hv, DONT_UPDATE);
   if (!it) {
-    return DELTA_ITEM_NOT_FOUND;
+    fprintf(stderr, "DELTA_ITEM_NOT_FOUND\n");
+    return std::pair<enum delta_result_type, item*>{DELTA_ITEM_NOT_FOUND, nullptr};
   }
 
   if (it->nbytes <= 2) {
     do_item_remove(it);
-    return NON_NUMERIC;
+    fprintf(stderr, "NON_NUMERIC\n");
+    return std::pair<enum delta_result_type, item*>{NON_NUMERIC, nullptr};
   }
 
   ptr = ITEM_data(it);
 
   if (!safe_strtoull(ptr, &value)) {
     do_item_remove(it);
-    return NON_NUMERIC;
+    fprintf(stderr, "NON_NUMERIC\n");
+    return std::pair<enum delta_result_type, item*>{NON_NUMERIC, nullptr};
   }
 
   if (incr) {
@@ -648,7 +649,8 @@ enum delta_result_type do_add_delta(const char *key,
     new_it = do_item_alloc(ITEM_key(it), it->nkey, flags, it->exptime, res + 2);
     if (new_it == 0) {
       do_item_remove(it);
-      return EOM;
+      fprintf(stderr, "EOM\n");
+      return std::pair<enum delta_result_type, item*>{EOM, nullptr};
     }
     memcpy(ITEM_data(new_it), buf, res);
     memcpy(ITEM_data(new_it) + res, "\r\n", 2);
@@ -664,7 +666,8 @@ enum delta_result_type do_add_delta(const char *key,
     } else {
       __thread_stats[stats_id].decr_misses.fetch_add(1);
     }
-    return DELTA_ITEM_NOT_FOUND;
+    fprintf(stderr, "DELTA_ITEM_NOT_FOUND\n");
+    return std::pair<enum delta_result_type, item*>{DELTA_ITEM_NOT_FOUND, nullptr};
   }
     if (incr) {
       __thread_stats[stats_id].slab_stats[it->slabs_clsid].incr_hits.fetch_add(1);
@@ -672,7 +675,7 @@ enum delta_result_type do_add_delta(const char *key,
       __thread_stats[stats_id].slab_stats[it->slabs_clsid].decr_hits.fetch_add(1);
     }
   do_item_remove(it);         /* release our reference */
-  return OK;
+  return std::pair<enum delta_result_type, item*>{OK, it};
 }
 
 // Race conditions don't happen in get operations. We never do in place writes,
@@ -737,13 +740,13 @@ pku_memcached_mget(const char * const *keys, const size_t *key_length,
   return MEMCACHED_SUCCESS;
 } 
 
-memcached_return_t
-pku_memcached_insert(const char* key, size_t nkey, const char * data, size_t datan,
-    uint32_t exptime){
+item* pku_memcached_insert(const char* key, size_t nkey, const char * data, size_t datan, uint32_t exptime){
   // Reduce the number of allocations we have to do
   char * key_prot = (char*)RP_malloc(nkey + datan);
-  if (key_prot == NULL) 
-    return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
+  if (key_prot == NULL){
+    fprintf(stderr, "MEMCACHED_MEMORY_ALLOCATION_FAILURE\n");
+    return nullptr;
+  } 
   char * dat_prot = key_prot + nkey;
 
   memcpy(key_prot, key, nkey);
@@ -761,16 +764,20 @@ pku_memcached_insert(const char* key, size_t nkey, const char * data, size_t dat
     switch(pr.first){
       case NOT_FOUND:
         RP_free(key_prot);
-        return MEMCACHED_NOTFOUND;
+        fprintf(stderr, "MEMCACHED_NOTFOUND\n");
+        return nullptr;
       case TOO_LARGE: 
         RP_free(key_prot);
-        return MEMCACHED_E2BIG;
+        fprintf(stderr, "MEMCACHED_E2BIG\n");
+        return nullptr;
       case NO_MEMORY:
         RP_free(key_prot);
-        return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
+        fprintf(stderr, "MEMCACHED_MEMORY_ALLOCATION_FAILURE\n");
+        return nullptr;
       case NOT_STORED:
         RP_free(key_prot);
-        return MEMCACHED_NOTSTORED;
+        fprintf(stderr, "MEMCACHED_NOTSTORED\n");
+        return nullptr;
       default:
         break;
     }
@@ -778,20 +785,20 @@ pku_memcached_insert(const char* key, size_t nkey, const char * data, size_t dat
   } else {
     perror("SERVER_ERROR Out of memory allocating new item");
     RP_free(key_prot);
-    return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
+    return nullptr;
   }
   dec_lookers();
   RP_free(key_prot);
-  return MEMCACHED_SUCCESS;
+  return it;
 }
 
-memcached_return_t
-pku_memcached_set(const char * key, size_t nkey, const char * data, size_t datan,
-    uint32_t exptime){
+item* pku_memcached_set(const char * key, size_t nkey, const char * data, size_t datan, uint32_t exptime){
   // increase # of set cmds in stats
   char * key_prot = (char*)RP_malloc(nkey + datan);
-  if (key_prot == NULL)
-    return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
+  if (key_prot == NULL){
+    fprintf(stderr, "MEMCACHED_MEMORY_ALLOCATION_FAILURE\n");
+    return nullptr;
+  }
   char * dat_prot = key_prot + nkey;
   memcpy(key_prot, key, nkey);
   memcpy(dat_prot, data, datan);
@@ -802,11 +809,11 @@ pku_memcached_set(const char * key, size_t nkey, const char * data, size_t datan
     if (! item_size_ok(nkey, 0, datan)) {
       RP_free(key_prot);
       fprintf(stderr, "SERVER_ERROR too big for the cache\n");
-      return MEMCACHED_KEY_TOO_BIG; // Maybe make this more informative
+      return nullptr; // Maybe make this more informative
     } else {
       RP_free(key_prot);
-      fprintf(stderr, "SERVER_ERROR out of memory storing object");
-      return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
+      fprintf(stderr, "SERVER_ERROR out of memory storing object\n");
+      return nullptr;
     }
     it = item_get(key_prot, nkey, DONT_UPDATE);
     if (it) {
@@ -816,7 +823,7 @@ pku_memcached_set(const char * key, size_t nkey, const char * data, size_t datan
     // If we're storing, don't allow data to overwrite to persist in cache,
     // we prefer old data to not exist than pollute the cache
     RP_free(key_prot);
-    return MEMCACHED_NOTSTORED;
+    return nullptr;
   }
   
   // increase # of set cmds in stats
@@ -834,19 +841,23 @@ pku_memcached_set(const char * key, size_t nkey, const char * data, size_t datan
       break;
     case NOT_FOUND:
       RP_free(key_prot);
-      return MEMCACHED_NOTFOUND;
+      fprintf(stderr, "MEMCACHED_NOTFOUND\n");
+      return nullptr;
     case TOO_LARGE: 
       RP_free(key_prot);
-      return MEMCACHED_E2BIG;
+      fprintf(stderr, "MEMCACHED_E2BIG\n");
+      return nullptr;
     case NO_MEMORY:
       RP_free(key_prot);
-      return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
+      fprintf(stderr, "MEMCACHED_MEMORY_ALLOCATION_FAILURE\n");
+      return nullptr;
     case NOT_STORED:
       RP_free(key_prot);
-      return MEMCACHED_NOTSTORED;
+      fprintf(stderr, "MEMCACHED_NOTSTORED\n");
+      return nullptr;
   }
   RP_free(key_prot);
-  return MEMCACHED_STORED;
+  return it;
 }
 
 memcached_return_t
@@ -888,9 +899,7 @@ pku_memcached_delete(const char * key, size_t nkey, uint32_t exptime){
   return ret;
 }
 
-memcached_return_t
-pku_memcached_append(const char * key, size_t nkey, const char * data, size_t datan,
-    uint32_t exptime, uint32_t flags) {
+item* pku_memcached_append(const char * key, size_t nkey, const char * data, size_t datan, uint32_t exptime, uint32_t flags) {
   char * key_prot = (char*)RP_malloc(nkey + datan);
   char * dat_prot = key_prot + nkey; 
   memcpy(key_prot, key, nkey);
@@ -902,11 +911,13 @@ pku_memcached_append(const char * key, size_t nkey, const char * data, size_t da
     if (! item_size_ok(nkey, 0, datan + 2)) {
       dec_lookers();
       RP_free(key_prot);
-      return MEMCACHED_E2BIG;
+      fprintf(stderr, "MEMCACHED_E2BIG\n");
+      return nullptr;
     } else {
       dec_lookers();
       RP_free(key_prot);
-      return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
+      fprintf(stderr, "MEMCACHED_MEMORY_ALLOCATION_FAILURE\n");
+      return nullptr;
     }
   }
   __thread_stats[stats_id].slab_stats[ITEM_clsid(it)].set_cmds.fetch_add(1);
@@ -915,17 +926,16 @@ pku_memcached_append(const char * key, size_t nkey, const char * data, size_t da
   if (store_item(it, NREAD_APPEND) != STORED){
     dec_lookers();
     RP_free(key_prot);
-    return MEMCACHED_NOTSTORED;
+    fprintf(stderr, "MEMCACHED_NOTSTORED\n");
+    return nullptr;    
   }
   item_remove(it);
   dec_lookers();
   RP_free(key_prot);
-  return MEMCACHED_STORED;  
+  return it;  
 }
 
-memcached_return_t
-pku_memcached_prepend(const char * key, size_t nkey, const char * data, size_t datan,
-    uint32_t exptime, uint32_t flags) {
+item* pku_memcached_prepend(const char * key, size_t nkey, const char * data, size_t datan, uint32_t exptime, uint32_t flags) {
   char * key_prot = (char*)RP_malloc(nkey + datan);
   char * dat_prot = key_prot + nkey; 
   memcpy(key_prot, key, nkey);
@@ -937,11 +947,13 @@ pku_memcached_prepend(const char * key, size_t nkey, const char * data, size_t d
     if (! item_size_ok(nkey, 0, datan + 2)) {
       dec_lookers();
       RP_free(key_prot);
-      return MEMCACHED_E2BIG;
+      fprintf(stderr, "MEMCACHED_E2BIG\n");
+      return nullptr;
     } else {
       dec_lookers();
       RP_free(key_prot);
-      return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
+      fprintf(stderr, "MEMCACHED_MEMORY_ALLOCATION_FAILURE\n");
+      return nullptr;
     }
   }
   __thread_stats[stats_id].slab_stats[ITEM_clsid(it)].set_cmds.fetch_add(1);
@@ -950,17 +962,16 @@ pku_memcached_prepend(const char * key, size_t nkey, const char * data, size_t d
   if (store_item(it, NREAD_PREPEND) != STORED){
     dec_lookers();
     RP_free(key_prot);
-    return MEMCACHED_NOTSTORED;
+    fprintf(stderr, "MEMCACHED NOTSTORED\n");
+    return nullptr;
   }
   item_remove(it);
   dec_lookers();
   RP_free(key_prot);
-  return MEMCACHED_STORED;  
+  return it;  
 }
 
-memcached_return_t
-pku_memcached_replace(const char * key, size_t nkey, const char * data, size_t datan,
-    uint32_t exptime, uint32_t flags){
+item* pku_memcached_replace(const char * key, size_t nkey, const char * data, size_t datan, uint32_t exptime, uint32_t flags){
   char * key_prot = (char*)RP_malloc(nkey + datan);
   char * dat_prot = key_prot + nkey;
   memcpy(key_prot, key, nkey);
@@ -972,11 +983,13 @@ pku_memcached_replace(const char * key, size_t nkey, const char * data, size_t d
     if (! item_size_ok(nkey, 0, datan + 2)) {
       dec_lookers();
       RP_free(key_prot);
-      return MEMCACHED_E2BIG;
+      fprintf(stderr, "MEMCACHED_E2BIG\n");
+      return nullptr;
     } else {
       dec_lookers();
       RP_free(key_prot);
-      return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
+      fprintf(stderr, "MEMCACHED_MEMORY_ALLOCATION_FAILURE\n");
+      return nullptr;
     }
   }
   
@@ -992,24 +1005,27 @@ pku_memcached_replace(const char * key, size_t nkey, const char * data, size_t d
     case NOT_FOUND:
       dec_lookers();
       RP_free(key_prot);
-      return MEMCACHED_NOTFOUND;
+      fprintf(stderr, "MEMCACHED_NOTFOUND\n");
+      return nullptr;
     case TOO_LARGE: 
       dec_lookers();
       RP_free(key_prot);
-      return MEMCACHED_E2BIG;
+      fprintf(stderr, "MEMCACHED_E2BIG\n");
+      return nullptr;
     case NO_MEMORY:
       dec_lookers();
       RP_free(key_prot);
-      return MEMCACHED_MEMORY_ALLOCATION_FAILURE;
+      fprintf(stderr, "MEMCACHED_MEMORY_ALLOCATION_FAILURE\n");
+      return nullptr;
     case NOT_STORED:
       dec_lookers();
       RP_free(key_prot);
-      return MEMCACHED_NOTSTORED;
+      fprintf(stderr, "MEMCACHED_NOTSTORED\n");
+      return nullptr;
   }
   item_remove(it);
   dec_lookers();
   RP_free(key_prot);
-  return MEMCACHED_SUCCESS;  
-
+  return it;  
 }
 

@@ -63,7 +63,12 @@ int main(){
   strcpy(qbuff, quality.c_str());
 
   auto t = memcached_set_internal(nbuff, strlen(nbuff), qbuff, strlen(qbuff), 0, 0);
-  printf("success? %d\n", t == MEMCACHED_STORED || t == MEMCACHED_SUCCESS);
+  //printf("success? %d\n", t == MEMCACHED_STORED || t == MEMCACHED_SUCCESS);
+  if(t){
+    printf("success\n");
+  }else{
+    printf("failure\n");
+  }
   memcached_close();
   return 0;
 }

@@ -29,6 +29,11 @@ using rel_time_t = int;
 #include <atomic>
 #include <ralloc.hpp>
 #include <BaseMeta.hpp>
+
+#include "EpochSys.hpp"
+
+using namespace pds;
+
 #define tcd_hash MurmurHash3_x86_32
 /* RPMalloc Root IDs */
 #define MEMCACHED_BITFIELD :1
@@ -169,7 +174,7 @@ struct pthread_args {
   char **argv;
 };
 
-#include "pku_memcached.h"
+//#include "pku_memcached.h"
 #include "constants.h"
 
 void pause_accesses(void);
@@ -183,25 +188,22 @@ pku_memcached_get(const char* key, size_t nkey, char* &buffer, size_t *buffLen,
 memcached_return_t
 pku_memcached_mget(const char * const *keys, const size_t *key_length,
    size_t number_of_keys, item **list);
-memcached_return_t
-pku_memcached_insert(const char* key, size_t nkey, const char * data, size_t datan,
-    uint32_t exptime);
-memcached_return_t
-pku_memcached_set(const char *key, size_t nkey, const char * data, size_t datan,
-    uint32_t exptime);
+
+item* pku_memcached_insert(const char* key, size_t nkey, const char * data, size_t datan, uint32_t exptime);
+
+item* pku_memcached_set(const char *key, size_t nkey, const char * data, size_t datan, uint32_t exptime);
+
 memcached_return_t
 pku_memcached_delete(const char *key, size_t nkey, uint32_t exptime);
+
 memcached_return_t
 pku_memcached_flush(uint32_t exptime);
-memcached_return_t
-pku_memcached_replace(const char *key, size_t nkey, const char * data, size_t datan,
-    uint32_t exptime, uint32_t flags);
-memcached_return_t
-pku_memcached_prepend(const char *key, size_t nkey, const char * data, size_t datan,
-    uint32_t exptime, uint32_t flags);
-memcached_return_t
-pku_memcached_append(const char *key, size_t nkey, const char * data, size_t datan,
-    uint32_t exptime, uint32_t flags);
+
+item* pku_memcached_replace(const char *key, size_t nkey, const char * data, size_t datan, uint32_t exptime, uint32_t flags);
+
+item* pku_memcached_prepend(const char *key, size_t nkey, const char * data, size_t datan, uint32_t exptime, uint32_t flags);
+
+item* pku_memcached_append(const char *key, size_t nkey, const char * data, size_t datan, uint32_t exptime, uint32_t flags);
 
 /*
  * NOTE: If you modify this table you _MUST_ update the function state_text
@@ -397,7 +399,8 @@ extern unsigned stats_id;
 /**
  * Structure for storing items within memcached.
  */
-struct item{
+
+struct item : public PBlk{
   /* Protected by LRU locks */
   pptr<item>      next;
   pptr<item>      prev;
@@ -498,9 +501,7 @@ struct st_st {
 };
 struct st_st *mk_st (enum store_item_type my_sit, size_t my_cas);
 
-enum delta_result_type do_add_delta(const char *key,
-    const size_t nkey, const bool incr,
-    const uint64_t delta, uint64_t *value, const uint32_t hv);
+std::pair<enum delta_result_type, item*> do_add_delta(const char *key,const size_t nkey, const bool incr, const uint64_t delta, uint64_t *value, const uint32_t hv);
 
 std::pair<store_item_type, size_t> do_store_item(item *item, int comm, const uint32_t hv);
 extern int daemonize(int nochdir, int noclose);
@@ -522,9 +523,7 @@ void memcached_thread_init();
 void agnostic_init();
 
 /* Lock wrappers for cache functions that are called from main loop. */
-enum delta_result_type add_delta(const char *key,
-    const size_t nkey, bool incr,
-    const uint64_t delta, uint64_t *value);
+std::pair<enum delta_result_type, item*> add_delta(const char *key, const size_t nkey, bool incr, const uint64_t delta, uint64_t *value);
 
 item *item_alloc(const char * key, size_t nkey, int flags, rel_time_t exptime, int nbytes);
 #define DO_UPDATE true

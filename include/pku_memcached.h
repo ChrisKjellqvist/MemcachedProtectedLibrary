@@ -5,7 +5,8 @@
 #include <stdbool.h>
 #endif
 #include "constants.h"
-
+#include "memcached.h"
+#include "items.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -34,36 +35,36 @@ char * memcached_fetch (
 char * memcached_fetch_internal (const char * key, size_t *key_length, 
     size_t *value_length, uint32_t *flags, memcached_return_t *error);
 
-memcached_return_t memcached_set (memcached_st *ptr, const char * key, 
+item* memcached_set (memcached_st *ptr, const char * key, 
     size_t nkey, const char * data, size_t datan, uint32_t exptime, 
     uint32_t flags); 
-memcached_return_t memcached_set_internal (const char * key, size_t nkey, 
+item* memcached_set_internal (const char * key, size_t nkey, 
     const char * data, size_t datan, uint32_t exptime, uint32_t flags);
 
-memcached_return_t memcached_add (
+item* memcached_add (
     memcached_st *ptr, const char * key, size_t nkey, const char * data, 
     size_t datan, uint32_t exptime, uint32_t flags); 
-memcached_return_t memcached_add_internal (
+item* memcached_add_internal (
     const char * key, size_t nkey, const char * data, size_t datan, 
     uint32_t exptime, uint32_t flags);
 
-memcached_return_t memcached_replace (
+item* memcached_replace (
     memcached_st *ptr, const char * key, size_t nkey, const char * data, 
     size_t datan, uint32_t exptime, uint32_t flags); 
-memcached_return_t memcached_replace_internal (const char * key, size_t nkey, 
+item* memcached_replace_internal (const char * key, size_t nkey, 
     const char * data, size_t datan, uint32_t exptime, uint32_t flags);
 
-memcached_return_t memcached_prepend (
+item* memcached_prepend (
     memcached_st *ptr, const char * key, size_t nkey, const char * data, 
     size_t datan, uint32_t exptime, uint32_t flags); 
-memcached_return_t memcached_prepend_internal (
+item* memcached_prepend_internal (
     const char * key, size_t nkey, const char * data, size_t datan, 
     uint32_t exptime, uint32_t flags);
 
-memcached_return_t memcached_append (
+item* memcached_append (
     memcached_st *ptr, const char * key, size_t nkey, const char * data, 
     size_t datan, uint32_t exptime, uint32_t flags); 
-memcached_return_t memcached_append_internal (
+item* memcached_append_internal (
     const char * key, size_t nkey, const char * data, size_t datan, 
     uint32_t exptime, uint32_t flags);
 
@@ -72,28 +73,22 @@ memcached_return_t memcached_delete (memcached_st *ptr, const char * key,
 memcached_return_t memcached_delete_internal (const char * key, size_t nkey, 
     uint32_t exptime);
 
-memcached_return_t memcached_increment (memcached_st *ptr, const char * key, 
-    size_t nkey, uint64_t delta, uint64_t *value); 
-memcached_return_t memcached_increment_internal (
-    const char * key, size_t nkey, uint64_t delta, uint64_t *value);
+item* memcached_increment(memcached_st *ptr, const char * key, size_t nkey, uint64_t delta, uint64_t *value); 
+item* memcached_increment_internal(const char * key, size_t nkey, uint64_t delta, uint64_t *value);
 
-memcached_return_t memcached_decrement (
-    memcached_st *ptr, const char * key, size_t nkey, uint64_t delta, 
-    uint64_t *value); 
-memcached_return_t memcached_decrement_internal (
-    const char * key, size_t nkey, uint64_t delta, uint64_t *value);
+item* memcached_decrement(memcached_st *ptr, const char * key, size_t nkey, uint64_t delta, uint64_t *value); 
+item* memcached_decrement_internal(const char * key, size_t nkey, uint64_t delta, uint64_t *value);
 
-memcached_return_t memcached_increment_with_initial (
-    memcached_st *ptr, const char * key, size_t nkey, uint64_t delta, 
+item* memcached_increment_with_initial(memcached_st *ptr, const char * key, size_t nkey, uint64_t delta, 
     uint64_t initial, uint32_t exptime, uint64_t *value); 
-memcached_return_t memcached_increment_with_initial_internal (
+item* memcached_increment_with_initial_internal (
     const char * key, size_t nkey, uint64_t delta, uint64_t initial,
     uint32_t exptime, uint64_t *value);
 
-memcached_return_t memcached_decrement_with_initial (
+item* memcached_decrement_with_initial (
     memcached_st *ptr, const char * key, size_t nkey, uint64_t delta,
     uint64_t initial, uint32_t exptime, uint64_t *value);
-memcached_return_t memcached_decrement_with_initial_internal (
+item* memcached_decrement_with_initial_internal (
     const char * key, size_t nkey, uint64_t delta, uint64_t initial, 
     uint32_t exptime, uint64_t *value);
 

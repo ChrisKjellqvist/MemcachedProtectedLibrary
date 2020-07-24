@@ -1,3 +1,5 @@
+#pragma once
+
 #include <pku_memcached.h>
 #include <constants.h>
 #include <memcached.h>
@@ -21,10 +23,7 @@ memcached_fetch_result
   return memcached_fetch_result_internal(result, error);
 }
 
-char*
-memcached_get
-  (memcached_st *ptr, const char *key, size_t key_length, size_t *value_length,
-   uint32_t *flags, memcached_return_t *error){
+char* memcached_get(memcached_st *ptr, const char *key, size_t key_length, size_t *value_length, uint32_t *flags, memcached_return_t *error){
   return memcached_get_internal(key, key_length, value_length, flags, error);
 }
 
@@ -35,38 +34,23 @@ memcached_mget
   return memcached_mget_internal(keys, key_length, number_of_keys);
 }
 
-memcached_return_t
-memcached_set
-  (memcached_st *ptr, const char * key, size_t nkey, const char * data, size_t datan, 
-   uint32_t exptime, uint32_t flags){
+item* memcached_set(memcached_st *ptr, const char * key, size_t nkey, const char * data, size_t datan, uint32_t exptime, uint32_t flags){
   return memcached_set_internal(key, nkey, data, datan, exptime, flags);
 }
 
-memcached_return_t
-memcached_add
-  (memcached_st *ptr, const char * key, size_t nkey, const char * data, size_t datan, 
-   uint32_t exptime, uint32_t flags){
+item* memcached_add(memcached_st *ptr, const char * key, size_t nkey, const char * data, size_t datan, uint32_t exptime, uint32_t flags){
   return memcached_add_internal(key, nkey, data, datan, exptime, flags);
 }
 
-memcached_return_t
-memcached_replace
-  (memcached_st *ptr, const char * key, size_t nkey, const char * data, size_t datan, 
-   uint32_t exptime, uint32_t flags){
+item* memcached_replace(memcached_st *ptr, const char * key, size_t nkey, const char * data, size_t datan, uint32_t exptime, uint32_t flags){
   return memcached_replace_internal(key, nkey, data, datan, exptime, flags);
 }
 
-memcached_return_t
-memcached_append
-  (memcached_st *ptr, const char * key, size_t nkey, const char * data, size_t datan,
-   uint32_t exptime, uint32_t flags){
+item* memcached_append(memcached_st *ptr, const char * key, size_t nkey, const char * data, size_t datan, uint32_t exptime, uint32_t flags){
   return memcached_append_internal(key, nkey, data, datan, exptime, flags);
 }
 
-memcached_return_t
-memcached_prepend
-  (memcached_st *ptr, const char * key, size_t nkey, const char * data, size_t datan,
-   uint32_t exptime, uint32_t flags){
+item* memcached_prepend(memcached_st *ptr, const char * key, size_t nkey, const char * data, size_t datan,uint32_t exptime, uint32_t flags){
   return memcached_prepend_internal(key, nkey, data, datan, exptime, flags);
 }
 
@@ -76,32 +60,21 @@ memcached_delete
   return memcached_delete_internal(key, nkey, exptime);
 }
 
-memcached_return_t
-memcached_increment
-  (memcached_st *ptr, const char * key, size_t nkey, uint64_t delta, uint64_t *value){
+item* memcached_increment(memcached_st *ptr, const char * key, size_t nkey, uint64_t delta, uint64_t *value){
   return memcached_increment_internal(key, nkey, delta, value);
 }
 
-memcached_return_t
-memcached_decrement
-  (memcached_st *ptr, const char * key, size_t nkey, uint64_t delta, uint64_t *value){
+item* memcached_decrement(memcached_st *ptr, const char * key, size_t nkey, uint64_t delta, uint64_t *value){
   return memcached_decrement_internal(key, nkey, delta, value); 
 }
 
-memcached_return_t
-memcached_increment_with_initial
-  (memcached_st *ptr, const char * key, size_t nkey, uint64_t delta, 
-   uint64_t initial, uint32_t exptime, uint64_t *value) {
+item* memcached_increment_with_initial(memcached_st *ptr, const char * key, size_t nkey, uint64_t delta, uint64_t initial, uint32_t exptime, uint64_t *value) {
   return memcached_increment_with_initial_internal(key, nkey, delta, initial,
       exptime, value);
 }
 
-memcached_return_t
-memcached_decrement_with_initial
-  (memcached_st *ptr, const char * key, size_t nkey, uint64_t delta, 
-   uint64_t initial, uint32_t exptime, uint64_t *value) {
-  return memcached_decrement_with_initial_internal(key, nkey, delta, initial, 
-      exptime, value);
+item* memcached_decrement_with_initial(memcached_st *ptr, const char * key, size_t nkey, uint64_t delta, uint64_t initial, uint32_t exptime, uint64_t *value) {
+  return memcached_decrement_with_initial_internal(key, nkey, delta, initial, exptime, value);
 }
 
 memcached_return_t
@@ -190,10 +163,7 @@ HODOR_FUNC_EXPORT(memcached_mget_internal, 3);
 #ifdef USE_HODOR
 HODOR_FUNC_ATTR
 #endif
-memcached_return_t
-memcached_set_internal
-  (const char* key, size_t nkey, const char * data, size_t datan, uint32_t exptime, 
-   uint32_t flags){
+item* memcached_set_internal(const char* key, size_t nkey, const char * data, size_t datan, uint32_t exptime, uint32_t flags){
   assert(run_once && "You must run memcached_init before calling memcached_functions");
   auto q = pku_memcached_set(key, nkey, data, datan, exptime);
   return q;
@@ -205,10 +175,7 @@ HODOR_FUNC_EXPORT(memcached_set_internal, 6);
 #ifdef USE_HODOR
 HODOR_FUNC_ATTR
 #endif
-memcached_return_t
-memcached_add_internal
-  (const char* key, size_t nkey, const char * data, size_t datan, uint32_t exptime,
-   uint32_t flags){
+item* memcached_add_internal(const char* key, size_t nkey, const char * data, size_t datan, uint32_t exptime, uint32_t flags){
   assert(run_once && "You must run memcached_init before calling memcached_functions");
   return pku_memcached_insert(key, nkey, data, datan, exptime);
 } 
@@ -219,10 +186,7 @@ HODOR_FUNC_EXPORT(memcached_add_internal, 6);
 #ifdef USE_HODOR
 HODOR_FUNC_ATTR
 #endif
-memcached_return_t
-memcached_replace_internal
-  (const char* key, size_t nkey, const char * data, size_t datan, uint32_t exptime,
-   uint32_t flags){
+item* memcached_replace_internal(const char* key, size_t nkey, const char * data, size_t datan, uint32_t exptime, uint32_t flags){
   assert(run_once && "You must run memcached_init before calling memcached_functions");
   return pku_memcached_replace(key, nkey, data, datan, exptime, flags);
 } 
@@ -233,9 +197,7 @@ HODOR_FUNC_EXPORT(memcached_replace_internal, 6);
 #ifdef USE_HODOR
 HODOR_FUNC_ATTR
 #endif
-memcached_return_t
-memcached_append_internal(const char * key, size_t nkey, const char * data, size_t datan,
-    uint32_t exptime, uint32_t flags){
+item* memcached_append_internal(const char * key, size_t nkey, const char * data, size_t datan, uint32_t exptime, uint32_t flags){
   assert(run_once && "You must run memcached_init before calling memcached_functions");
   return pku_memcached_append(key, nkey, data, datan, exptime, flags);
 } 
@@ -246,9 +208,7 @@ HODOR_FUNC_EXPORT(memcached_append_internal, 6);
 #ifdef USE_HODOR
 HODOR_FUNC_ATTR
 #endif
-memcached_return_t
-memcached_prepend_internal(const char * key, size_t nkey, const char * data, size_t datan,
-    uint32_t exptime, uint32_t flags){
+item* memcached_prepend_internal(const char * key, size_t nkey, const char * data, size_t datan, uint32_t exptime, uint32_t flags){
   assert(run_once && "You must run memcached_init before calling memcached_functions");
   return pku_memcached_prepend(key, nkey, data, datan, exptime, flags);
 } 
@@ -259,8 +219,8 @@ HODOR_FUNC_EXPORT(memcached_prepend_internal, 6);
 #ifdef USE_HODOR
 HODOR_FUNC_ATTR
 #endif
-memcached_return_t
-memcached_delete_internal(const char* key, size_t nkey, uint32_t exptime){
+
+memcached_return_t memcached_delete_internal(const char* key, size_t nkey, uint32_t exptime){
   assert(run_once && "You must run memcached_init before calling memcached_functions");
   return pku_memcached_delete(key, nkey, exptime);
 } 
@@ -272,15 +232,16 @@ HODOR_FUNC_EXPORT(memcached_delete_internal, 3);
 #ifdef USE_HODOR
 HODOR_FUNC_ATTR
 #endif
-memcached_return_t
-memcached_increment_internal
+
+item* memcached_increment_internal
   (const char* key, size_t nkey, uint64_t delta, uint64_t *value){
   assert(run_once && "You must run memcached_init before calling memcached_functions");
-  switch(add_delta(key, nkey, true, delta, value)){
+  std::pair<enum delta_result_type, item*> ret = add_delta(key, nkey, true, delta, value);
+  switch(ret.first){
     case OK:
-      return MEMCACHED_SUCCESS;
+      return ret.second;
     default:
-      return MEMCACHED_FAILURE;
+      return nullptr;
   }
 } 
 #ifdef USE_HODOR
@@ -291,15 +252,15 @@ HODOR_FUNC_EXPORT(memcached_increment_internal, 4)
 #ifdef USE_HODOR
 HODOR_FUNC_ATTR
 #endif
-memcached_return_t
-memcached_decrement_internal
-  (const char* key, size_t nkey, uint64_t delta, uint64_t *value){
+
+item* memcached_decrement_internal(const char* key, size_t nkey, uint64_t delta, uint64_t *value){
   assert(run_once && "You must run memcached_init before calling memcached_functions");
-  switch (add_delta(key, nkey, false, delta, value)){
+  std::pair<enum delta_result_type, item*> ret = add_delta(key, nkey, true, delta, value);
+  switch (ret.first){
     case OK:
-      return MEMCACHED_SUCCESS;
+      return ret.second;
     default:
-      return MEMCACHED_FAILURE;
+      return nullptr;
   }
 } 
 #ifdef USE_HODOR
@@ -310,22 +271,21 @@ HODOR_FUNC_EXPORT(memcached_decrement_internal, 4);
 #ifdef USE_HODOR
 HODOR_FUNC_ATTR
 #endif
-memcached_return_t
-memcached_increment_with_initial_internal
-  (const char * key, size_t nkey, uint64_t delta, uint64_t initial, uint32_t exptime, 
-   uint64_t *value) {
+
+item* memcached_increment_with_initial_internal(const char * key, size_t nkey, uint64_t delta, uint64_t initial, uint32_t exptime, uint64_t *value) {
   assert(run_once && "You must run memcached_init before calling memcached_functions");
   char *NT;
-  switch(add_delta(key, nkey, true, delta, value)){
+  std::pair<enum delta_result_type, item*> ret = add_delta(key, nkey, true, delta, value);
+  switch(ret.first){
     case OK:
-      return MEMCACHED_SUCCESS;
+      return ret.second;
     case DELTA_ITEM_NOT_FOUND:
       char buff[32];
       NT = itoa_u64(initial, buff);
       *value = initial;
       return pku_memcached_insert(key, nkey, buff, NT-(&*buff), exptime);
     default:
-      return MEMCACHED_FAILURE;
+      return nullptr;
   }
 } 
 #ifdef USE_HODOR
@@ -336,22 +296,21 @@ HODOR_FUNC_EXPORT(memcached_increment_with_initial_internal, 6);
 #ifdef USE_HODOR
 HODOR_FUNC_ATTR
 #endif
-memcached_return_t
-memcached_decrement_with_initial_internal
-  (const char * key, size_t nkey, uint64_t delta, uint64_t initial, uint32_t exptime, 
-   uint64_t *value) {
+
+item* memcached_decrement_with_initial_internal(const char * key, size_t nkey, uint64_t delta, uint64_t initial, uint32_t exptime, uint64_t *value) {
   assert(run_once && "You must run memcached_init before calling memcached_functions");
   char *NT;
-  switch(add_delta(key, nkey, false, delta, value)){
+  std::pair<enum delta_result_type, item*> ret = add_delta(key, nkey, false, delta, value);
+  switch(ret.first){
     case OK:
-      return MEMCACHED_SUCCESS;
+      return ret.second;
     case DELTA_ITEM_NOT_FOUND:
       char buff[32];
       NT = itoa_u64(initial, buff);
       *value = initial;
       return pku_memcached_insert(key, nkey, buff, NT-(&*buff), exptime);
     default:
-      return MEMCACHED_FAILURE;
+      return nullptr;
   }
 } 
 #ifdef USE_HODOR

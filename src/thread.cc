@@ -188,11 +188,9 @@ void item_unlink(item *item) {
 /*
  * Does arithmetic on a numeric item value.
  */
-enum delta_result_type add_delta(const char *key,
-                                 const size_t nkey, bool incr,
-                                 const uint64_t delta, uint64_t *value) {
-    enum delta_result_type ret;
+std::pair<enum delta_result_type, item*> add_delta(const char *key, const size_t nkey, bool incr, const uint64_t delta, uint64_t *value) {
     uint32_t hv;
+    std::pair<enum delta_result_type, item*> ret;
 
     hv = tcd_hash(key, nkey);
     item_lock(hv);
