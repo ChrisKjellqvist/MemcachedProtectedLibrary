@@ -424,7 +424,7 @@ struct item : public PBlk{
   /* then null-terminated key */
   /* then " flags length\r\n" (no terminating null) */
   /* then data with terminating \r\n (no terminating null; it's binary!) */
-};
+}__attribute__((aligned(CACHELINE_SIZE)));;
 
 // TODO: If we eventually want user loaded modules, we can't use an enum :(
 enum crawler_run_type {

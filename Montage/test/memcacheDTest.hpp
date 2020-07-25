@@ -51,40 +51,42 @@ public:
         traces = new vector<std::string>* [gtc->task_num];
         for(int i=0;i<gtc->task_num;i++){
             traces[i] = new vector<std::string>();
-            traces[i]->push_back("hello");
+            std::ifstream infile("data");
+            std::string cmd;
+            while(getline(infile, cmd)){
+                traces[i]->push_back(cmd);
+            }
         }
         /* set interval to inf so this won't be killed by timeout */
         gtc->interval = numeric_limits<double>::max();
     }
     void operation(const std::string& t, int tid, bool rm = false){
+
         char nbuff[64];
         char qbuff[64];
-        strcpy(nbuff, t.c_str());
-        strcpy(qbuff, value_buffer.c_str());
-
-        std::cout << "size of PBlk is " << sizeof(PBlk) << std::endl; 
-        std::cout << "size of item is " << sizeof(item) << std::endl;
-        
-
-        std::cout << "key length is " << strlen(nbuff) << std::endl;
-        std::cout << "value length is " << strlen(qbuff) << std::endl;
-        auto ret = montage_put(nbuff, strlen(nbuff), qbuff, strlen(qbuff), 0, 0);
-        if(ret == MEMCACHED_SUCCESS){
-            std::cout << "success" << std::endl;
-        }else{
-            std::cout << "fails" << std::endl;
-        }
-        
-        char buff[64];
         size_t len;
         uint32_t flags;
         memcached_return_t err;
+        
+        strcpy(qbuff, value_buffer.c_str());
 
-        char* k = montage_get(nbuff, strlen(nbuff), &len, &flags, &err);
-        if( err == MEMCACHED_SUCCESS){
-            std::cout << k << std::endl;
-        }else{
-            std::cout << "fails" << std::endl;
+        string tag = t.substr(0, 3);
+        if (tag == "Add" && rm){
+            strcpy(nbuff, t.substr(4).c_str());
+            auto ret = montage_put(nbuff, strlen(nbuff), qbuff, strlen(qbuff), 0, 0);
+            if(ret == MEMCACHED_SUCCESS){
+                std::cout << "success" << std::endl;
+            }else{
+                std::cout << "fails" << std::endl;
+            }
+        } else{// Update
+            strcpy(nbuff, t.substr(4).c_str());
+            char* k = montage_get(nbuff, strlen(nbuff), &len, &flags, &err);
+            if( err == MEMCACHED_SUCCESS){
+                std::cout << k << std::endl;
+            }else{
+                std::cout << "fails" << std::endl;
+            }
         }
     }
 
